@@ -29,6 +29,7 @@ import {
 } from '../../lib/api';
 import GlassCard from '../../components/GlassCard';
 import { confirmWithFallback } from '../../lib/dialogs';
+import LayerHierarchyPanel from './LayerHierarchyPanel';
 
 const isAbortError = (error) =>
   Boolean(
@@ -763,6 +764,10 @@ export default function MemoryBrowser() {
                       ) : null}
                     </div>
                   )}
+                </GlassCard>
+
+                <GlassCard className="p-6">
+                  <LayerHierarchyPanel />
                 </GlassCard>
               </>
             )}

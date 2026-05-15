@@ -44,6 +44,9 @@
 | `/maintenance/*` | 所有请求 | `backend/api/maintenance.py` — `require_maintenance_api_key` 作为路由依赖 |
 | `/review/*` | 所有请求 | `backend/api/review.py` — 导入并依赖同一鉴权函数 |
 | `/browse/*` | 所有请求（含读操作） | `backend/api/browse.py` — 路由统一挂载 `Depends(require_maintenance_api_key)` |
+| `/api/layering/*` | 所有请求 | `backend/api/layering.py` — 路由统一依赖同一鉴权函数 |
+| `/api/forgetting/*` | 所有请求 | `backend/api/forgetting.py` — 路由统一依赖同一鉴权函数 |
+| `/search/quality-metrics` | 所有请求 | `backend/api/search_quality.py` — 搜索质量面板接口，仍需维护 key |
 | SSE 接口 | `/sse` 与 `/messages` | `backend/run_sse.py` — 可复用 ASGI 鉴权中间件与 SSE transport，既可被 standalone `run_sse.py` 使用，也可被 `backend/main.py` 挂载 |
 
 > 📖 `/browse/node` 的 `GET` 请求也在鉴权范围内，请携带 `X-MCP-API-Key` 或 `Authorization: Bearer`。
@@ -127,6 +130,9 @@ Authorization: Bearer <MCP_API_KEY>
 - `backend/tests/test_reflection_workflow_api.py` — 验证 reflection rollback 在已知 `session_id` 时会继续做一致性校验，只带 `job_id` 时会先恢复原始 `session_id`，并在 review rollback 后继续做 best-effort namespace cleanup
 - `backend/tests/test_reflection_observability_summary.py` — 验证 `reflection_workflow` 统计在 summary 层是 restart-stable
 - `backend/tests/test_setup_api.py` — 验证 `openai` embedding backend、远端 `RETRIEVAL_EMBEDDING_DIM` 显式必填、`/setup/status` 默认汇总与运行时默认值一致，以及 setup fail-closed 边界
+- `backend/tests/test_layering_engine.py` / `backend/tests/test_forgetting_engine.py` — 验证 L2 read-only、遗忘候选与 archive 人工确认边界
+- `backend/tests/test_sse_deploy_contracts.py` — 验证 Docker 前端代理只给受保护路由注入 `X-MCP-API-Key`，并覆盖 `/api/layering/*`、`/api/forgetting/*`、`/api/search/quality-metrics`
+- `backend/tests/test_artifact_stripper.py` / `backend/tests/test_prompt_cache_adapter.py` — 验证 opt-in adapter 默认 no-op，只有 env flag + host capability 同时满足才生效
 - `frontend/src/App.test.jsx` — 验证 proxy-held auth 已生效时首启向导不误弹
 - `frontend/src/features/memory/MemoryBrowser.test.jsx` — 验证 `confirm()` 不可用时 Memory 页 fail-closed
 
@@ -151,7 +157,7 @@ Authorization: Bearer <MCP_API_KEY>
 
 1. `readRuntimeMaintenanceAuth()` 读取 `window.__MEMORY_PALACE_RUNTIME__`
 2. axios 请求拦截器 `isProtectedApiRequest()` 判断请求是否需要鉴权
-3. 对 `/maintenance/*`、`/review/*`、`/browse/*` 以及新的 `/setup/*` 自动注入鉴权头
+3. 对 `/maintenance/*`、`/review/*`、`/browse/*`、`/setup/*`、`/layering/*`、`/forgetting/*` 以及 `/search/quality-metrics` 自动注入鉴权头
 4. Observability 订阅 `/sse` 时也会复用这套鉴权：没有浏览器侧 Dashboard key 时继续走原生 `EventSource`；有 key 时切到可带 header/bearer 的 fetch-based SSE，这样不会把 key 拼到 URL 里；而且每次重连都会重新读取当前浏览器里的 Dashboard 鉴权，并继续带上 `Last-Event-ID`；明确的 `4xx` 鉴权失败则会停止重试。现在只要浏览器侧 Dashboard 鉴权被修改、清空，前端还会额外发出一条 maintenance-auth 变更事件；Observability 会利用这条事件，再加上重新聚焦标签页时的检查，在鉴权变更后或终态 `401` 之后重建带鉴权的连接。
 
 > 兼容性：也支持旧字段名 `window.__MCP_RUNTIME_CONFIG__`（见 `frontend/src/lib/api.js` 中的 runtime config fallback 逻辑）。
@@ -180,6 +186,7 @@ Authorization: Bearer <MCP_API_KEY>
 - provider API base 字段现在会先做归一化和校验：`/embeddings`、`/rerank`、`/chat/completions`、`/responses` 这类常见尾缀会自动去掉；格式不对、带凭证、或指到 link-local 的地址会直接拒绝。`127.0.0.1` / `::1` 这类 loopback IP 字面量，再加上 `localhost`，仍然默认允许；如果你故意指到其它 private IP 字面量，或者指到一个解析后会落到 private 非 loopback 地址的 hostname，还要通过 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` 显式放行。
 - 当前运行时如果读到无效的 `chat / embedding / reranker` API base，也会按 fail-closed 处理：直接忽略这条配置并走降级/回退，不会继续拿这类地址发请求。
 - Memory 页在确认弹窗不可用时也会保持同样的 fail-closed 边界：不会继续执行删除或跳转，而是直接拦下动作并给出页内提示。
+- `ArtifactStripper` 与 `PromptCacheAdapter` 都是 opt-in adapter。前者需要 `ARTIFACT_STRIPPING_ENABLED` 和 host capability `can_strip_tool_artifacts=true` 同时满足；后者需要 `PROMPT_CACHE_SPLIT_ENABLED` 和 `can_set_system_context=true` 同时满足。默认情况下它们都保持 no-op，不会改变 `read_memory("system://boot")` 或 MCP 工具返回契约。
 
 **新增测试锚点：**
 
@@ -214,7 +221,7 @@ Authorization: Bearer <MCP_API_KEY>
 |---|---|---|
 | 非 root 运行（后端） | `groupadd --gid 10001 app && useradd --uid 10001` | `deploy/docker/Dockerfile.backend` |
 | 非 root 运行（前端） | 使用 `nginxinc/nginx-unprivileged:1.27-alpine` 基础镜像 | `deploy/docker/Dockerfile.frontend` |
-| 前端代理鉴权 | 由 Nginx 在服务端转发 `X-MCP-API-Key`，浏览器侧不保存真实 key；当前仅对受保护的 `/api/maintenance/*`、`/api/review/*`、`/api/browse/*`、`/api/setup/*` 以及 `/sse` / `/messages` 路径注入该头，通用 `/api/*` 不再一律附加；生成配置前会先转义代理持有 key 里的特殊字符 | `deploy/docker/nginx.conf.template` |
+| 前端代理鉴权 | 由 Nginx 在服务端转发 `X-MCP-API-Key`，浏览器侧不保存真实 key；当前仅对受保护的 `/api/maintenance/*`、`/api/review/*`、`/api/browse/*`、`/api/setup/*`、`/api/layering/*`、`/api/forgetting/*`、精确 `/api/search/quality-metrics` 以及 `/sse` / `/messages` 路径注入该头，通用 `/api/*` 不再一律附加；生成配置前会先转义代理持有 key 里的特殊字符 | `deploy/docker/nginx.conf.template` |
 | 禁止提权 | `security_opt: no-new-privileges:true` | `docker-compose.yml` |
 | 数据持久化 | Docker Volumes 默认按 compose project 隔离：`<compose-project>_data` → `/app/data`，`<compose-project>_snapshots` → `/app/snapshots` | `docker-compose.yml` |
 | 健康检查（后端） | `python /usr/local/bin/backend-healthcheck.py`；脚本内部会请求 `http://127.0.0.1:8000/health`，并要求返回 payload 的 `status == "ok"`；请求超时可通过 `MEMORY_PALACE_BACKEND_HEALTHCHECK_TIMEOUT_SEC` 调整。backend 镜像现在也会把这条检查接进 Docker `HEALTHCHECK` | `docker-compose.yml` 中的 `backend.healthcheck`、`deploy/docker/backend-healthcheck.py`、`deploy/docker/Dockerfile.backend` |

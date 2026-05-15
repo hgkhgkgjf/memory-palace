@@ -161,6 +161,18 @@ A filter toolbar sits above the child list:
 
 > If you are editing the current node and then click a breadcrumb or a child card, the page asks whether you want to discard the unsaved edits first.
 
+### 🧱 Layer Hierarchy
+
+The Memory page now also includes a **Layer Hierarchy** panel for quickly reading the L0 / L1 / L2 relationship.
+
+- L0 is the entry layer: roots and domains
+- L1 is the concrete memory-node layer
+- L2 is a summary derived from multiple L1 memories
+
+You can expand an L2 summary to see which source memories produced it and whether the current source content still matches the hash captured at derivation time. The current “generate summary” path returns a draft preview only; opening the panel does not silently write a new summary into the database.
+
+> If the panel shows a sample / mock badge, the backend has no real L2 data to show yet. The page is using placeholder data to explain the layout and interaction, not claiming that a real summary has already been generated.
+
 ---
 
 ## 📋 Review Page
@@ -289,6 +301,17 @@ Each card can be expanded to view full content. Diff details only appear when th
 
 > If confirm fails because the phrase was wrong, the key was rejected, or the request just timed out or dropped before the backend used that prepared batch, the prepared review stays on the page so you can fix the problem and retry instead of preparing the whole batch again.
 
+### 🧠 Forgetting Simulation and Archive Candidates
+
+The Maintenance page also includes a **Forgetting** panel for previewing which memories would fall below a threshold after N more days.
+
+- **Decay simulation** is read-only and does not modify the database
+- **Candidate queue** lists low-vitality memories that still need human review
+- **Keep** only removes the item from the current queue; it does not delete content
+- **Archive** requires prepare first, then an exact confirmation phrase; the backend marks the original memory deprecated and writes an archive row instead of hard-deleting it
+
+> The rule is simple: the system can find candidates, but it cannot forget for you. Any archive write requires human confirmation.
+
 ---
 
 ## 📊 Observability Page
@@ -319,6 +342,14 @@ The subtitle reads: *Track search latency, degrade reasons, cache hits, and inde
 > **What is "Rebuild Index"?** It submits a rebuild request to the backend. Use it when the index may be out of date or search quality looks wrong. Think of it as asking the backend to rebuild the table of contents.
 
 > **What is "Sleep Consolidation"?** It submits a consolidation job request to the backend. Its goal is to help the system reorganize fragmented memory records, but the exact effect still depends on backend policy and current runtime state.
+
+### 📈 Search Quality Panel
+
+The new **Search Quality** panel on the Observability page shows MRR, Recall, p95, channel contribution, and RRF status by retrieval mode.
+
+The backend endpoint is real and authenticated, but labelled quality samples are not persisted yet. For that reason it explicitly returns `is_mock=true` / `status=unavailable`; any MRR / Recall values shown as examples are only there to show the panel shape, not to claim a real benchmark or production quality result.
+
+> For real retrieval numbers that can be cited, use the public benchmark wording in [EVALUATION_EN.md](EVALUATION_EN.md).
 
 ### 🔎 Search Console
 

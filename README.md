@@ -60,12 +60,13 @@ If you want the AI to guide installation step by step, start with the standalone
 - **Repo-local wrapper rejects more local sqlite misconfigurations now**: the built-in Python and shell wrappers now normalize common slash and case variants, reject relative sqlite paths, and also decode common percent-escaped container paths before deciding whether a local `DATABASE_URL` still points at Docker-internal `/app/...` or `/data/...`. In practice, values such as `sqlite+aiosqlite:///demo.db`, `sqlite+aiosqlite://///app/data/...`, and `sqlite+aiosqlite:////%2Fapp%2Fdata/...` are no longer accepted by accident.
 - **Docker base images are pinned more tightly now**: the repository Dockerfiles now keep explicit digest pins on the shipped base images, so rebuilds are less likely to drift just because an upstream tag moved.
 - **GHCR release images now self-check the backend health helper**: the backend image now ships a Docker-level `HEALTHCHECK`, `docker-compose.ghcr.yml` keeps the backend bound to `0.0.0.0`, and the publish workflow now verifies `/usr/local/bin/backend-healthcheck.py` before it pushes a new backend image.
-- **The current validation snapshot is based on fresh reruns in this session**: backend tests are now `1136 passed, 22 skipped`; frontend is now `198 passed`; frontend build and typecheck both passed; repo-local live MCP e2e was rerun and remains full `PASS`. Earlier in the same session, a repo-local macOS `Profile B` browser smoke, a Docker readiness/auth recheck (`/` = `200`, `/health` = `200`, protected setup/SSE requests still fail-closed), and a smaller real A/B/C/D rerun on `BEIR NFCorpus` (`sample_size=5`, `Profile D` Phase 6 Gate still `PASS`) were also completed. The narrower 2026-04-18 benchmark tables below were **not** recalculated in this final doc-sync pass. Docker one-click `Profile C/D`, plus native Windows and native Linux host runtime paths, still keep explicit target-environment recheck boundaries.
+- **The current validation wording separates old full-suite checks from the latest Docker rerun**: the earlier 2026-04 validation snapshot had backend `1136 passed, 22 skipped`, frontend `198 passed`, frontend build/typecheck, and repo-local live MCP e2e passing. The 2026-05-15 follow-up reran Docker/Linux `Profile B/C/D`: `Profile B` used the project's existing settings, while `Profile C/D` used explicit runtime injection with a 1024-dimension external embedding/reranker setup. B/C/D all passed health/SSE/browser smoke, and C/D also passed create/search/delete with `degrade_reasons=None`. The benchmark tables below were not recalculated in that follow-up.
 - **Public MCP contracts are stricter now**: the MCP boundary now rejects control/invisible/surrogate URI characters, blocks overlong `search_memory` / `create_memory` / `update_memory` payloads before DB work starts, and keeps percent-encoded memory URIs predictable: literal percent sequences remain valid path text, existing memories can also be resolved through decoded path variants such as encoded spaces or slashes, and percent-decoded Windows filesystem paths such as `C%3A/...` are rejected as invalid memory URIs. `add_alias` also rolls back the alias path if snapshot capture fails after the DB write.
 - **Search fail-closed behavior is tighter now**: if final path revalidation itself blows up, `search_memory` now drops that result instead of fail-opening with stale data, and surfaces the degradation in the response. Unsafe FTS control syntax (`AND` / `OR` / `NOT` / `NEAR` or wildcard-heavy forms) now falls back per request instead of steering query semantics or surfacing a noisy `fts_query_invalid` for normal user text. Fast-tier temporal queries also keep the fast candidate cap, and the keyword LIKE fallback now escapes literal `%` / `_` instead of treating them as accidental wildcards.
 - **Private provider targets are no longer implicitly trusted**: loopback IP literals such as `127.0.0.1` / `::1`, plus `localhost`, still work out of the box, but other private IP literals, and hostnames that resolve to private non-loopback addresses, now require an explicit allowlist entry through `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`. Link-local and malformed targets remain fail-closed.
 - **SQLite startup and index repair are tighter now**: existing on-disk SQLite files now fail closed during init if `PRAGMA quick_check(1)` does not return `ok`, bootstrap indexing now repairs active memories that are missing FTS rows as well as ones missing chunk rows, and permanent memory deletion now clears chunk/vector/FTS rows for that memory instead of leaving index remnants behind.
 - **Dashboard writes and reflection are wired together now**: Dashboard `/browse/node` writes now feed the reflection workflow summary, so `/maintenance/learn/reflection` no longer gets stuck on `session_summary_empty` just because the change came from the Dashboard surface.
+- **The Dashboard now has layer, forgetting, and search-quality panels**: Memory shows an L0/L1/L2 hierarchy panel, Maintenance shows forgetting simulation and reviewed archive candidates, and Observability shows Search Quality. Search Quality is a real authenticated endpoint, but it still reports `is_mock=true` / `status=unavailable` until labelled quality samples are persisted.
 - **Reflection rollback is less ambient and more auditable now**: reflection rollback no longer depends on an ambient session. When callers already know `session_id`, the backend still verifies that `session_id` (and `actor_id` when supplied) against the learn job before deleting anything; when rollback only carries a learn `job_id`, the backend now recovers the stored `session_id` from that job for backward compatibility. Explicit blank or whitespace-only `session_id` values still fail closed, and the workflow still records one `reflection_workflow` rollback event instead of double-counting. If the execute path has to roll back through a review snapshot, the backend now also does best-effort namespace cleanup for the auto-created reflection path.
 - **Review snapshot cleanup is less likely to grow forever**: after a successful snapshot write, the backend now does conservative session-level retention by age/count, while still protecting the current session and skipping old sessions whose lock cannot be acquired safely.
 - **Reflection background cleanup is tighter now**: concurrent `prepare` requests with the same session, source, reason, and content still reuse the same prepared review, and if the last waiter goes away before the shared prepare finishes, the backend now cancels that abandoned background task instead of letting it keep running.
@@ -82,7 +83,7 @@ If you want the AI to guide installation step by step, start with the standalone
 - **Docker frontend readiness is less proxy-sensitive now**: the frontend container healthcheck now explicitly unsets inherited proxy env before it probes `127.0.0.1:8080`, so a host or compose proxy is less likely to keep `depends_on` waiting on a page that is already healthy.
 - **Docker one-click port probing is less naive now**: when the shell path falls back to its Python socket probe, it now checks the wildcard bind (`0.0.0.0`) instead of only `127.0.0.1`, so a port already occupied on another local host IP is less likely to be treated as free.
 - **Real benchmark artifacts are stricter about degradation truth**: the real A/B/C/D runner now records both query-time and index-time degradation, and Profile D no longer looks clean when reranker config is missing or the reranker response is invalid.
-- **Benchmark artifacts are easier to keep isolated now**: the benchmark helpers now default to `backend/tests/benchmark/artifacts/<run-token>/...`, and still accept explicit `artifact_dir` overrides, so parallel reruns are less likely to overwrite each other by accident.
+- **Benchmark artifacts are easier to keep isolated now**: the benchmark helpers now default to the system temp directory under `memory-palace-benchmark-artifacts/<run-token>/...`, and still accept explicit `artifact_dir` / `BENCHMARK_ARTIFACT_DIR` overrides, so parallel reruns are less likely to overwrite each other or dirty the worktree.
 - **Local validation reports leak less**: skill / MCP smoke reports now redact common secret-like values and session tokens, and use private file permissions where the host supports them.
 - **Pre-publish checks are stricter about local-only artifacts now**: `scripts/pre_publish_check.sh` now blocks tracked `.audit` / `.playwright-mcp` artifacts, scans tracked files for local-only endpoint/key patterns such as `sk-local-*` and loopback/private provider bases with ports, and ignores the repository's own frontend loopback health probe instead of treating it as a false leak.
 - **Observability success messages stay localized now**: the Dashboard no longer mixes raw English `job` / `sync` fragments into zh-CN success banners for rebuild, sleep-consolidation, or retry actions.
@@ -294,22 +295,28 @@ If you want a page-by-page walkthrough of the Dashboard, see [Dashboard User Gui
 memory-palace/
 ├── backend/
 │   ├── main.py                 # FastAPI entrypoint; registers Review/Browse/Maintenance/Setup routes
-│   ├── mcp_server.py           # 9 MCP tools + snapshot logic + URI parsing
+│   ├── mcp_server.py           # MCP public entrypoint; 9 tool signatures stay compatible
 │   ├── runtime_state.py        # Write Lane queue, Index Worker, vitality decay scheduler
 │   ├── run_sse.py              # SSE transport layer with API Key auth gating
 │   ├── requirements.txt        # Backend runtime dependencies
 │   ├── requirements-dev.txt    # Backend test dependencies
 │   ├── db/
-│   │   └── sqlite_client.py    # Schema definition, CRUD, retrieval, Write Guard, Gist
-│   ├── api/                    # REST routers: review, browse, maintenance, setup
+│   │   ├── sqlite_client.py    # Compatibility facade for CRUD, retrieval, Write Guard, Gist
+│   │   ├── models.py           # SQLAlchemy models
+│   │   ├── repositories/       # Split data access helpers
+│   │   └── search/             # FTS5/vector/RRF/entity boost channels
+│   ├── core/                   # MemoryCore facade, layering/forgetting/compression/procedural engines
+│   ├── api/                    # REST routers: review, browse, maintenance, setup, layering, forgetting, search quality
+│   ├── mcp/                    # Tool re-export wrappers, system views, host adapters
+│   ├── security/               # Sanitizers and opt-in artifact stripping
 ├── frontend/
 │   └── src/
 │       ├── App.jsx             # Routing and page scaffold
 │       ├── features/
-│       │   ├── memory/         # MemoryBrowser.jsx — tree browser, editor, Gist view
+│       │   ├── memory/         # MemoryBrowser.jsx + LayerHierarchyPanel.jsx
 │       │   ├── review/         # ReviewPage.jsx — diff comparison, rollback, integrate
-│       │   ├── maintenance/    # MaintenancePage.jsx — vitality cleanup tasks
-│       │   └── observability/  # ObservabilityPage.jsx — retrieval & task monitoring
+│       │   ├── maintenance/    # MaintenancePage.jsx + ForgettingPanel.jsx
+│       │   └── observability/  # ObservabilityPage.jsx + SearchQualityPanel.jsx
 │       └── lib/
 │           └── api.js          # Unified API client with runtime auth injection
 ├── deploy/
@@ -945,9 +952,11 @@ Full guides:
 | C | 1.000 | 1.000 | 1.000 | 666.607 |
 | D | 1.000 | 1.000 | 1.000 | 1261.532 |
 
-> In the same session, Docker `Profile B` smoke, repo-local live MCP e2e, and the real A/B/C/D benchmark were also rerun. Native Windows and native Linux host runtime paths were not rerun in this round.
+> In the earlier 2026-04 session, Docker `Profile B` smoke, repo-local live MCP e2e, and the real A/B/C/D benchmark were also rerun. Native Windows and native Linux host runtime paths were not rerun in that round.
 >
 > Follow-up note (2026-04-21): after the regression-fix reruns, the repository reran the full backend suite (`1136 passed, 22 skipped`), the full frontend suite (`198 passed`), frontend build/typecheck, and repo-local live MCP e2e (`docs/skills/MCP_LIVE_E2E_REPORT.md`, full `PASS`). Earlier in the same session, the Docker readiness/auth recheck (`/` `200`, `/health` `200`, protected setup/SSE requests still fail-closed), the repo-local `Profile B` browser smoke, and a smaller real A/B/C/D rerun on `BEIR NFCorpus` (`sample_size=5`, `Profile D` gate still `PASS`) were also completed. The narrower benchmark table above itself was not recalculated in that final doc-sync pass.
+>
+> Follow-up note (2026-05-15): Docker/Linux `Profile B/C/D` were rerun. B used the project defaults; C/D used explicit runtime injection with 1024-dimension external embedding/reranker settings. Health, SSE, and browser smoke passed for all three; C/D create/search/delete also passed with `degrade_reasons=None`. The table above was not recalculated in that follow-up.
 
 ### Retrieval Quality — A/B/C/D Real Run
 
@@ -1143,7 +1152,7 @@ Real-time search query monitoring, retrieval quality insights, and task queue st
 - All API keys in documentation use placeholders only
 - HTTP/SSE auth is **fail-closed** by default: protected endpoints return `401` when `MCP_API_KEY` is missing or invalid
 - This gate applies only to HTTP/SSE interfaces; `stdio` mode is unaffected
-- Docker one-click deployment forwards auth headers at the server-side proxy, so the browser does not receive the real `MCP_API_KEY`
+- Docker one-click deployment forwards auth headers at the server-side proxy for protected Dashboard API routes, so the browser does not receive the real `MCP_API_KEY`
 - Local bypass requires explicit opt-in: `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` (loopback only)
 - The Setup Assistant's local `.env` write path is stricter than that loopback read bypass: it only targets project-local `.env*` files, stays direct-loopback-only, requires a non-empty Dashboard key on the first local save, and once the backend already has `MCP_API_KEY` configured, even loopback writes must carry a valid key
 - Provider API bases written through the assistant are normalized and validated before save: common suffixes such as `/embeddings`, `/rerank`, and `/chat/completions` are trimmed, malformed or link-local targets are rejected, loopback IP literals such as `127.0.0.1` / `::1` plus `localhost` stay allowed, and other private IP literals, plus hostnames that resolve to private non-loopback addresses, require `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`

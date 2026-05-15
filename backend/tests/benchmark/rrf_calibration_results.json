@@ -1,0 +1,121 @@
+{
+  "calibrated_at": "2026-05-15",
+  "corpus_size": 50,
+  "query_set_size": 20,
+  "k_values_tested": [
+    5,
+    10,
+    20,
+    40,
+    60
+  ],
+  "results": {
+    "5": {
+      "mrr_at_8": 0.975,
+      "recall_at_8": 1.0,
+      "ndcg_at_8": 0.981546,
+      "p95_ms": 2.563,
+      "avg_ms": 2.249,
+      "queries_evaluated": 20,
+      "queries_with_hit": 20,
+      "degraded_query_count": 3
+    },
+    "10": {
+      "mrr_at_8": 0.975,
+      "recall_at_8": 1.0,
+      "ndcg_at_8": 0.981546,
+      "p95_ms": 2.862,
+      "avg_ms": 2.503,
+      "queries_evaluated": 20,
+      "queries_with_hit": 20,
+      "degraded_query_count": 3
+    },
+    "20": {
+      "mrr_at_8": 0.975,
+      "recall_at_8": 1.0,
+      "ndcg_at_8": 0.981546,
+      "p95_ms": 3.684,
+      "avg_ms": 2.597,
+      "queries_evaluated": 20,
+      "queries_with_hit": 20,
+      "degraded_query_count": 3
+    },
+    "40": {
+      "mrr_at_8": 0.975,
+      "recall_at_8": 1.0,
+      "ndcg_at_8": 0.981546,
+      "p95_ms": 3.421,
+      "avg_ms": 2.624,
+      "queries_evaluated": 20,
+      "queries_with_hit": 20,
+      "degraded_query_count": 3
+    },
+    "60": {
+      "mrr_at_8": 0.975,
+      "recall_at_8": 1.0,
+      "ndcg_at_8": 0.981546,
+      "p95_ms": 2.891,
+      "avg_ms": 2.545,
+      "queries_evaluated": 20,
+      "queries_with_hit": 20,
+      "degraded_query_count": 3
+    }
+  },
+  "baseline_comparison": {
+    "weighted_fusion_keyword": {
+      "mrr_at_8": 0.85,
+      "recall_at_8": 0.85,
+      "ndcg_at_8": 0.85,
+      "p95_ms": 2.123,
+      "avg_ms": 1.419,
+      "queries_evaluated": 20,
+      "queries_with_hit": 17,
+      "degraded_query_count": 0
+    },
+    "weighted_fusion_semantic": {
+      "mrr_at_8": 0.485,
+      "recall_at_8": 0.55,
+      "ndcg_at_8": 0.500889,
+      "p95_ms": 4.039,
+      "avg_ms": 3.468,
+      "queries_evaluated": 20,
+      "queries_with_hit": 11,
+      "degraded_query_count": 0
+    },
+    "weighted_fusion_hybrid": {
+      "mrr_at_8": 0.9,
+      "recall_at_8": 0.9,
+      "ndcg_at_8": 0.9,
+      "p95_ms": 3.828,
+      "avg_ms": 3.107,
+      "queries_evaluated": 20,
+      "queries_with_hit": 18,
+      "degraded_query_count": 0
+    }
+  },
+  "recommendation": {
+    "optimal_k": 5,
+    "reason": "composite=0.6*MRR+0.3*Recall+0.1*NDCG=0.9832; p95=2.563ms",
+    "feature_flag_default": false,
+    "notes": "RRF stays OFF by default (C5). Operators enable it via RRF_ENABLED=true after replicating this calibration."
+  },
+  "adaptive_formula": {
+    "formula": "k = clamp(2 * max_channel_depth, 10, 60)",
+    "max_channel_depth_proxy": 32,
+    "suggested_k": 60,
+    "notes": "max_channel_depth is approximated by max_results * candidate_multiplier for this calibration run. Production code can plug in the live channel depth at query time (e.g. observed candidate pool size)."
+  },
+  "environment": {
+    "max_results": 8,
+    "candidate_multiplier": 4,
+    "embedding_backend": "hash",
+    "embedding_dim": "64",
+    "channels": [
+      "fts5",
+      "vector"
+    ],
+    "entity_channel_excluded": true,
+    "entity_channel_note": "C6: entity channel is reserved for future rerank boost and is NOT part of the equal-weight RRF fusion."
+  },
+  "results_path": "tests/benchmark/rrf_calibration_results.json"
+}

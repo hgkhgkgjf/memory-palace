@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Union
 from urllib.parse import unquote
 from filelock import FileLock, Timeout
 
@@ -132,8 +132,17 @@ class MigrationRunner:
         """Apply all pending migrations and return applied versions."""
         return await asyncio.to_thread(self._apply_pending_sync)
 
-    def _apply_pending_sync(self) -> List[str]:
+    def _apply_pending_sync(
+        self, versions: Optional[Sequence[str]] = None
+    ) -> List[str]:
         migration_files = self._discover_migrations()
+        if versions is not None:
+            wanted_versions = set(versions)
+            migration_files = [
+                migration
+                for migration in migration_files
+                if migration.version in wanted_versions
+            ]
         if not migration_files:
             return []
         if self.database_file is None:

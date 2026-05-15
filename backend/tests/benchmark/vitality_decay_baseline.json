@@ -1,0 +1,93 @@
+{
+  "config": {
+    "half_life_days": 30.0,
+    "min_score": 0.05,
+    "cleanup_threshold": 0.35,
+    "cleanup_inactive_days": 14.0,
+    "reinforce_delta": 0.08
+  },
+  "decay_result": {
+    "applied": true,
+    "day": "2026-05-14",
+    "checked_memories": 7,
+    "updated_memories": 6,
+    "low_vitality_count": 4,
+    "half_life_days": 30.0,
+    "threshold": 0.35
+  },
+  "per_memory": [
+    {
+      "title": "fresh_zero_age",
+      "initial_score": 1.0,
+      "age_days": 0.0,
+      "access_count": 0,
+      "expected_score": 1.0,
+      "observed_score": 1.0,
+      "delta": 0.0
+    },
+    {
+      "title": "half_life",
+      "initial_score": 1.0,
+      "age_days": 30.0,
+      "access_count": 0,
+      "expected_score": 0.367879441,
+      "observed_score": 0.367879441,
+      "delta": 0.0
+    },
+    {
+      "title": "two_half_lives",
+      "initial_score": 1.5,
+      "age_days": 60.0,
+      "access_count": 0,
+      "expected_score": 0.203002925,
+      "observed_score": 0.203002925,
+      "delta": 0.0
+    },
+    {
+      "title": "four_half_lives",
+      "initial_score": 2.0,
+      "age_days": 120.0,
+      "access_count": 0,
+      "expected_score": 0.05,
+      "observed_score": 0.05,
+      "delta": 0.0
+    },
+    {
+      "title": "aged_with_access",
+      "initial_score": 1.0,
+      "age_days": 60.0,
+      "access_count": 8,
+      "expected_score": 0.322851127,
+      "observed_score": 0.322851127,
+      "delta": 0.0
+    },
+    {
+      "title": "young_with_access",
+      "initial_score": 1.0,
+      "age_days": 2.0,
+      "access_count": 20,
+      "expected_score": 0.968240289,
+      "observed_score": 0.968240289,
+      "delta": 0.0
+    },
+    {
+      "title": "floor_clamp",
+      "initial_score": 0.06,
+      "age_days": 240.0,
+      "access_count": 0,
+      "expected_score": 0.05,
+      "observed_score": 0.05,
+      "delta": 0.0
+    }
+  ],
+  "stats_after_decay": {
+    "total_memories": 7,
+    "avg_score": 0.423139,
+    "min_score": 0.05,
+    "max_score": 1.0,
+    "low_vitality_count": 4,
+    "threshold": 0.35
+  },
+  "seed_count": 7,
+  "tolerance": 1e-06
+}

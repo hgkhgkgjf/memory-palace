@@ -522,7 +522,7 @@ If you just cloned the GitHub repository, it is normal if you don't see these tw
 
 > The checks here focus on "getting the system running"; if you need additional local Markdown validation summaries, run the validation scripts mentioned above.
 >
-> Current real verification snapshot for this repository session: backend tests `1136 passed, 22 skipped`; frontend `198 passed`; frontend typecheck and the frontend build both passed; repo-local live MCP e2e was rerun and remains full `PASS`. Earlier in the same session, a repo-local macOS `Profile B` real-browser smoke, a Docker readiness/auth recheck (`/` = `200`, `/health` = `200`, protected setup/SSE requests still fail-closed), and a smaller real A/B/C/D rerun on `BEIR NFCorpus` with `Profile D` Phase 6 Gate still `PASS` were also completed. The public A/B/C/D benchmark tables were not recalculated in this final doc-sync pass. Docker one-click `Profile C/D`, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.
+> Current real verification wording: the 2026-04 full snapshot had backend `1136 passed, 22 skipped`, frontend `198 passed`, frontend typecheck/build, and repo-local live MCP e2e passing. The 2026-05-15 follow-up reran Docker/Linux `Profile B/C/D`: B used the project's existing settings, while C/D used explicit runtime injection with a 1024-dimension external embedding/reranker setup. Health, SSE, and browser smoke passed for all three; C/D create/search/delete also passed with `degrade_reasons=None`. The public A/B/C/D benchmark tables were not recalculated in that Docker follow-up, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.
 
 ### 5.1 Health Check
 
@@ -865,7 +865,7 @@ If the frontend also needs to access protected interfaces, runtime configuration
 
 > This configuration is mainly for the scenario of **manually starting front and back ends locally**.
 >
-> Docker one-click deployment by default does not require writing the key into the page: the frontend container will automatically forward the same `MCP_API_KEY` to `/api/*`, `/sse`, and `/messages` at the proxy layer.
+> Docker one-click deployment by default does not require writing the key into the page: the frontend container forwards the same `MCP_API_KEY` to protected Dashboard API routes, `/sse`, and `/messages` at the proxy layer. It no longer attaches that key to every generic `/api/*` path.
 
 ### Skipping Auth for Local Debugging
 

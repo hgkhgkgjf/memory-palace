@@ -14,7 +14,10 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from db.sqlite_client import SQLiteClient
 
-from helpers.common import BENCHMARK_ARTIFACT_DIR  # noqa: E402
+from helpers.common import (  # noqa: E402
+    BENCHMARK_ARTIFACT_DIR,
+    BENCHMARK_ARTIFACTS_ROOT,
+)
 from helpers.profile_abcd_real_runner import (  # noqa: E402
     DatasetBundle,
     QueryCase,
@@ -37,8 +40,9 @@ import run_profile_abcd_real  # noqa: E402
 
 
 def test_default_benchmark_artifacts_use_run_scoped_directory() -> None:
-    assert BENCHMARK_ARTIFACT_DIR.parent == BENCHMARK_DIR / "artifacts"
+    assert BENCHMARK_ARTIFACT_DIR.parent == BENCHMARK_ARTIFACTS_ROOT
     assert BENCHMARK_ARTIFACT_DIR != BENCHMARK_DIR
+    assert BENCHMARK_DIR not in BENCHMARK_ARTIFACT_DIR.parents
     assert REAL_PROFILE_JSON_ARTIFACT.parent == BENCHMARK_ARTIFACT_DIR
     assert REAL_PROFILE_MARKDOWN_ARTIFACT.parent == BENCHMARK_ARTIFACT_DIR
     assert REAL_PROFILE_CD_MARKDOWN_ARTIFACT.parent == BENCHMARK_ARTIFACT_DIR

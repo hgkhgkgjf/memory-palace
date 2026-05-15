@@ -343,6 +343,8 @@ search_memory(
 | `semantic` | 基于 Embedding 向量语义搜索（需启用可用的 embedding 链路，如 `hash` / `api` / `router` / `openai`） |
 | `hybrid` | 关键词 + 语义混合检索；若已启用 Reranker，会在后面继续重排 |
 
+> `RRF_ENABLED=false` 是当前默认值。显式开启后，RRF 只融合 `RRF_CHANNELS=fts5,vector` 这类 allowlist 通道，默认 `RRF_K=60`；`RRF_LOG_CHANNEL_CONTRIBUTIONS=false` 表示默认不额外记录通道贡献日志。`ENTITY_RERANK_WEIGHT=0.0` 也是默认关闭；entity 信号只在融合结果之后做 boost，不是 RRF 的第三条 channel。
+
 **过滤条件 (`filters`)：**
 
 | 字段 | 类型 | 说明 |

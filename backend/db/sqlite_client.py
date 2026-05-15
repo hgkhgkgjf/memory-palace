@@ -58,6 +58,36 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base, relationship
 from dotenv import load_dotenv
 from .migration_runner import apply_pending_migrations
+# ORM models are extracted into ``db.models`` (Round 1 refactor); the names are
+# re-exported here so existing callers (tests, benchmarks, downstream code)
+# continue to use ``from db.sqlite_client import Memory, ...``.
+from .models import (
+    AccessLog,
+    ArchivedMemory,
+    Base,
+    EmbeddingCache,
+    IndexMeta,
+    Memory,
+    MemoryChunk,
+    MemoryChunkVec,
+    MemoryGist,
+    MemorySummary,
+    MemoryTag,
+    Path,
+    ProceduralMemory,
+    SchemaMigration,
+    _utc_now_naive,
+)
+# RRF fusion is an opt-in alternative to the weighted-fusion scoring path.
+# It is wired into ``search_advanced`` behind ``RRF_ENABLED`` (default OFF).
+# When disabled, the production code path is byte-for-byte identical to
+# before.
+from .search.rrf_fusion import (
+    RRFConfig as _RRFConfig,
+    RRFFusion as _RRFFusion,
+    load_rrf_config_from_env as _load_rrf_config_from_env,
+)
+from .embeddings.drift_detector import DriftDetector, DriftDetectorConfig
 
 # Load environment variables from project root only.
 _current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -66,8 +96,6 @@ _project_root = os.path.dirname(_backend_dir)
 _dotenv_path = os.path.join(_project_root, ".env")
 if os.path.exists(_dotenv_path):
     load_dotenv(_dotenv_path)
-
-Base = declarative_base()
 
 _SQLITE_ADAPTERS_REGISTERED = False
 _DATABASE_URL_PLACEHOLDER_PATTERN = re.compile(r"<[^>]+>|__REPLACE_ME__")
@@ -295,175 +323,15 @@ def _detect_sqlite_wal_network_filesystem_signal(
     return ""
 
 
-def _utc_now_naive() -> datetime:
-    """Naive UTC datetime for existing DB schema compatibility."""
-    return _utc_now().replace(tzinfo=None)
-
-
 # =============================================================================
-# ORM Models
+# ORM Models (extracted to db.models in Round 1 refactor)
+#
+# ``Memory``, ``Path``, ``MemoryChunk``, ``MemoryChunkVec``, ``EmbeddingCache``,
+# ``IndexMeta``, ``SchemaMigration``, ``MemoryGist``, ``MemoryTag``, ``Base``
+# and ``_utc_now_naive`` are imported from :mod:`db.models` at the top of this
+# module so existing ``from db.sqlite_client import Memory, ...`` callers keep
+# working.  Do not redefine those names here.
 # =============================================================================
-
-
-class Memory(Base):
-    """A single memory unit with content and metadata.
-
-    Note: The 'title' column was removed. A memory's display name is now
-    derived from the last segment of its path(s) in the paths table.
-    Existing DB columns named 'title' are simply ignored by SQLAlchemy.
-
-    Version chain: When a memory is updated, the old version's `migrated_to`
-    field points to the new version's ID, forming a singly-linked list:
-        Memory(id=1, migrated_to=5) → Memory(id=5, migrated_to=12) → Memory(id=12, migrated_to=NULL)
-    When a middle node is permanently deleted, the chain is repaired by
-    skipping over it (A→B→C, delete B → A→C).
-    """
-
-    __tablename__ = "memories"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    content = Column(Text, nullable=False)
-    deprecated = Column(Boolean, default=False)  # Marked for review/deletion
-    migrated_to = Column(
-        Integer, nullable=True
-    )  # Points to successor memory ID (version chain)
-    created_at = Column(DateTime, default=_utc_now_naive)
-    vitality_score = Column(
-        Float, default=1.0, server_default=text("1.0"), nullable=False
-    )
-    last_accessed_at = Column(DateTime, nullable=True)
-    access_count = Column(
-        Integer, default=0, server_default=text("0"), nullable=False
-    )
-
-    # Relationship to paths
-    paths = relationship("Path", back_populates="memory")
-    gists = relationship("MemoryGist", back_populates="memory")
-    tags = relationship("MemoryTag", back_populates="memory")
-
-
-class Path(Base):
-    """A path pointing to a memory. Multiple paths can point to the same memory."""
-
-    __tablename__ = "paths"
-
-    # Composite primary key: (domain, path)
-    # domain examples: "core", "writer", "game"
-    # path examples: "memory-palace", "memory-palace/salem"
-    domain = Column(String(64), primary_key=True, default="core")
-    path = Column(String(512), primary_key=True)
-    memory_id = Column(Integer, ForeignKey("memories.id"), nullable=False)
-    created_at = Column(DateTime, default=_utc_now_naive)
-
-    # Context metadata (moved from Memory to Path)
-    priority = Column(Integer, default=0)  # Relative priority for ranking
-    disclosure = Column(Text, nullable=True)  # When to expand this memory
-
-    # Relationship to memory
-    memory = relationship("Memory", back_populates="paths")
-
-
-class MemoryChunk(Base):
-    """Chunked text slices for memory-level retrieval."""
-
-    __tablename__ = "memory_chunks"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    memory_id = Column(Integer, ForeignKey("memories.id"), nullable=False, index=True)
-    chunk_index = Column(Integer, nullable=False)
-    chunk_text = Column(Text, nullable=False)
-    char_start = Column(Integer, nullable=False, default=0)
-    char_end = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, default=_utc_now_naive)
-
-
-class MemoryChunkVec(Base):
-    """Persisted vectors for memory chunks (fallback pure-SQLite storage)."""
-
-    __tablename__ = "memory_chunks_vec"
-
-    chunk_id = Column(Integer, ForeignKey("memory_chunks.id"), primary_key=True)
-    memory_id = Column(Integer, ForeignKey("memories.id"), nullable=False, index=True)
-    vector = Column(Text, nullable=False)
-    model = Column(String(64), nullable=False, default="hash-v1")
-    dim = Column(Integer, nullable=False, default=64)
-    created_at = Column(DateTime, default=_utc_now_naive)
-
-
-class EmbeddingCache(Base):
-    """Cache embeddings by deterministic text hash."""
-
-    __tablename__ = "embedding_cache"
-
-    cache_key = Column(String(128), primary_key=True)
-    text_hash = Column(String(128), nullable=False, index=True)
-    model = Column(String(64), nullable=False, default="hash-v1")
-    embedding = Column(Text, nullable=False)
-    updated_at = Column(DateTime, default=_utc_now_naive, onupdate=_utc_now_naive)
-
-
-class IndexMeta(Base):
-    """Index runtime metadata and capability flags."""
-
-    __tablename__ = "index_meta"
-
-    key = Column(String(128), primary_key=True)
-    value = Column(Text, nullable=False)
-    updated_at = Column(DateTime, default=_utc_now_naive, onupdate=_utc_now_naive)
-
-
-class SchemaMigration(Base):
-    """Applied schema migration records."""
-
-    __tablename__ = "schema_migrations"
-
-    version = Column(String(32), primary_key=True)
-    applied_at = Column(DateTime, default=_utc_now_naive, nullable=False)
-    checksum = Column(String(128), nullable=False)
-
-
-class MemoryGist(Base):
-    """Compact gist materialized from a memory body."""
-
-    __tablename__ = "memory_gists"
-    __table_args__ = (
-        Index("idx_memory_gists_memory_id", "memory_id"),
-        Index(
-            "idx_memory_gists_memory_source_hash_unique",
-            "memory_id",
-            "source_content_hash",
-            unique=True,
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    memory_id = Column(Integer, ForeignKey("memories.id"), nullable=False)
-    gist_text = Column(Text, nullable=False)
-    source_content_hash = Column(String(128), nullable=False)
-    gist_method = Column(String(64), nullable=False, default="fallback")
-    quality_score = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=_utc_now_naive)
-
-    memory = relationship("Memory", back_populates="gists")
-
-
-class MemoryTag(Base):
-    """Structured tag extraction output for memories."""
-
-    __tablename__ = "memory_tags"
-    __table_args__ = (
-        Index("idx_tags_value", "tag_value"),
-        Index("idx_memory_tags_memory_id", "memory_id"),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    memory_id = Column(Integer, ForeignKey("memories.id"), nullable=False)
-    tag_type = Column(String(64), nullable=False)
-    tag_value = Column(String(255), nullable=False)
-    confidence = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=_utc_now_naive)
-
-    memory = relationship("Memory", back_populates="tags")
 
 
 # =============================================================================
@@ -481,6 +349,16 @@ class SQLiteClient:
     - update: Create new version, deprecate old, repoint path
     - add_path: Create alias to existing memory
     - search: Substring search on path and content
+
+    Refactor note (Round 1)
+    -----------------------
+    The public methods below are now also reachable through thin repository
+    facades in :mod:`db.repositories` (MemoryRepository, PathRepository,
+    SearchRepository, IndexRepository, VitalityRepository, GistRepository,
+    MaintenanceRepository).  Those wrappers delegate back to this class and
+    add no behavior of their own.  Future rounds will gradually move method
+    *bodies* into the repositories; until then this class remains the
+    canonical implementation.
     """
 
     def __init__(self, database_url: str):
@@ -573,6 +451,13 @@ class SQLiteClient:
             16,
             self._env_int("RETRIEVAL_EMBEDDING_DIM", DEFAULT_EMBEDDING_DIM),
         )
+        self._embedding_drift_detection_result: Dict[str, Any] = {
+            "drift_detected": False,
+            "differences": {},
+            "reindex_queued": False,
+            "errors": [],
+            "status": "not_run",
+        }
         self._remote_http_timeout_sec = max(
             1.0, self._env_float("RETRIEVAL_REMOTE_TIMEOUT_SEC", 8.0)
         )
@@ -620,6 +505,16 @@ class SQLiteClient:
         self._mmr_lambda = min(1.0, max(0.0, self._env_float("RETRIEVAL_MMR_LAMBDA", 0.65)))
         self._mmr_candidate_factor = max(
             1, self._env_int("RETRIEVAL_MMR_CANDIDATE_FACTOR", 3)
+        )
+        # RRF fusion configuration. Loaded once at construction so each
+        # search call avoids re-parsing env vars. Default OFF (C5).
+        self._rrf_config_error = ""
+        self._rrf_config = _load_rrf_config_from_env()
+        # Entity rerank boost (C6: entity is rerank boost only, NOT an
+        # RRF channel). Default weight = 0.0 means feature is dormant unless
+        # an operator opts in via ``ENTITY_RERANK_WEIGHT``.
+        self._entity_rerank_weight = max(
+            0.0, min(5.0, self._env_float("ENTITY_RERANK_WEIGHT", 0.0))
         )
         self._intent_llm_enabled = self._env_bool("INTENT_LLM_ENABLED", False)
         self._intent_llm_api_base = self._normalize_chat_api_base(
@@ -1312,6 +1207,7 @@ class SQLiteClient:
             # Migration: add migrated_to column if not present (for existing DBs)
             await conn.run_sync(self._migrate_add_migrated_to)
         await apply_pending_migrations(self.database_url)
+        await self._detect_embedding_drift_before_meta_update()
         async with self.engine.begin() as conn:
             capabilities = await conn.run_sync(self._setup_index_infra)
             self._fts_available = capabilities.get("fts_available", False)
@@ -1324,6 +1220,50 @@ class SQLiteClient:
             await conn.run_sync(self._sync_set_vector_engine_meta)
             await conn.run_sync(self._sync_set_write_lane_wal_meta)
         await self._bootstrap_indexes()
+
+    async def _detect_embedding_drift_before_meta_update(self) -> None:
+        """Compare stored embedding metadata before current boot rewrites it."""
+
+        async def _queue_reindex(differences: Dict[str, Dict[str, str]]) -> None:
+            enqueue_result = await runtime_state.index_worker.enqueue_rebuild(
+                reason="embedding_provider_drift"
+            )
+            async with self.session() as session:
+                await self._set_index_meta(
+                    session,
+                    "embedding_drift_last_differences",
+                    json.dumps(differences, sort_keys=True),
+                )
+                await self._set_index_meta(
+                    session,
+                    "embedding_drift_reindex_enqueue_result",
+                    json.dumps(enqueue_result, sort_keys=True),
+                )
+                await session.commit()
+
+        detector = DriftDetector(
+            read_index_meta=self.get_runtime_meta,
+            queue_reindex=_queue_reindex,
+            config=DriftDetectorConfig(
+                env_var_map={
+                    "embedding_backend": "embedding_backend",
+                    "embedding_model": "embedding_model",
+                    "embedding_dim": "embedding_dim",
+                    "embedding_api_base": "embedding_api_base",
+                }
+            ),
+            env={
+                "embedding_backend": self._embedding_backend,
+                "embedding_model": self._embedding_model,
+                "embedding_dim": str(int(self._embedding_dim)),
+                "embedding_api_base": self._embedding_api_base,
+            },
+        )
+        result = await detector.detect()
+        self._embedding_drift_detection_result = {
+            **result.to_dict(),
+            "status": "completed",
+        }
 
     async def init_db(self):
         """Create tables, run migrations, and serialize startup across processes."""
@@ -1399,6 +1339,18 @@ class SQLiteClient:
         )
         self._sync_set_index_meta(connection, "embedding_backend", self._embedding_backend, now)
         self._sync_set_index_meta(connection, "embedding_model", self._embedding_model, now)
+        self._sync_set_index_meta(
+            connection,
+            "embedding_dim",
+            str(int(self._embedding_dim)),
+            now,
+        )
+        self._sync_set_index_meta(
+            connection,
+            "embedding_api_base",
+            str(self._embedding_api_base or ""),
+            now,
+        )
         self._sync_set_index_meta(
             connection,
             "embedding_provider_chain_enabled",
@@ -1713,6 +1665,13 @@ class SQLiteClient:
         source_hash: str,
         gist_method: str = "fallback",
         quality_score: Optional[float] = None,
+        source_memory_ids: Optional[Sequence[int]] = None,
+        source_chunk_ids: Optional[Sequence[int]] = None,
+        source_hashes: Optional[Sequence[str]] = None,
+        derivation_method: Optional[str] = None,
+        confidence: Optional[float] = None,
+        review_state: str = "auto_generated",
+        storage_budget_bytes: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Create or update a gist record for a memory and content hash.
@@ -1741,6 +1700,41 @@ class SQLiteClient:
                 quality_value = float(quality_score)
             except (TypeError, ValueError) as exc:
                 raise ValueError("quality_score must be a float value or null") from exc
+        source_memory_ids_value = [
+            int(item)
+            for item in (source_memory_ids if source_memory_ids is not None else [parsed_memory_id])
+        ]
+        if not source_memory_ids_value:
+            source_memory_ids_value = [parsed_memory_id]
+        source_chunk_ids_value = [
+            int(item) for item in (source_chunk_ids if source_chunk_ids is not None else [])
+        ]
+        source_hashes_value = [
+            str(item).strip()
+            for item in (source_hashes if source_hashes is not None else [source_hash_value])
+            if str(item).strip()
+        ] or [source_hash_value]
+        derivation_method_value = (
+            str(derivation_method or method_value or "fallback").strip().lower()
+            or "fallback"
+        )
+        review_state_value = (
+            str(review_state or "auto_generated").strip().lower()
+            or "auto_generated"
+        )
+        if confidence is None:
+            confidence_value = quality_value if quality_value is not None else 0.0
+        else:
+            try:
+                confidence_value = float(confidence)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("confidence must be a float value or null") from exc
+        confidence_value = max(0.0, min(1.0, float(confidence_value)))
+        budget_value = (
+            int(storage_budget_bytes)
+            if storage_budget_bytes is not None
+            else len(gist_value.encode("utf-8"))
+        )
 
         async with self.session() as session:
             memory_row = await session.get(Memory, parsed_memory_id)
@@ -1750,14 +1744,25 @@ class SQLiteClient:
             await session.execute(
                 text(
                     "INSERT INTO memory_gists("
-                    "memory_id, gist_text, source_content_hash, gist_method, quality_score, created_at"
+                    "memory_id, gist_text, source_content_hash, gist_method, quality_score, created_at, "
+                    "source_memory_ids, source_chunk_ids, source_hashes, derivation_method, "
+                    "confidence, review_state, storage_budget_bytes"
                     ") VALUES ("
-                    ":memory_id, :gist_text, :source_content_hash, :gist_method, :quality_score, :created_at"
+                    ":memory_id, :gist_text, :source_content_hash, :gist_method, :quality_score, :created_at, "
+                    ":source_memory_ids, :source_chunk_ids, :source_hashes, :derivation_method, "
+                    ":confidence, :review_state, :storage_budget_bytes"
                     ") ON CONFLICT(memory_id, source_content_hash) DO UPDATE SET "
                     "gist_text = excluded.gist_text, "
                     "gist_method = excluded.gist_method, "
                     "quality_score = excluded.quality_score, "
-                    "created_at = excluded.created_at"
+                    "created_at = excluded.created_at, "
+                    "source_memory_ids = excluded.source_memory_ids, "
+                    "source_chunk_ids = excluded.source_chunk_ids, "
+                    "source_hashes = excluded.source_hashes, "
+                    "derivation_method = excluded.derivation_method, "
+                    "confidence = excluded.confidence, "
+                    "review_state = excluded.review_state, "
+                    "storage_budget_bytes = excluded.storage_budget_bytes"
                 ),
                 {
                     "memory_id": parsed_memory_id,
@@ -1766,6 +1771,13 @@ class SQLiteClient:
                     "gist_method": method_value,
                     "quality_score": quality_value,
                     "created_at": now_value,
+                    "source_memory_ids": json.dumps(source_memory_ids_value),
+                    "source_chunk_ids": json.dumps(source_chunk_ids_value),
+                    "source_hashes": json.dumps(source_hashes_value),
+                    "derivation_method": derivation_method_value,
+                    "confidence": confidence_value,
+                    "review_state": review_state_value,
+                    "storage_budget_bytes": budget_value,
                 },
             )
             row = (
@@ -1785,6 +1797,13 @@ class SQLiteClient:
                 "gist_method": row.gist_method,
                 "quality_score": row.quality_score,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
+                "source_memory_ids": json.loads(row.source_memory_ids or "[]"),
+                "source_chunk_ids": json.loads(row.source_chunk_ids or "[]"),
+                "source_hashes": json.loads(row.source_hashes or "[]"),
+                "derivation_method": row.derivation_method,
+                "confidence": row.confidence,
+                "review_state": row.review_state,
+                "storage_budget_bytes": row.storage_budget_bytes,
             }
 
     @staticmethod
@@ -1797,6 +1816,13 @@ class SQLiteClient:
             "gist_method": row.gist_method,
             "quality_score": row.quality_score,
             "created_at": row.created_at.isoformat() if row.created_at else None,
+            "source_memory_ids": json.loads(row.source_memory_ids or "[]"),
+            "source_chunk_ids": json.loads(row.source_chunk_ids or "[]"),
+            "source_hashes": json.loads(row.source_hashes or "[]"),
+            "derivation_method": row.derivation_method,
+            "confidence": row.confidence,
+            "review_state": row.review_state,
+            "storage_budget_bytes": row.storage_budget_bytes,
         }
 
     async def _get_latest_gists_map(
@@ -6582,6 +6608,17 @@ class SQLiteClient:
             "mmr_candidate_count": 0,
             "mmr_selected_count": 0,
         }
+        default_rrf_metadata = {
+            "rrf_applied": False,
+            "rrf_k": int(self._rrf_config.k),
+            "rrf_channels": list(self._rrf_config.channels),
+            "rrf_config_error": self._rrf_config_error,
+        }
+        default_entity_metadata = {
+            "entity_boost_applied": False,
+            "entity_rerank_weight": float(self._entity_rerank_weight),
+            "entity_boost_count": 0,
+        }
         vector_engine_metadata = {
             "vector_engine_requested": self._vector_engine_requested,
             "vector_engine_requested_raw": self._vector_engine_requested_raw,
@@ -6616,6 +6653,8 @@ class SQLiteClient:
                     **strategy_metadata,
                     **vector_engine_metadata,
                     **default_mmr_metadata,
+                    **default_rrf_metadata,
+                    **default_entity_metadata,
                 },
             }
 
@@ -6999,6 +7038,8 @@ class SQLiteClient:
                         **strategy_metadata,
                         **vector_engine_metadata,
                         **default_mmr_metadata,
+                        **default_rrf_metadata,
+                        **default_entity_metadata,
                     },
                 }
 
@@ -7074,6 +7115,119 @@ class SQLiteClient:
                     degrade_reasons=degrade_reasons,
                 )
 
+            # ---------------------------------------------------------------
+            # RRF rollout (Round 1 Track B, C5). The fusion is opt-in via
+            # ``RRF_ENABLED`` and only kicks in when at least one ranked
+            # channel returned hits. The response shape is preserved: when
+            # RRF is active we set each candidate's ``final`` score to the
+            # RRF score (plus a small priority/recency/path tiebreaker) so
+            # downstream code (MMR, MCP layer) does not need to special-case
+            # it. The original component scores remain available under the
+            # same keys (``vector``, ``text``, ...).
+            # ---------------------------------------------------------------
+            rrf_metadata: Dict[str, Any] = {
+                "rrf_applied": False,
+                "rrf_k": int(self._rrf_config.k),
+                "rrf_channels": list(self._rrf_config.channels),
+                "rrf_config_error": self._rrf_config_error,
+            }
+            rrf_score_by_key: Dict[Tuple[str, str], float] = {}
+            if self._rrf_config.enabled and candidate_items:
+                from .search.base_channel import SearchResult as _SearchResult
+                from .search.rrf_fusion import RRFFusion as _Fusion
+
+                def _to_search_result(
+                    row: Mapping[str, Any], rank: int, source: str
+                ) -> "_SearchResult":
+                    return _SearchResult(
+                        uri=f"{row.get('domain') or 'core'}://{row.get('path') or ''}",
+                        memory_id=row.get("memory_id"),
+                        chunk_id=row.get("chunk_id"),
+                        chunk_text=str(row.get("chunk_text") or ""),
+                        char_start=int(row.get("char_start") or 0),
+                        char_end=int(row.get("char_end") or 0),
+                        domain=str(row.get("domain") or "core"),
+                        path=str(row.get("path") or ""),
+                        priority=int(row.get("priority") or 0),
+                        disclosure=row.get("disclosure"),
+                        created_at=row.get("created_at"),
+                        score=0.0,
+                        rank=rank,
+                        metadata={"source": source},
+                    )
+
+                channel_lists: Dict[str, List["_SearchResult"]] = {}
+                if "fts5" in self._rrf_config.channels and keyword_rows:
+                    channel_lists["fts5"] = [
+                        _to_search_result(row, rank=i + 1, source="fts5")
+                        for i, row in enumerate(keyword_rows)
+                    ]
+                if "vector" in self._rrf_config.channels and semantic_rows:
+                    channel_lists["vector"] = [
+                        _to_search_result(row, rank=i + 1, source="vector")
+                        for i, row in enumerate(semantic_rows)
+                    ]
+
+                if channel_lists:
+                    fusion = _Fusion(self._rrf_config)
+                    fused = fusion.fuse(channel_lists)
+                    for entry in fused:
+                        key = (entry.domain, entry.path)
+                        rrf_score_by_key[key] = float(entry.score)
+                    rrf_metadata.update(
+                        {
+                            "rrf_applied": True,
+                            "rrf_channel_counts": {
+                                name: len(rows) for name, rows in channel_lists.items()
+                            },
+                            "rrf_fused_count": len(fused),
+                        }
+                    )
+
+            # ---------------------------------------------------------------
+            # Entity rerank boost (Round 1 Track C, C6). The boost is opt-in
+            # via ``ENTITY_RERANK_WEIGHT`` (default 0.0). It is applied as a
+            # multiplicative factor on the final score *after* fusion, so it
+            # only nudges ordering rather than replacing the underlying
+            # ranking. Failures are tolerated -- a degrade reason is added
+            # and the search returns without entity influence.
+            # ---------------------------------------------------------------
+            entity_metadata: Dict[str, Any] = {
+                "entity_boost_applied": False,
+                "entity_rerank_weight": float(self._entity_rerank_weight),
+                "entity_boost_count": 0,
+            }
+            entity_boosts: Dict[int, float] = {}
+            if self._entity_rerank_weight > 0.0 and candidate_items:
+                memory_ids_for_boost = [
+                    int(item.get("memory_id"))
+                    for item in candidate_items
+                    if item.get("memory_id") is not None
+                ]
+                if memory_ids_for_boost:
+                    try:
+                        from .search.entity_channel import compute_boost as _compute_boost
+                        entity_boosts = await _compute_boost(
+                            query,
+                            memory_ids_for_boost,
+                            session,
+                        )
+                        entity_metadata.update(
+                            {
+                                "entity_boost_applied": True,
+                                "entity_boost_count": len(entity_boosts),
+                            }
+                        )
+                    except Exception as exc:  # noqa: BLE001 -- boost must never raise.
+                        self._append_degrade_reason(
+                            degrade_reasons, "entity_boost_failed"
+                        )
+                        self._append_degrade_reason(
+                            degrade_reasons,
+                            f"entity_boost_failed:{type(exc).__name__}",
+                        )
+                        entity_boosts = {}
+
             for idx, item in enumerate(candidate_items):
                 created_at = item.get("created_at")
                 if isinstance(created_at, str):
@@ -7104,6 +7258,38 @@ class SQLiteClient:
                 )
                 rerank_score = rerank_scores_by_index.get(idx, 0.0)
                 final_score = base_score + (self._rerank_weight * rerank_score)
+
+                # RRF substitution: when fusion is active, replace
+                # ``final_score`` with the RRF score plus a small
+                # priority/recency/path_prefix tiebreaker so ordering
+                # remains deterministic and existing knobs (priority,
+                # recency) still have nudge-level influence.
+                if rrf_metadata.get("rrf_applied"):
+                    domain_candidate = item.get("domain") or "core"
+                    path_candidate = item.get("path") or ""
+                    rrf_score = rrf_score_by_key.get(
+                        (str(domain_candidate), str(path_candidate)), 0.0
+                    )
+                    tiebreak = (
+                        0.001 * priority_score
+                        + 0.001 * recency_score
+                        + 0.001 * path_prefix_score
+                    )
+                    final_score = rrf_score + tiebreak + (
+                        self._rerank_weight * rerank_score
+                    )
+
+                # Entity rerank boost (multiplicative). The boost is bounded
+                # to ``(1 + weight * boost_score)`` so it never zeroes out
+                # the fused score.
+                if entity_metadata.get("entity_boost_applied"):
+                    mid = item.get("memory_id")
+                    if mid is not None:
+                        boost_score = entity_boosts.get(int(mid), 0.0)
+                        if boost_score:
+                            final_score = final_score * (
+                                1.0 + self._entity_rerank_weight * boost_score
+                            )
 
                 snippet = self._make_snippet(item["chunk_text"], query)
                 domain = item.get("domain") or "core"
@@ -7185,6 +7371,8 @@ class SQLiteClient:
                     **strategy_metadata,
                     **vector_engine_metadata,
                     **mmr_metadata,
+                    **rrf_metadata,
+                    **entity_metadata,
                 },
             }
 
@@ -7415,6 +7603,8 @@ class SQLiteClient:
                     "embedding_backend": self._embedding_backend,
                     "embedding_model": self._embedding_model,
                     "embedding_dim": self._embedding_dim,
+                    "embedding_api_base": self._embedding_api_base,
+                    "embedding_drift": dict(self._embedding_drift_detection_result),
                     "embedding_provider_chain_enabled": self._embedding_provider_chain_enabled,
                     "embedding_provider_fail_open": self._embedding_provider_fail_open,
                     "embedding_provider_fallback": self._resolve_chain_fallback_backend(),
@@ -7450,6 +7640,10 @@ class SQLiteClient:
                     "reranker_enabled": self._reranker_enabled,
                     "reranker_model": self._reranker_model,
                     "rerank_weight": self._rerank_weight,
+                    "rrf_enabled": bool(self._rrf_config.enabled),
+                    "rrf_k": int(self._rrf_config.k),
+                    "rrf_channels": list(self._rrf_config.channels),
+                    "rrf_config_error": self._rrf_config_error,
                 },
                 "counts": {
                     "active_memories": int(memory_count_result.scalar() or 0),

@@ -528,7 +528,7 @@ cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 
 > 这里的检查以“先跑通系统”为主；如果你需要额外的本地 Markdown 验证摘要，再运行上面的验证脚本即可。
 >
-> 当前这轮真实验证快照：backend `1136 passed, 22 skipped`；frontend `198 passed`；前端 `typecheck` 和 build 都通过；repo-local live MCP e2e 也重新跑过，结果仍然是全 `PASS`。同一个 session 里更早一些，还补跑了 repo-local macOS `Profile B` 的真实浏览器 smoke，以及一轮 Docker 就绪/鉴权复核：Dashboard `/` `200`、backend `/health` `200`，受保护的 setup/SSE 请求继续保持 fail-close。本轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核，`Profile D` 的 Phase 6 Gate 继续 `PASS`；真实 A/B/C/D benchmark 的公开表格没有在这轮最终文档收口里重算。Docker one-click 的 `Profile C/D`，以及原生 Windows / Linux 宿主 runtime 仍保留目标环境复核边界。
+> 当前真实验证口径：2026-04 那轮全量快照里，backend `1136 passed, 22 skipped`、frontend `198 passed`、前端 `typecheck` / build 和 repo-local live MCP e2e 都通过。2026-05-15 又补跑了 Docker/Linux `Profile B/C/D`：B 使用项目原本设置，C/D 使用显式运行时注入和 1024 维外部 embedding/reranker 组合；三档 health、SSE、浏览器 smoke 都通过，C/D create/search/delete 也通过，查询 `degrade_reasons=None`。真实 A/B/C/D benchmark 的公开表格没有在这轮 Docker 复验里重算；原生 Windows / Linux 宿主 runtime 仍保留目标环境复核边界。
 
 ### 5.1 健康检查
 
@@ -870,7 +870,7 @@ curl -fsS http://127.0.0.1:8000/maintenance/orphans \
 
 > 这段配置主要用于**本地手动启动前后端**的场景。
 >
-> Docker 一键部署默认不需要把 key 写进页面：前端容器会在代理层自动把同一把 `MCP_API_KEY` 转发到 `/api/*`、`/sse` 和 `/messages`。
+> Docker 一键部署默认不需要把 key 写进页面：前端容器会在代理层把同一把 `MCP_API_KEY` 转发到受保护的 Dashboard API 路径、`/sse` 和 `/messages`。通用 `/api/*` 不会一律注入这把 key。
 
 ### 本地调试跳过鉴权
 

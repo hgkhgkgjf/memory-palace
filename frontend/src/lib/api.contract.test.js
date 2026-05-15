@@ -40,6 +40,8 @@ import {
     getOrphanMemoryDetail,
     deleteOrphanMemory,
     confirmVitalityCleanup,
+    prepareForgettingArchive,
+    confirmForgettingArchive,
     extractApiErrorCode,
     saveStoredMaintenanceAuth,
     clearStoredMaintenanceAuth,
@@ -232,6 +234,33 @@ describe('api contract regression', () => {
     );
   });
 
+  it('uses reviewed prepare/confirm endpoints for forgetting archive', async () => {
+    mockApi.post.mockResolvedValue({ data: { ok: true } });
+
+    await prepareForgettingArchive({ memory_ids: [1], threshold: 0.35, days: 30 });
+    await confirmForgettingArchive({
+      review_id: 'cleanup-abc',
+      token: '0123456789abcdef',
+      confirmation_phrase: 'CONFIRM ARCHIVE 1',
+    });
+
+    expect(mockApi.post).toHaveBeenNthCalledWith(
+      1,
+      '/forgetting/archive/prepare',
+      { memory_ids: [1], threshold: 0.35, days: 30 }
+    );
+    expect(mockApi.post).toHaveBeenNthCalledWith(
+      2,
+      '/forgetting/archive/confirm',
+      {
+        review_id: 'cleanup-abc',
+        token: '0123456789abcdef',
+        confirmation_phrase: 'CONFIRM ARCHIVE 1',
+      },
+      { timeout: 60000 }
+    );
+  });
+
   it('routes orphan maintenance APIs through unified client', async () => {
     mockApi.get.mockResolvedValueOnce({ data: [{ id: 1 }] });
     mockApi.get.mockResolvedValueOnce({ data: { id: 1, content: 'content' } });
@@ -315,6 +344,25 @@ describe('api contract regression', () => {
 
     const config = interceptor({
       url: '/setup/status',
+      headers: {},
+      method: 'get',
+    });
+
+    expect(config.headers['X-MCP-API-Key']).toBe('stored-key');
+  });
+
+  it('treats search quality endpoint as protected and injects stored auth headers', () => {
+    const interceptor = interceptorRef.current;
+    window.sessionStorage.setItem(
+      'memory-palace.dashboardAuth',
+      JSON.stringify({
+        maintenanceApiKey: 'stored-key',
+        maintenanceApiKeyMode: 'header',
+      })
+    );
+
+    const config = interceptor({
+      url: '/search/quality-metrics',
       headers: {},
       method: 'get',
     });

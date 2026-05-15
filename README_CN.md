@@ -56,11 +56,12 @@
 - **repo-local wrapper 现在会更一致地拦住本地 sqlite 误配**：仓库自带的 Python / shell wrapper 现在会先把常见的斜杠和大小写变体归一化，拒绝相对 sqlite 路径，也会把常见的 URL 编码容器路径先解开，再判断本地 `DATABASE_URL` 是否还指着 Docker 内部的 `/app/...` 或 `/data/...`。说人话就是：像 `sqlite+aiosqlite:///demo.db`、`sqlite+aiosqlite://///app/data/...`、`sqlite+aiosqlite:////%2Fapp%2Fdata/...` 这类值，现在都不会再被误放过。
 - **Docker 基础镜像现在也收得更紧了**：仓库自带的 Dockerfile 现在把基础镜像 digest 一起锁住了，后面重建时不容易再因为上游 tag 漂了而悄悄变样。
 - **GHCR 发布镜像现在会先自查 backend 健康脚本了**：backend 镜像现在自带 Docker 级别的 `HEALTHCHECK`，`docker-compose.ghcr.yml` 里的 backend 也继续明确绑在 `0.0.0.0`，发布工作流还会在 push 前先检查 `/usr/local/bin/backend-healthcheck.py` 是否真的在镜像里而且可执行。
-- **当前这轮公开验证是按这次 session 的 fresh rerun 写的**：后端测试现在是 `1136 passed, 22 skipped`；前端是 `198 passed`；前端 `npm run build` 和 `npm run typecheck` 也都通过；repo-local live MCP e2e 也重新跑过，结果仍然是全 `PASS`。同一个 session 里更早一些，还补跑了 repo-local macOS `Profile B` 的真实浏览器 smoke，复核了 Docker 的标准就绪/鉴权路径（Dashboard `/` 返回 `200`，backend `/health` 返回 `200`，受保护的 setup/SSE 请求继续保持 fail-close），并补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核（`sample_size=5`，`Profile D` 的 Phase 6 Gate 继续 `PASS`）。下面那组 2026-04-18 的 benchmark 表格这次**没有**重新跑；Docker one-click `Profile C/D`，以及原生 Windows、原生 Linux 宿主 runtime 仍继续保留目标环境复验边界。
+- **当前验证口径把旧的全量测试和最新 Docker 复验分开写**：2026-04 那轮全量快照里，backend `1136 passed, 22 skipped`、frontend `198 passed`、前端 build/typecheck 和 repo-local live MCP e2e 都通过。2026-05-15 又补跑了 Docker/Linux `Profile B/C/D`：B 使用项目原本设置，C/D 使用显式运行时注入和 1024 维外部 embedding/reranker 组合；三档 health、SSE、浏览器 smoke 都通过，C/D create/search/delete 也通过，查询 `degrade_reasons=None`。下面的 benchmark 表格没有在这轮 Docker 复验里重算。
 - **公开 MCP 契约现在更严格了**：MCP 入口会直接拒绝带控制字符 / 不可见字符 / surrogate 的 URI，也会在真正进库前拦住超长的 `search_memory` / `create_memory` / `update_memory` payload；对 percent-encoded 记忆 URI 的处理现在也更可预期：字面 `%20` 这类路径文本仍然合法，已有记忆也可以通过编码空格 / 编码斜杠这类解码变体去兼容查找，而像 `C%3A/...` 这种解码后变成 Windows 文件路径的输入会继续被当成非法记忆 URI 直接拒绝。如果 `add_alias` 已经写入数据库，但 snapshot 补记失败，也会把 alias path 一起回滚掉。
 - **搜索 fail-close 这条链也更收口了**：如果最终 path 状态复核自己出错，`search_memory` 现在会直接丢掉那条结果，而不是把可能已经过期的 URI 继续当正常命中返回。像 `AND` / `OR` / `NOT` / `NEAR` 这类 FTS 控制词，或者 wildcard 很重的查询，也会改成当前请求内回退，而不是让控制语义悄悄改掉匹配结果，或把正常用户输入打成一条吵人的 `fts_query_invalid`。
 - **private provider 目标现在不会再被默认信任**：像 `127.0.0.1` / `::1` 这类 loopback IP 字面量，再加上 `localhost`，仍然默认可用；其它 private IP 字面量，以及解析后会落到 private 非 loopback 地址的 hostname，现在都必须通过 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` 显式 allowlist 才能继续使用。link-local 和格式错误地址仍然会 fail-close。
 - **SQLite 启动和索引补修现在更收口了**：已有的本地 SQLite 文件在启动时如果 `PRAGMA quick_check(1)` 不是 `ok`，现在会直接 fail-close；bootstrap 建索引时也不只会补缺 chunk 的记忆，还会补缺失的 FTS 行；永久删除一条记忆时，也会把这条记忆关联的 chunk/vector/FTS 索引一起清掉，不再留下残留行。
+- **Dashboard 多了层级、遗忘和搜索质量面板**：Memory 页会展示 L0/L1/L2 层级视图，Maintenance 页会展示遗忘模拟和人工归档候选，Observability 页会展示 Search Quality。Search Quality 是真实鉴权接口，但在带标签质量样本持久化前仍会返回 `is_mock=true` / `status=unavailable`。
 - **Review snapshot 不会再默认一直涨下去了**：每次 snapshot 成功写入后，后端现在会按 age/count 做保守的 session 级清理，同时保护当前 session，并跳过拿不到锁的旧 session。
 - **reflection 后台清理现在更收口了**：同一个 session、source、reason、content 的并发 `prepare` 请求，仍然会复用同一个 prepared review；如果最后一个等待方先走掉了，后端现在也会把这条已经没人等的后台 prepare 一起取消，不再让它自己继续跑完。
 - **external import guard 现在会更早、更干净地 fail-close**：`/maintenance/import/prepare` 现在会先按文件 metadata 汇总大小，再决定要不要继续读正文，所以超大单文件或超大批次会在读内容前直接被拒绝。非 UTF-8 文本现在也会稳定返回 `file_read_failed`，不再冒出底层 fd 关闭错误。
@@ -71,6 +72,7 @@
 - **vitality cleanup 的多条删除现在更保守了**：带确认的多选删除现在会在后端具备 session-backed permanent delete 能力时，放进同一条 DB session 里原子执行；如果做不到这条原子路径，后端会直接拒绝多条 fallback，而不是出现“前几条删掉，后几条失败”的半成功状态。单条删除 fallback 仍然允许继续执行。
 - **Maintenance 里的孤儿记忆清理现在更顺手了**：孤儿记忆卡片现在可以直接用键盘聚焦，并用 `Enter` / `Space` 展开；批量删除也会并行发出少量请求，同时继续保留逐条失败和部分成功的提示。
 - **真实 benchmark 产物现在更诚实地记录降级了**：真实 A/B/C/D runner 现在会同时记录查询阶段和建索引阶段的降级信息；对 D 档位来说，`reranker` 配置缺失或响应无效都不会再被算成“干净通过”。
+- **Benchmark 产物默认不再写回工作树**：benchmark helpers 默认把运行产物写到系统临时目录下的 `memory-palace-benchmark-artifacts/<run-token>/...`，也仍支持显式 `artifact_dir` / `BENCHMARK_ARTIFACT_DIR` 覆盖，方便并行复验时保持隔离。
 - **本地验证报告现在更收口了**：skill / MCP smoke 报告会脱敏常见 secret、session token 和本地绝对路径，并在宿主支持时改用更私有的文件权限。
 - **分享前检查现在会更主动拦住本地工件了**：`scripts/pre_publish_check.sh` 现在会直接拦截已跟踪的 `.audit` / `.playwright-mcp` 工件，也会扫描 tracked 文件里的本地 endpoint/key 模式，比如 `sk-local-*`、以及带端口的 loopback/private provider 地址；仓库自己在 compose 里用来探测前端健康的 `127.0.0.1:8080` 这条合法探针不会再被误报。
 - **Observability 成功提示现在不再把英文词夹进中文里了**：重建、睡眠整合、任务重试这些成功提示现在会先走本地化 token，再拼进最终消息，所以中文界面里不会再看到生硬的 `job` / `sync` 片段。
@@ -277,22 +279,28 @@ Observability 搜索和活力清理确认这类更容易跑久一点的操作，
 memory-palace/
 ├── backend/
 │   ├── main.py                 # FastAPI 入口；注册 Review/Browse/Maintenance/Setup 路由
-│   ├── mcp_server.py           # 9 个 MCP 工具 + 快照逻辑 + URI 解析
+│   ├── mcp_server.py           # MCP 公开入口；9 个工具签名保持兼容
 │   ├── runtime_state.py        # Write Lane 队列、Index Worker、活力衰减调度器
 │   ├── run_sse.py              # SSE 传输层，带 API Key 鉴权网关
 │   ├── requirements.txt        # 后端运行依赖
 │   ├── requirements-dev.txt    # 后端测试依赖
 │   ├── db/
-│   │   └── sqlite_client.py    # Schema 定义、CRUD、检索、Write Guard、Gist
-│   ├── api/                    # REST 路由：review、browse、maintenance、setup
+│   │   ├── sqlite_client.py    # 兼容外观层：CRUD、检索、Write Guard、Gist
+│   │   ├── models.py           # SQLAlchemy 模型
+│   │   ├── repositories/       # 数据访问拆分模块
+│   │   └── search/             # FTS5/vector/RRF/entity boost 通道
+│   ├── core/                   # MemoryCore 外观、层级/遗忘/压缩/程序性记忆引擎
+│   ├── api/                    # REST 路由：review、browse、maintenance、setup、layering、forgetting、search quality
+│   ├── mcp/                    # 工具 re-export wrapper、system 视图、host adapter
+│   ├── security/               # 输入清洗与 opt-in artifact stripping
 ├── frontend/
 │   └── src/
 │       ├── App.jsx             # 路由与页面脚手架
 │       ├── features/
-│       │   ├── memory/         # MemoryBrowser.jsx — 树形浏览器、编辑器、Gist 视图
+│       │   ├── memory/         # MemoryBrowser.jsx + LayerHierarchyPanel.jsx
 │       │   ├── review/         # ReviewPage.jsx — 差异对比、回滚、整合
-│       │   ├── maintenance/    # MaintenancePage.jsx — 活力清理任务
-│       │   └── observability/  # ObservabilityPage.jsx — 检索与任务监控
+│       │   ├── maintenance/    # MaintenancePage.jsx + ForgettingPanel.jsx
+│       │   └── observability/  # ObservabilityPage.jsx + SearchQualityPanel.jsx
 │       └── lib/
 │           └── api.js          # 统一 API 客户端，运行时注入鉴权信息
 ├── deploy/

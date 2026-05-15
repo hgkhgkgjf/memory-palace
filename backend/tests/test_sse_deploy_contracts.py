@@ -158,8 +158,15 @@ def test_frontend_nginx_template_only_injects_api_key_for_protected_api_routes()
         "location ^~ /api/review/ {",
         "location ^~ /api/browse/ {",
         "location ^~ /api/setup/ {",
+        "location ^~ /api/layering/ {",
+        "location ^~ /api/forgetting/ {",
+        "location = /api/search/quality-metrics {",
     ):
         assert path in template_text
+
+    assert "proxy_pass http://backend:8000/api/layering/;" in template_text
+    assert "proxy_pass http://backend:8000/api/forgetting/;" in template_text
+    assert "proxy_pass http://backend:8000/search/quality-metrics;" in template_text
 
     public_api_block = template_text.split("location /api/ {", 1)[1].split("}", 1)[0]
     assert "proxy_pass http://backend:8000/;" in public_api_block

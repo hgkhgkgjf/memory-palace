@@ -633,8 +633,15 @@ exit 0
         values.get("INTENT_LLM_API_BASE")
         == "http://host.docker.internal:8317/v1/chat/completions"
     )
-    assert values.get("MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS") == "10.88.1.144"
+    assert (
+        values.get("MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS")
+        == "10.88.1.144,host.docker.internal"
+    )
     assert "MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS appended 10.88.1.144" in result.stdout
+    assert (
+        "MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS appended host.docker.internal"
+        in result.stdout
+    )
     assert "ROUTER_API_BASE mapped loopback host to host.docker.internal" in result.stdout
     assert "INTENT_LLM_API_BASE mapped loopback host to host.docker.internal" in result.stdout
 

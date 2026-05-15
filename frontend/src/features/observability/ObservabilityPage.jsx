@@ -29,6 +29,7 @@ import {
 } from '../../lib/api';
 import { formatDateTime as formatDateTimeValue, formatNumber as formatNumberValue } from '../../lib/format';
 import { bindEventSourceListeners, createEventSource, DEFAULT_SSE_REFRESH_EVENT_NAMES } from '../../lib/sse';
+import SearchQualityPanel from './SearchQualityPanel';
 
 const MODE_OPTIONS = ['hybrid', 'semantic', 'keyword'];
 const PANEL_CLASS =
@@ -1033,6 +1034,10 @@ export default function ObservabilityPage() {
             tone={cleanupQueryStats.index_hit_ratio >= 0.9 ? 'good' : cleanupQueryStats.index_hit_ratio >= 0.5 ? 'neutral' : 'warn'}
           />
         </section>
+
+        <div className="mb-5">
+          <SearchQualityPanel />
+        </div>
 
         <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
           <div className="space-y-4">

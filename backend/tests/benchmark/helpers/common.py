@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, Dict
@@ -11,7 +12,9 @@ PROJECT_ROOT = BENCHMARK_DIR.parents[2]
 DATASETS_DIR = TESTS_DIR / "datasets"
 THRESHOLDS_V1_PATH = BENCHMARK_DIR / "thresholds_v1.json"
 BASELINE_MANIFEST_PATH = BENCHMARK_DIR / "baseline_manifest.md"
-BENCHMARK_ARTIFACTS_ROOT = BENCHMARK_DIR / "artifacts"
+BENCHMARK_ARTIFACTS_ROOT = (
+    Path(tempfile.gettempdir()) / "memory-palace-benchmark-artifacts"
+)
 BENCHMARK_ARTIFACT_DIR_ENV = "BENCHMARK_ARTIFACT_DIR"
 BENCHMARK_ARTIFACT_RUN_TOKEN_ENV = "BENCHMARK_ARTIFACT_RUN_TOKEN"
 
@@ -34,7 +37,7 @@ def resolve_benchmark_artifact_dir(artifact_dir: Path | str | None = None) -> Pa
         path = Path(env_dir).expanduser()
         if path.is_absolute():
             return path
-        return BENCHMARK_DIR / path
+        return BENCHMARK_ARTIFACTS_ROOT / path
 
     return BENCHMARK_ARTIFACT_DIR
 

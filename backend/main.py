@@ -31,7 +31,15 @@ def _load_project_dotenv(project_root: Optional[Path] = None) -> Optional[Path]:
 
 _load_project_dotenv()
 
-from api import review_router, browse_router, maintenance_router, setup_router
+from api import (
+    review_router,
+    browse_router,
+    maintenance_router,
+    setup_router,
+    layering_router,
+    forgetting_router,
+    search_quality_router,
+)
 from api.maintenance import (
     _extract_bearer_token,
     _get_configured_mcp_api_key,
@@ -153,6 +161,9 @@ app.include_router(review_router)
 app.include_router(browse_router)
 app.include_router(maintenance_router)
 app.include_router(setup_router)
+app.include_router(layering_router)
+app.include_router(forgetting_router)
+app.include_router(search_quality_router)
 
 
 @app.get("/")

@@ -1,0 +1,544 @@
+{
+  "_meta": {
+    "description": "Frozen MCP tool signatures for Memory Palace. Round 0 baseline: any tool added, removed, renamed, or whose parameter list changes MUST update this file in the same commit. Used by test_mcp_contract_golden.py for zero-regression verification across all refactoring rounds.",
+    "extracted_from": "backend/mcp_server.py",
+    "extraction_method": "ast.parse + decorator filter on @mcp.tool()",
+    "source_lines_extracted_at": {
+      "add_alias": 5460,
+      "compact_context": 6061,
+      "create_memory": 4718,
+      "delete_memory": 5352,
+      "index_status": 6277,
+      "read_memory": 4336,
+      "rebuild_index": 6131,
+      "search_memory": 5567,
+      "update_memory": 4950
+    }
+  },
+  "boot_text_hash": "0af56208c16514fcede1fdc23643cce25c3b9d55cef17a684c7e6a012e582160",
+  "boot_text_skeleton": [
+    "# Core Memories",
+    "# Loaded: 0/1 memories",
+    "",
+    "## Failed to load:",
+    "- core://memory-palace: Memory not found",
+    "",
+    "(No core memories loaded yet.)"
+  ],
+  "boot_text_skeleton_notes": "sha256 over the deterministic empty-DB skeleton (header + Failed-to-load + empty notice). The live system://boot return appends a recent-memories view that depends on runtime time/state, so only the deterministic skeleton is hashed. E2E asserts `'Core Memories' in text` and `'Loaded: 0/1' in text` (see scripts/evaluate_memory_palace_mcp_e2e.py).",
+  "core_memory_uris_default": [
+    "core://memory-palace"
+  ],
+  "default_domain": "core",
+  "frozen_at": "2026-05-15",
+  "read_only_domains": [
+    "system"
+  ],
+  "tool_count": 9,
+  "tools": {
+    "add_alias": {
+      "docstring_first_line": "Creates an alias URI pointing to the same memory as target_uri.",
+      "error_shapes": [
+        {
+          "condition": "new_uri or target_uri fails URI validation (control chars, traversal, invalid scheme)",
+          "shape": "string starting with 'Error:'"
+        },
+        {
+          "condition": "target memory not found",
+          "shape": "string starting with 'Error:'"
+        },
+        {
+          "condition": "write_guard blocks alias on writable domain",
+          "shape": "_tool_response(ok=False, message=...) JSON"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "new_uri",
+          "order": 0
+        },
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "target_uri",
+          "order": 1
+        },
+        {
+          "annotation": "int",
+          "default": 0,
+          "has_default": true,
+          "name": "priority",
+          "order": 2
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "disclosure",
+          "order": 3
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 5460,
+      "success_response_pattern": "string containing 'Success: Alias'"
+    },
+    "compact_context": {
+      "docstring_first_line": "Compact current session context into a durable memory summary.",
+      "error_shapes": [
+        {
+          "condition": "compaction service unavailable / runtime error",
+          "shape": "_tool_response(ok=False, message=...) JSON"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": "manual",
+          "has_default": true,
+          "name": "reason",
+          "order": 0
+        },
+        {
+          "annotation": "bool",
+          "default": false,
+          "has_default": true,
+          "name": "force",
+          "order": 1
+        },
+        {
+          "annotation": "int",
+          "default": 12,
+          "has_default": true,
+          "name": "max_lines",
+          "order": 2
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 6061,
+      "success_response_pattern": "JSON object with ok=true"
+    },
+    "create_memory": {
+      "docstring_first_line": "Creates a new memory under a parent URI.",
+      "error_shapes": [
+        {
+          "condition": "content exceeds 100000 chars",
+          "shape": "_tool_response(ok=False, message contains 'at most 100000 characters', created=false)"
+        },
+        {
+          "condition": "priority is not int >= 0",
+          "shape": "_tool_response(ok=False, message contains 'priority must be an integer >= 0', created=false)"
+        },
+        {
+          "condition": "title contains invalid chars",
+          "shape": "_tool_response(ok=False, message starts with 'Error: Title must only contain', created=false)"
+        },
+        {
+          "condition": "parent_uri targets read-only domain (system://)",
+          "shape": "_tool_response(ok=False, message contains 'read-only', created=false)"
+        },
+        {
+          "condition": "write_guard blocks (action != ADD)",
+          "shape": "_tool_response(ok=False, ...) with guard_action set to UPDATE/NOOP/DUPLICATE"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "parent_uri",
+          "order": 0
+        },
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "content",
+          "order": 1
+        },
+        {
+          "annotation": "int",
+          "default": null,
+          "has_default": false,
+          "name": "priority",
+          "order": 2
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "title",
+          "order": 3
+        },
+        {
+          "annotation": "str",
+          "default": "",
+          "has_default": true,
+          "name": "disclosure",
+          "order": 4
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 4718,
+      "success_response_pattern": "JSON object with created=true, guard_action='ADD'"
+    },
+    "delete_memory": {
+      "docstring_first_line": "Delete a memory by removing its URI path.",
+      "error_shapes": [
+        {
+          "condition": "uri targets read-only domain",
+          "shape": "_tool_response(ok=False, message contains 'read-only')"
+        },
+        {
+          "condition": "memory not found at uri",
+          "shape": "_tool_response(ok=False, ...)"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "uri",
+          "order": 0
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 5352,
+      "success_response_pattern": "JSON object with ok=true, deleted=true, uri=<requested_uri>, message=\"Success: Memory '<uri>' deleted.\""
+    },
+    "index_status": {
+      "docstring_first_line": "Get retrieval index availability and statistics.",
+      "error_shapes": [
+        {
+          "condition": "runtime unavailable",
+          "shape": "JSON object with ok=false (degraded path) or runtime block with degrade_reasons"
+        }
+      ],
+      "is_async": true,
+      "params": [],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 6277,
+      "success_response_pattern": "JSON object with ok=true and 'runtime' key (containing index_worker, sleep_consolidation, write_lanes)"
+    },
+    "read_memory": {
+      "docstring_first_line": "Reads a memory by its URI.",
+      "error_shapes": [
+        {
+          "condition": "chunk_id < 0 in partial mode",
+          "shape": "JSON {\"ok\": false, \"error\": \"chunk_id must be >= 0\"}"
+        },
+        {
+          "condition": "uri not found in partial mode",
+          "shape": "JSON {\"ok\": false, \"error\": \"... not found ...\"}"
+        },
+        {
+          "condition": "invalid uri / unknown domain (legacy mode)",
+          "shape": "string starting with 'Error:'"
+        },
+        {
+          "condition": "system:// resolution failure",
+          "shape": "string starting with 'Error:'"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "uri",
+          "order": 0
+        },
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "chunk_id",
+          "order": 1
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "range",
+          "order": 2
+        },
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "max_chars",
+          "order": 3
+        },
+        {
+          "annotation": "Optional[bool]",
+          "default": false,
+          "has_default": true,
+          "name": "include_ancestors",
+          "order": 4
+        }
+      ],
+      "partial_mode_trigger": "any of chunk_id, range, max_chars is non-None",
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 4336,
+      "success_response_pattern": "Default: formatted plain text starting with 'MEMORY: <uri>'. Partial mode: JSON with selection metadata."
+    },
+    "rebuild_index": {
+      "docstring_first_line": "Trigger retrieval index rebuild jobs.",
+      "error_shapes": [
+        {
+          "condition": "queue full / runtime unavailable",
+          "shape": "_tool_response(ok=False, message=...)"
+        },
+        {
+          "condition": "wait=True and job timeout",
+          "shape": "JSON with ok=true and wait_result.job.status != 'succeeded'"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "memory_id",
+          "order": 0
+        },
+        {
+          "annotation": "str",
+          "default": "manual",
+          "has_default": true,
+          "name": "reason",
+          "order": 1
+        },
+        {
+          "annotation": "bool",
+          "default": false,
+          "has_default": true,
+          "name": "wait",
+          "order": 2
+        },
+        {
+          "annotation": "int",
+          "default": 30,
+          "has_default": true,
+          "name": "timeout_seconds",
+          "order": 3
+        },
+        {
+          "annotation": "bool",
+          "default": false,
+          "has_default": true,
+          "name": "sleep_consolidation",
+          "order": 4
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 6131,
+      "success_response_pattern": "JSON with ok=true; when wait=true, wait_result.job.status='succeeded'"
+    },
+    "search_memory": {
+      "docstring_first_line": "Search memories using keyword/semantic/hybrid retrieval.",
+      "error_shapes": [
+        {
+          "condition": "query is not a string",
+          "shape": "JSON {\"ok\": false, \"error\": \"query must be a string.\"}"
+        },
+        {
+          "condition": "invalid mode",
+          "shape": "JSON {\"ok\": false, \"error\": \"Invalid mode ...\"}"
+        },
+        {
+          "condition": "query > 8000 chars",
+          "shape": "JSON {\"ok\": false, \"error\": \"... at most 8000 characters ...\"}"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "query",
+          "order": 0
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "mode",
+          "order": 1
+        },
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "max_results",
+          "order": 2
+        },
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "candidate_multiplier",
+          "order": 3
+        },
+        {
+          "annotation": "Optional[bool]",
+          "default": null,
+          "has_default": true,
+          "name": "include_session",
+          "order": 4
+        },
+        {
+          "annotation": "Optional[Dict[str, Any]]",
+          "default": null,
+          "has_default": true,
+          "name": "filters",
+          "order": 5
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "scope_hint",
+          "order": 6
+        },
+        {
+          "annotation": "Optional[bool]",
+          "default": true,
+          "has_default": true,
+          "name": "verbose",
+          "order": 7
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 5567,
+      "success_response_pattern": "JSON with ok=true, degraded=false, results=[{uri, ...}, ...]",
+      "supported_modes": [
+        "keyword",
+        "semantic",
+        "hybrid"
+      ]
+    },
+    "update_memory": {
+      "docstring_first_line": "Updates an existing memory to a new version.",
+      "error_shapes": [
+        {
+          "condition": "old_string equals new_string",
+          "shape": "_tool_response(ok=False, message contains 'identical', updated=false)"
+        },
+        {
+          "condition": "priority is not int >= 0",
+          "shape": "_tool_response(ok=False, message contains 'priority must be an integer >= 0', updated=false)"
+        },
+        {
+          "condition": "any text field exceeds 100000 chars",
+          "shape": "_tool_response(ok=False, message contains 'at most 100000 characters', updated=false)"
+        },
+        {
+          "condition": "uri targets read-only domain",
+          "shape": "_tool_response(ok=False, message contains 'read-only', updated=false)"
+        },
+        {
+          "condition": "write_lane timeout",
+          "shape": "_tool_response(ok=False, message='Error: write_lane_timeout')"
+        },
+        {
+          "condition": "snapshot unavailable",
+          "shape": "_tool_response(ok=False, message contains 'snapshot', updated=false)"
+        },
+        {
+          "condition": "guard_action=UPDATE without valid guard_target_id",
+          "shape": "_tool_response(ok=False, fail-closed block, updated=false)"
+        }
+      ],
+      "is_async": true,
+      "params": [
+        {
+          "annotation": "str",
+          "default": null,
+          "has_default": false,
+          "name": "uri",
+          "order": 0
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "old_string",
+          "order": 1
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "new_string",
+          "order": 2
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "append",
+          "order": 3
+        },
+        {
+          "annotation": "Optional[int]",
+          "default": null,
+          "has_default": true,
+          "name": "priority",
+          "order": 4
+        },
+        {
+          "annotation": "Optional[str]",
+          "default": null,
+          "has_default": true,
+          "name": "disclosure",
+          "order": 5
+        }
+      ],
+      "return_annotation": "str",
+      "source_file": "mcp_server.py",
+      "source_line": 4950,
+      "supported_modes": [
+        "patch (old_string+new_string)",
+        "append",
+        "metadata-only (priority and/or disclosure without text changes)"
+      ],
+      "success_response_pattern": "JSON with updated=true, guard_action='ADD' (for content edits) or no guard for metadata-only"
+    }
+  },
+  "uri_schemes": [
+    "core://",
+    "writer://",
+    "game://",
+    "notes://",
+    "system://"
+  ],
+  "valid_domains_env_default": "core,writer,game,notes,system",
+  "version": "1.0.0",
+  "writable_domains": [
+    "core",
+    "writer",
+    "game",
+    "notes"
+  ]
+}

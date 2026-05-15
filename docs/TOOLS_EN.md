@@ -346,6 +346,8 @@ search_memory(
 | `semantic` | Embedding-based semantic search (requires an enabled embedding pipeline: `hash` / `api` / `router` / `openai`) |
 | `hybrid` | Combined keyword + semantic retrieval; followed by reranking if Reranker is enabled |
 
+> `RRF_ENABLED=false` is the current default. When explicitly enabled, RRF only fuses allowlisted channels such as `RRF_CHANNELS=fts5,vector`, with `RRF_K=60` by default; `RRF_LOG_CHANNEL_CONTRIBUTIONS=false` means channel-contribution logging stays off by default. `ENTITY_RERANK_WEIGHT=0.0` is also disabled by default; the entity signal is a boost after fusion, not a third RRF channel.
+
 **Filters (`filters`):**
 
 | Field | Type | Description |

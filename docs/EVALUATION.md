@@ -2,7 +2,7 @@
 
 本文档汇总 Memory Palace 各档位（A/B/C/D）的检索质量、延迟与语义质量门禁测试结果。这里保留**摘要表 + 复核说明**；公开仓库会保留 `backend/tests/benchmark/` 下的 benchmark helpers 与测试入口，机器相关的原始 benchmark 日志、一次性门禁草稿、阶段性重测记录以及部分指标 JSON 默认只在开发阶段或本地使用。
 
-> 状态说明（2026-04）：本页保留 2026-02 的公开基线表格，同时把 2026-04-17 的真实 A/B/C/D 复核、2026-04-18 的当前 rerun，以及 2026-04-21 的修复后复核一起收口到公开口径里。2026-04-21 这轮修复后复核重跑了完整 backend 测试（`1111 passed, 22 skipped`）、frontend 测试（`194 passed`）、frontend build、frontend typecheck、repo-local live MCP e2e（`PASS`）和一轮 repo-local `Profile B` 真实浏览器 smoke；同一轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核（`sample_size=5`，`Profile D` 的 Phase 6 Gate 继续 `PASS`）。本页里的 benchmark 表格并没有在这轮收口里重算。当前交互默认档位、深检索档位和新的门禁项，请优先看本页第 3 节和第 4 节。
+> 状态说明（2026-04 / 2026-05）：本页保留 2026-02 的公开基线表格，同时把 2026-04-17 的真实 A/B/C/D 复核、2026-04-18 的当前 rerun、2026-04-21 的修复后复核，以及 2026-05-15 的 Docker/Linux `Profile B/C/D` 复核一起收口到公开口径里。2026-04-21 这轮修复后复核重跑了完整 backend 测试（`1136 passed, 22 skipped`）、frontend 测试（`198 passed`）、frontend build、frontend typecheck、repo-local live MCP e2e（`PASS`）和一轮 repo-local `Profile B` 真实浏览器 smoke；同一轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核（`sample_size=5`，`Profile D` 的 Phase 6 Gate 继续 `PASS`）。2026-05-15 这轮补验只覆盖 Docker/Linux `Profile B/C/D` 启动、受保护代理路由、SSE、浏览器 smoke 和 C/D 的 create/search/delete，不重算本页 benchmark 表格。当前交互默认档位、深检索档位和新的门禁项，请优先看本页第 3 节和第 4 节。
 
 ---
 
@@ -16,9 +16,9 @@
 | 当前发布说明 | `docs/changelog/release_v3.7.1_2026-03-26.md` |
 | 发布对比摘要 | `docs/changelog/release_summary_vs_old_project_2026-03-06.md` |
 
-> 数据生成时间：`2026-02-19T06:55:30+00:00`（早期门禁基线）/ `2026-04-17T10:35:51+00:00`（当前公开验证）/ `2026-04-18T06:31:05+00:00`（本 session rerun）/ `2026-04-21`（修复后复核刷新；benchmark 表未重跑）
+> 数据生成时间：`2026-02-19T06:55:30+00:00`（早期门禁基线）/ `2026-04-17T10:35:51+00:00`（当前公开验证）/ `2026-04-18T06:31:05+00:00`（本 session rerun）/ `2026-04-21`（修复后复核刷新；benchmark 表未重跑）/ `2026-05-15`（Docker/Linux Profile B/C/D 复核；benchmark 表未重跑）
 
-> 工件路径补充：当前公开 benchmark helpers 默认把运行产物写到 `backend/tests/benchmark/artifacts/<run-token>/...`；如果你要固定路径，显式传 `artifact_dir` 即可。这个目录默认已被 `.gitignore` 忽略，避免并行 benchmark 把临时工件带进工作树。
+> 工件路径补充：当前公开 benchmark helpers 默认把运行产物写到系统临时目录下的 `memory-palace-benchmark-artifacts/<run-token>/...`；如果你要固定路径，显式传 `artifact_dir` 或设置 `BENCHMARK_ARTIFACT_DIR` 即可。这样并行 benchmark 不会把临时工件带进工作树。
 
 ---
 
@@ -43,7 +43,7 @@
 
 ## 2. 检索评测（A/B/CD 小样本门禁）
 
-**来源**：当前最新一轮 run-scoped benchmark 产物 `backend/tests/benchmark/artifacts/<run-token>/profile_ab_metrics.json`（`sample_size=100`，每档 3 个数据集 × 100 条查询；通常由 `backend/tests/benchmark/` 下的 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped benchmark 产物 `memory-palace-benchmark-artifacts/<run-token>/profile_ab_metrics.json`（`sample_size=100`，每档 3 个数据集 × 100 条查询；通常由 `backend/tests/benchmark/` 下的 benchmark helpers 在维护阶段生成）
 
 | 档位 | 模式 | 数据集 | HR@10 | MRR | NDCG@10 | Recall@10 | p50(ms) | p95(ms) | 降级率 |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
@@ -61,7 +61,7 @@
 
 ## 3. 检索评测（真实 A/B/C/D 运行）
 
-**来源**：当前最新一轮 run-scoped real-run 产物 `backend/tests/benchmark/artifacts/<run-token>/profile_abcd_real_metrics.json`（`sample_size_requested=8`，2 个数据集 × 8 条查询；通常由 `backend/tests/benchmark/` 下的 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped real-run 产物 `memory-palace-benchmark-artifacts/<run-token>/profile_abcd_real_metrics.json`（`sample_size_requested=8`，2 个数据集 × 8 条查询；通常由 `backend/tests/benchmark/` 下的 benchmark helpers 在维护阶段生成）
 
 策略：每条查询按 `first_relevant_only=true` 仅保留首个相关文档，额外灌入 `200` 条干扰文档，`candidate_multiplier=8`，随机种子 `20260219`。
 
@@ -125,7 +125,7 @@
 - `Profile B` 还是默认交互档，质量已经明显高于 A，延迟也还很低。
 - `Profile C/D` 这轮质量都跑满了，但时延明显更高，属于按需打开的深检索档。
 - `Profile A` 依旧只是低配兜底，不适合拿来代表语义检索质量。
-- 后续 2026-04-21 的修复后复核重跑了完整 backend/frontend 测试、frontend build/typecheck、repo-local live MCP e2e 和 repo-local `Profile B` 真实浏览器 smoke；同一轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核，`Profile D` 的 Phase 6 Gate 继续 `PASS`。这张 benchmark 表本身没有在那轮重算。
+- 后续 2026-04-21 的修复后复核重跑了完整 backend/frontend 测试、frontend build/typecheck、repo-local live MCP e2e 和 repo-local `Profile B` 真实浏览器 smoke；同一轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核，`Profile D` 的 Phase 6 Gate 继续 `PASS`。2026-05-15 又补跑了 Docker/Linux `Profile B/C/D` 的启动、SSE、浏览器 smoke 和 C/D create/search/delete。这里两轮都没有重算这张 benchmark 表。
 
 ### 3.3 2026-04-20 同配置 follow-up（默认 reranker 权重）
 
@@ -217,7 +217,7 @@
 
 ### Write Guard（写入守卫）
 
-**来源**：当前最新一轮 run-scoped 产物 `backend/tests/benchmark/artifacts/<run-token>/write_guard_quality_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped 产物 `memory-palace-benchmark-artifacts/<run-token>/write_guard_quality_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
 
 | 指标 | 值 | 阈值 | 状态 |
 |---|---:|---:|---|
@@ -236,7 +236,7 @@
 
 ### Intent 分类（查询意图识别）
 
-**来源**：当前最新一轮 run-scoped 产物 `backend/tests/benchmark/artifacts/<run-token>/intent_accuracy_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped 产物 `memory-palace-benchmark-artifacts/<run-token>/intent_accuracy_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
 
 | 指标 | 值 | 阈值 | 状态 |
 |---|---:|---:|---|
@@ -258,7 +258,7 @@
 
 ### Gist 质量（上下文压缩摘要）
 
-**来源**：当前最新一轮 run-scoped 产物 `backend/tests/benchmark/artifacts/<run-token>/compact_context_gist_quality_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped 产物 `memory-palace-benchmark-artifacts/<run-token>/compact_context_gist_quality_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
 
 | 指标 | 值 | 阈值 | 状态 |
 |---|---:|---:|---|
@@ -282,7 +282,7 @@
 
 ### Prompt Safety（反射提示安全契约）
 
-**来源**：当前最新一轮 run-scoped 产物 `backend/tests/benchmark/artifacts/<run-token>/prompt_safety_contract_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped 产物 `memory-palace-benchmark-artifacts/<run-token>/prompt_safety_contract_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
 
 | 指标 | 值 | 阈值 | 状态 |
 |---|---:|---:|---|
@@ -294,7 +294,7 @@
 
 ### Reflection Lane（反射并发通道）
 
-**来源**：当前最新一轮 run-scoped 产物 `backend/tests/benchmark/artifacts/<run-token>/reflection_lane_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
+**来源**：当前最新一轮 run-scoped 产物 `memory-palace-benchmark-artifacts/<run-token>/reflection_lane_metrics.json`（通常由 benchmark helpers 在维护阶段生成）
 
 | Metric | Value | Threshold | Status |
 |---|---:|---:|---|
@@ -304,6 +304,15 @@
 - 关注点：反射 lane 在并发受限且获取超时时，是否仍然按预期返回 `reflection_lane_timeout` 并留下运行时指标。
 - 关键观测字段包括：`tasks_total`、`tasks_failed`、`wait_ms_p95`、`duration_ms_p95`。
 - 这条公开门禁覆盖的是反射的 `prepare/execute` 并发边界；真正的 rollback 路径仍以当前结果里返回的 endpoint 为准：prepare 阶段通常先给 `/maintenance/import/jobs/.../rollback`，执行后如果已经拿到 review snapshot，则会升级为 `/review/...`，同时保留 `/maintenance/learn/jobs/.../rollback` alias。
+
+### RRF / Search Quality calibration
+
+当前仓库还带有两份小型 seeded harness：
+
+- `backend/tests/benchmark/search_quality_baseline.py` / `search_quality_baseline.json`
+- `backend/tests/benchmark/rrf_calibration.py` / `rrf_calibration_results.json`
+
+它们的作用是给 RRF 和 entity boost 这类检索改动提供可复跑的校准基线，不是线上质量承诺。`rrf_calibration_results.json` 里当前记录的推荐默认仍是 **RRF 关闭**：`feature_flag_default=false`，生产配置需要显式设置 `RRF_ENABLED=true` 才会启用。Search Quality Dashboard 当前也没有把这些 seeded harness 结果当成线上指标持久化；面板接口会继续标出 `is_mock=true` / `status=unavailable`，直到项目真的写入带标签的质量样本。
 
 ---
 
@@ -324,15 +333,17 @@ curl -fsS http://127.0.0.1:8000/health
 
 ### 5.1 本 session 已实际复核到哪里
 
-- Backend 非 benchmark 全量：`1111 passed / 22 skipped`
-- Frontend 全量：`194 passed`
+- Backend 非 benchmark 全量：`1136 passed / 22 skipped`
+- Frontend 全量：`198 passed`
 - Frontend `typecheck` / `build`：通过
 - repo-local `Profile B` 真实浏览器 smoke：通过
 - repo-local live MCP e2e：通过（`docs/skills/MCP_LIVE_E2E_REPORT.md` 全 `PASS`）
 - `BEIR NFCorpus` 小样本 real A/B/C/D rerun：通过（`sample_size=5`，`extra_distractors=20`，`candidate_multiplier=8`，`Profile D` 的 Phase 6 Gate = `PASS`）
-- Docker 就绪/鉴权复核：Dashboard `/` `200`、backend `/health` `200`，受保护的 setup/SSE 请求继续保持 fail-close
+- Docker/Linux `Profile B`：使用项目原本设置重跑，backend/frontend healthy，`/sse` 返回 endpoint event，Memory / Observability / Maintenance 浏览器 smoke 无 console error；新增受保护代理路由 `/api/layering/*`、`/api/forgetting/*`、`/api/search/quality-metrics` 返回正常
+- Docker/Linux `Profile C/D`：使用显式运行时注入和 1024 维外部 embedding / reranker 组合重跑；两档 create/search/delete smoke 通过，查询 `degrade_reasons=None`，SSE 与浏览器 smoke 通过
+- Docker / profile / SSE 合同测试：`backend/tests/test_profile_script_regressions.py`、`backend/tests/test_docker_one_click_contracts.py`、`backend/tests/test_sse_deploy_contracts.py` 合计 `67 passed, 10 skipped`
 - 真实 A/B/C/D benchmark：本 session 早些时候已重跑；这轮收口未重算，继续沿用第 3 节表格
-- Docker one-click `Profile C/D`：本轮未重跑，继续保留目标环境复核边界
+- Search Quality Dashboard 面板：当前后端 endpoint 是真实鉴权接口，但因为尚未持久化带标签的质量样本，会明确返回 `is_mock=true` / `status=unavailable`；这里不能把面板里的示例 MRR/Recall 当成 benchmark 结果
 - `skills+MCP` / `single-MCP`：skill smoke 的公开说明仍沿用更早那轮专门宿主验证的结果：`claude` / `codex` / `gemini` 为 `PASS`，`cursor` / `agent` / `antigravity` 为 `PARTIAL`，`gemini_live` 为 `SKIP`。`OpenCode` 在整轮脚本里出现过一次 timeout，但单独重跑通过；这里更适合按宿主波动理解，不把它写成稳定全绿。本次 2026-04-21 文档刷新没有重新跑这组 host-bound smoke。
 
 这里故意不把这轮结果写成“全链路全绿”。尤其是 `skills-only`，现在还只能写 PARTIAL，不能往上拔。

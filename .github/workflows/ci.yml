@@ -1,0 +1,146 @@
+name: CI
+
+# Cross-platform CI matrix that runs on every pull request and push to the
+# default branches. It exercises the backend, the new cross-platform smoke
+# test, and the frontend (build + tests + i18n audit) across the three
+# supported OSes and two Python versions.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend / ${{ matrix.os }} / py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run cross-platform smoke test
+        run: python scripts/cross_platform_smoke.py --json --output cross_platform_report.json
+
+      - name: Upload cross-platform smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-platform-smoke-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: cross_platform_report.json
+          if-no-files-found: ignore
+
+      - name: Run backend pytest (excluding benchmarks)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          cd backend
+          python -m pytest tests --ignore=tests/benchmark -q
+
+  frontend:
+    name: frontend / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python (for i18n audit)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Run i18n audit
+        run: python scripts/i18n_audit.py --json --output i18n_report.json
+
+      - name: Upload i18n audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-audit-${{ matrix.os }}
+          path: i18n_report.json
+          if-no-files-found: ignore
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  audit-pytest:
+    # The smoke + i18n audits also ship pytest wrappers so the dashboards
+    # they emit can be enforced from a normal pytest run. This job exercises
+    # those wrappers explicitly and only on Linux for fast feedback.
+    name: audit wrappers (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run audit wrappers
+        run: |
+          python -m pytest \
+            scripts/cross_platform_smoke_test.py \
+            scripts/i18n_audit_test.py \
+            -v

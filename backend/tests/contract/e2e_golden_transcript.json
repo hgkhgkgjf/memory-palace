@@ -1,0 +1,231 @@
+{
+  "_meta": {
+    "description": "Frozen E2E expectations for the Memory Palace MCP stdio test harness. Derived from scripts/evaluate_memory_palace_mcp_e2e.py. Any refactor that changes a tool's response shape MUST update both this golden transcript and the assertions in the live E2E script in the same commit.",
+    "extracted_from": "scripts/evaluate_memory_palace_mcp_e2e.py",
+    "frozen_at": "2026-05-15",
+    "report_path_default": "docs/skills/MCP_LIVE_E2E_REPORT.md",
+    "version": "1.0.0"
+  },
+  "expected_tool_inventory": [
+    "add_alias",
+    "compact_context",
+    "create_memory",
+    "delete_memory",
+    "index_status",
+    "read_memory",
+    "rebuild_index",
+    "search_memory",
+    "update_memory"
+  ],
+  "steps": [
+    {
+      "args": null,
+      "expected_text_contains": [
+        "tool_inventory"
+      ],
+      "name": "tool_inventory",
+      "rule": "session.list_tools() name set == expected_tool_inventory",
+      "source_line": 217,
+      "tool": null
+    },
+    {
+      "args": {
+        "uri": "system://boot"
+      },
+      "expected_text_contains": [
+        "Core Memories",
+        "Loaded: 0/1"
+      ],
+      "name": "boot_empty",
+      "rule": "system://boot on empty DB returns header + Loaded: 0/1",
+      "source_line": 230,
+      "tool": "read_memory"
+    },
+    {
+      "args": {
+        "content": "user likes concise answers",
+        "disclosure": "when answering",
+        "parent_uri": "core://",
+        "priority": 1,
+        "title": "pref_concise"
+      },
+      "expected_json": {
+        "created": true,
+        "guard_action": "ADD"
+      },
+      "name": "create_memory",
+      "rule": "create returns JSON with created=true and guard_action='ADD'",
+      "source_line": 236,
+      "tool": "create_memory"
+    },
+    {
+      "args": {
+        "content": "user likes concise answers",
+        "disclosure": "when answering",
+        "parent_uri": "core://",
+        "priority": 1,
+        "title": "pref_concise_dup"
+      },
+      "expected_json": {
+        "created": false,
+        "guard_action_in": [
+          "UPDATE",
+          "NOOP",
+          "DUPLICATE",
+          "DEDUPED"
+        ]
+      },
+      "name": "write_guard_block",
+      "rule": "duplicate content is blocked (not created) by write_guard",
+      "source_line": 255,
+      "tool": "create_memory"
+    },
+    {
+      "args": {
+        "query": "concise answers"
+      },
+      "expected_json": {
+        "degraded": false,
+        "ok": true,
+        "results_contains_uri": "core://pref_concise"
+      },
+      "name": "search_memory",
+      "rule": "search returns ok=true, degraded=false, and includes core://pref_concise in results",
+      "source_line": 285,
+      "tool": "search_memory"
+    },
+    {
+      "args": {
+        "uri": "core://pref_concise"
+      },
+      "expected_text_contains": [
+        "user likes concise answers"
+      ],
+      "name": "read_memory",
+      "rule": "read returns content of just-created memory",
+      "source_line": 296,
+      "tool": "read_memory"
+    },
+    {
+      "args": {
+        "new_string": "short",
+        "old_string": "concise",
+        "uri": "core://pref_concise"
+      },
+      "expected_json": {
+        "guard_action": "ADD",
+        "updated": true
+      },
+      "name": "update_memory",
+      "rule": "patch-mode update succeeds with guard_action=ADD",
+      "source_line": 302,
+      "tool": "update_memory"
+    },
+    {
+      "args": {
+        "new_uri": "notes://pref_alias",
+        "target_uri": "core://pref_concise"
+      },
+      "expected_text_contains": [
+        "Success: Alias"
+      ],
+      "expected_text_followup": {
+        "args": {
+          "uri": "notes://pref_alias"
+        },
+        "contains": [
+          "MEMORY: notes://pref_alias"
+        ],
+        "tool": "read_memory"
+      },
+      "name": "add_alias",
+      "rule": "alias creation returns 'Success: Alias' and alias URI is readable",
+      "source_line": 315,
+      "tool": "add_alias"
+    },
+    {
+      "args": {
+        "uri": "notes://pref_alias"
+      },
+      "expected_json": {
+        "deleted": true,
+        "message_contains": "Success: Memory 'notes://pref_alias' deleted.",
+        "ok": true,
+        "uri": "notes://pref_alias"
+      },
+      "expected_text_followup": {
+        "args": {
+          "uri": "core://pref_concise"
+        },
+        "contains": [
+          "user likes short answers"
+        ],
+        "tool": "read_memory"
+      },
+      "name": "delete_alias",
+      "rule": "delete alias removes URI route but underlying core memory is preserved",
+      "source_line": 322,
+      "tool": "delete_memory"
+    },
+    {
+      "args": {
+        "force": true,
+        "max_lines": 6,
+        "reason": "force test"
+      },
+      "expected_json": {
+        "ok": true
+      },
+      "name": "compact_context",
+      "rule": "compact_context with force=true returns ok=true",
+      "source_line": 345,
+      "tool": "compact_context"
+    },
+    {
+      "args": {},
+      "expected_json": {
+        "has_key": "runtime",
+        "ok": true
+      },
+      "name": "index_status",
+      "rule": "index_status returns ok=true with a 'runtime' key",
+      "source_line": 351,
+      "tool": "index_status"
+    },
+    {
+      "args": {
+        "reason": "live_e2e",
+        "wait": true
+      },
+      "expected_json": {
+        "ok": true,
+        "wait_result.job.status": "succeeded"
+      },
+      "name": "rebuild_index",
+      "rule": "rebuild_index(wait=true) completes with job.status='succeeded'",
+      "source_line": 357,
+      "tool": "rebuild_index"
+    },
+    {
+      "args": {
+        "uri": "system://boot"
+      },
+      "expected_text_contains": [
+        "Loaded: 1/1",
+        "user likes short answers"
+      ],
+      "name": "boot_after_write",
+      "rule": "after writes, system://boot loads the core memory and shows updated content",
+      "source_line": 364,
+      "tool": "read_memory"
+    }
+  ],
+  "test_environment": {
+    "report_redaction": {
+      "absolute_paths": "regex sanitized",
+      "session_tokens": "mcp_ctx_* and session-* patterns sanitized"
+    },
+    "stdio_transport": true,
+    "transport": "MCP stdio"
+  }
+}

@@ -15,6 +15,8 @@ vi.mock('../../lib/api', async (importOriginal) => {
     deleteMemoryNode: vi.fn(),
     getMemoryNode: vi.fn(),
     updateMemoryNode: vi.fn(),
+    getLayeringSummaries: vi.fn().mockResolvedValue({ summaries: [] }),
+    getLayeringSummaryDetail: vi.fn().mockResolvedValue({ summary: null, sources: [] }),
   };
 });
 

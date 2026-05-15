@@ -1,0 +1,73 @@
+{
+  "version": "1.0.0",
+  "measured_at": "2026-05-15",
+  "environment": {
+    "search_modes": [
+      "keyword",
+      "semantic",
+      "hybrid"
+    ],
+    "max_results_default": 8,
+    "candidate_multiplier_default": 4,
+    "backend_method": "sqlite_client.search_advanced",
+    "source_file": "backend/db/sqlite_client.py",
+    "source_method_lines": {
+      "search_advanced": [
+        6523,
+        7190
+      ],
+      "search_legacy": [
+        7191,
+        7253
+      ]
+    }
+  },
+  "metric_definitions": {
+    "mrr_at_8": "Mean Reciprocal Rank over top 8 results. For each query, score = 1/rank if expected URI appears within first 8 results else 0; aggregate as arithmetic mean across queries.",
+    "recall_at_8": "Fraction of queries whose expected URI appears within the top 8 returned results.",
+    "p95_ms": "95th percentile of per-query wall-clock latency in milliseconds (asyncio.perf_counter)",
+    "avg_ms": "Arithmetic mean of per-query latency in milliseconds"
+  },
+  "query_set": {
+    "source": "embedded in search_quality_baseline.py",
+    "size": 6,
+    "rationale": "Small representative set spanning factual lookups, multi-token retrieval, and disambiguation. Each query has exactly one expected URI seeded in the test database. Designed to be deterministic and reproducible without external datasets.",
+    "notes": "Queries reuse the same shape as backend/tests/fixtures/memory_gold_set.jsonl (id, query, expected_memory_uri)."
+  },
+  "baseline_metrics": {
+    "keyword": {
+      "mrr_at_8": 0.666667,
+      "recall_at_8": 0.666667,
+      "p95_ms": 1.839,
+      "avg_ms": 1.495,
+      "queries_evaluated": 6,
+      "queries_with_hit": 4,
+      "degraded_query_count": 0
+    },
+    "semantic": {
+      "mrr_at_8": 1.0,
+      "recall_at_8": 1.0,
+      "p95_ms": 3.09,
+      "avg_ms": 2.75,
+      "queries_evaluated": 6,
+      "queries_with_hit": 6,
+      "note": "Falls back to keyword path when embedding backend is disabled. Will report degraded=true and degrade_reasons in metadata.",
+      "degraded_query_count": 0
+    },
+    "hybrid": {
+      "mrr_at_8": 1.0,
+      "recall_at_8": 1.0,
+      "p95_ms": 2.783,
+      "avg_ms": 2.385,
+      "queries_evaluated": 6,
+      "queries_with_hit": 6,
+      "degraded_query_count": 0
+    }
+  },
+  "regression_guidance": {
+    "rrf_change": "After enabling Reciprocal Rank Fusion, re-run search_quality_baseline.py. Compare new metrics against this baseline: mrr_at_8 and recall_at_8 must not decrease beyond noise; p95_ms must remain within 2x for the same query set and seed data.",
+    "entity_rerank_change": "After enabling entity-based reranking, expect mrr_at_8 to improve on multi-entity queries. Capture both new metrics and per-query deltas; do not accept overall regression on recall_at_8.",
+    "tolerance": "Treat differences below 0.02 (2 percentage points) in mrr_at_8 / recall_at_8 as noise unless deterministic seeding is verified."
+  },
+  "notes": "Baseline before RRF implementation. Null values to be filled by running search_quality_baseline.py against a seeded database. The script can be invoked via 'python -m pytest backend/tests/benchmark/search_quality_baseline.py'. The 'measure' test writes the live metrics back into this JSON file in-place under baseline_metrics.*."
+}

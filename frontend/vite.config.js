@@ -9,17 +9,22 @@ const apiProxyTarget =
 const sseProxyTarget =
   process.env.MEMORY_PALACE_SSE_PROXY_TARGET ||
   process.env.NOCTURNE_SSE_PROXY_TARGET ||
-  'http://127.0.0.1:8010'
+  apiProxyTarget
+const apiProxyOptions = {
+  target: apiProxyTarget,
+  changeOrigin: true
+}
 
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
     proxy: {
+      '/api/layering': apiProxyOptions,
+      '/api/forgetting': apiProxyOptions,
       '/api': {
         // 避免 Windows 下优先解析 ::1 导致 IPv6 拒绝连接
-        target: apiProxyTarget,
-        changeOrigin: true,
+        ...apiProxyOptions,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
       // Keep same-origin SSE paths available during local Vite development for

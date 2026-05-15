@@ -415,6 +415,10 @@ extract_hostname_from_url() {
     host_port="${host_port%:*}"
   fi
 
+  if [[ "${host_port}" == *:* ]]; then
+    return 1
+  fi
+
   if [[ -z "${host_port}" ]]; then
     return 1
   fi
@@ -492,7 +496,7 @@ append_provider_allowlist_host_from_api_base() {
     return 0
   fi
   case "${provider_host,,}" in
-    127.0.0.1|::1|localhost|host.docker.internal)
+    127.0.0.1|::1|localhost)
       return 0
       ;;
   esac

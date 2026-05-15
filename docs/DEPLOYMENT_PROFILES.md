@@ -190,11 +190,11 @@ RETRIEVAL_RERANKER_WEIGHT=0.35                     # 远程推荐略高
 - 它每次都会先基于 `deploy/profiles/docker/profile-*.env` 生成一份 Docker env，再按脚本参数决定是否注入运行时覆盖
 - 所以如果你只是把最终直连配置写进仓库根的 `.env`，然后直接执行 `bash scripts/docker_one_click.sh --profile c`，实际启动的仍然是档位模板，不一定是你刚写进去的那套最终值
 
-> 按当前 `v3.7.0` 的复验结果，本地 `profile c/d + --allow-runtime-env-injection` 现在已经会按预期顺序工作：先基于模板生成 Docker env，再把这次运行的模板占位符校验延后，写入运行时注入值，最后仍然对缺失的外部配置做 fail-closed 检查。用人话说就是：模板里的占位符不再会在你真实值落盘前提前挡住本地联调，但缺失必填注入值时仍然会直接拦下。
+> 按当前复验结果，本地 `profile c/d + --allow-runtime-env-injection` 会按预期顺序工作：先基于模板生成 Docker env，再把这次运行的模板占位符校验延后，写入运行时注入值，最后仍然对缺失的外部配置做 fail-closed 检查。用人话说就是：模板里的占位符不再会在你真实值落盘前提前挡住本地联调，但缺失必填注入值时仍然会直接拦下。
 >
 > 对 native Windows PowerShell 路径来说，`docker_one_click.ps1` 后续对这个 Docker env 文件做运行时覆写时，现在也会继续保持 UTF-8 without BOM，不会再把同一个文件改写成 PowerShell 5.1 默认的 UTF-16 形态再交给 Docker Compose。
 >
-> 再补一条这次实测对齐过的边界：对 one-click 的 `profile c/d + --allow-runtime-env-injection` 路径来说，当前 shell 里的 loopback provider base（`127.0.0.1` / `localhost` / `::1`）现在会在生成的 Docker env 里自动改成 `host.docker.internal`，这样容器还能继续访问宿主机上的本地 router / chat 服务。其它 private IP 字面量地址仍然保持原值；脚本只会把它们的精确 host 追加到 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`，不会顺手放宽成更大的信任范围。如果你绕过 one-click，自己准备最终 Docker env，还是要手动写成容器可达地址。
+> 再补一条这次实测对齐过的边界：对 one-click 的 `profile c/d + --allow-runtime-env-injection` 路径来说，当前 shell 里的 loopback provider base（`127.0.0.1` / `localhost` / `::1`）现在会在生成的 Docker env 里自动改成 `host.docker.internal`，这样容器还能继续访问宿主机上的本地 router / chat 服务。这个被改写后的 host 也会追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`，因为后端仍会按 private-address 规则校验 provider base；其它 private IP 字面量地址仍然保持原值，也只追加精确 host，不会顺手放宽成更大的信任范围。脚本不会把还没解析掉的 `host:PORT` 占位串当成可信 host 追加。如果你绕过 one-click，自己准备最终 Docker env，还是要手动写成容器可达地址。
 
 最小验证建议分成两种：
 
@@ -382,7 +382,7 @@ cd <project-root>
 >
 > 当 `RETRIEVAL_EMBEDDING_API_*` / `RETRIEVAL_RERANKER_API_*` 没显式提供时，它会优先复用当前进程里的 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底；当 `RETRIEVAL_RERANKER_MODEL` 没显式提供时，也会优先复用 `ROUTER_RERANKER_MODEL`。
 >
-> 当前验证快照里，本机 A/B/C/D 的启动与检索 smoke 都重新跑过，一键 Docker 路径也重新验证了 A/B/C/D。A 档位这次更多是启动、`/health`、`/sse` 基线 smoke；B/C/D 则额外复验了 setup status、受保护 browse 路由和代理 `/sse` 可达性。这次补跑里，一键 Docker `profile c/d` 的 `--build` 和 `--no-build` 也都重新收证了：生成出来的 Docker env 会把 loopback router / LLM 地址改成 `host.docker.internal`，private embedding / reranker host 继续只保留在显式 allowlist 上，之前那两条 `invalid embedding/reranker API base` warning 也不再出现。对 Docker `profile d` 来说，reranker 可达性仍然是目标环境边界：整套服务可以先正常启动，但如果容器本身连不到 reranker endpoint，查询阶段仍会以 `reranker_request_failed` 的形式降级。
+> 当前验证快照（2026-05-15）：Docker/Linux `Profile B/C/D` 都重新跑过。`Profile B` 使用项目原本设置，backend/frontend health 通过，`/sse` 返回 endpoint event，Dashboard 的 Memory / Observability / Maintenance 页面浏览器 smoke 没有 console error；同时复验了前端代理对 `/api/layering/*`、`/api/forgetting/*`、`/api/search/quality-metrics` 的受保护路由。`Profile C/D` 使用显式运行时注入和 1024 维外部 embedding / reranker 组合，容器内会把宿主机 loopback chat base 改成 `host.docker.internal` 并加入本次 allowlist；两档的 create/search/delete smoke 都通过，查询返回 `degrade_reasons=None`，SSE 与浏览器 smoke 也通过。本轮没有把原生 Windows / 原生 Linux host runtime benchmark 表重算。
 >
 > 本地 build 路径现在还会使用按 checkout 固定的本地镜像名。这样做的好处很直接：只要这个 checkout 里已经成功 build 过一次，后续即使切换 `COMPOSE_PROJECT_NAME`，`--no-build` 也还是能复用之前的本地镜像；只有第一次启动或手动删掉本地镜像时，才需要重新 build。
 
@@ -398,7 +398,7 @@ cd <project-root>
 ### 一键脚本做了什么
 
 1. 调用 profile 脚本从模板生成本次运行使用的 Docker env 文件（默认是 per-run 临时文件；仅当显式设置 `MEMORY_PALACE_DOCKER_ENV_FILE` 时才复用指定路径）
-2. 默认禁用运行时环境注入，避免隐式覆盖模板；仅在显式开关注入时才覆盖运行参数。对 `profile c/d`，注入模式会额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api` 用于本地联调；若显式 `RETRIEVAL_*` 未提供，则优先复用 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源，并同步透传显式的 `RETRIEVAL_EMBEDDING_DIM` 与可选的 `INTENT_LLM_*`。对这条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 现在还会在生成的 Docker env 里自动改成 `host.docker.internal`；non-loopback private provider 字面量地址则保持原值，只把精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`。
+2. 默认禁用运行时环境注入，避免隐式覆盖模板；仅在显式开关注入时才覆盖运行参数。对 `profile c/d`，注入模式会额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api` 用于本地联调；若显式 `RETRIEVAL_*` 未提供，则优先复用 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源，并同步透传显式的 `RETRIEVAL_EMBEDDING_DIM` 与可选的 `INTENT_LLM_*`。对这条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 现在还会在生成的 Docker env 里自动改成 `host.docker.internal`，并把这个 host 追加进本次 allowlist；non-loopback private provider 字面量地址则保持原值，只把精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`。
 3. 自动检测端口占用，若默认端口被占用则自动递增寻找空闲端口
 4. 检测并注入 Docker 持久化卷：默认按 compose project 生成隔离卷名（数据库 `<compose-project>_data`，snapshot `<compose-project>_snapshots`）；如需复用旧卷，必须显式设置 `MEMORY_PALACE_DATA_VOLUME` / `MEMORY_PALACE_SNAPSHOTS_VOLUME`
 5. 若 backend `/app/data` 被改成 NFS/CIFS/SMB 等网络文件系统 bind mount，且本次配置仍会启用 WAL，则在启动前直接 fail-fast
@@ -573,7 +573,7 @@ Authorization: Bearer <你的 MCP_API_KEY>
 
 **Docker 一键部署**时，不需要把 key 写进浏览器页面：
 
-- 前端容器会在代理层自动给 `/api/*`、`/sse`、`/messages` 带上同一把 `MCP_API_KEY`
+- 前端容器会在代理层自动给受保护的 Dashboard API 路径、`/sse`、`/messages` 带上同一把 `MCP_API_KEY`；通用 `/api/*` 不会一律注入这把 key
 - 这把 key 默认保存在本次运行使用的 Docker env 文件里
 - 浏览器只看到代理后的结果，不会直接拿到真实 key
 - 也请把这个前端端口视为可信管理入口。如果你要把 `3000` 暴露到受信网络之外，请先在前面加上自己的 VPN、反向代理鉴权或网络访问控制。

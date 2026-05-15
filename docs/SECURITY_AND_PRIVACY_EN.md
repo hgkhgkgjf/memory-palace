@@ -44,6 +44,9 @@ The following interfaces are protected by default:
 | `/maintenance/*` | All requests | `backend/api/maintenance.py` — `require_maintenance_api_key` as a route dependency |
 | `/review/*` | All requests | `backend/api/review.py` — imports and depends on the same authentication function |
 | `/browse/*` | All requests (including read operations) | `backend/api/browse.py` — routes are uniformly mounted with `Depends(require_maintenance_api_key)` |
+| `/api/layering/*` | All requests | `backend/api/layering.py` — routes depend on the same authentication function |
+| `/api/forgetting/*` | All requests | `backend/api/forgetting.py` — routes depend on the same authentication function |
+| `/search/quality-metrics` | All requests | `backend/api/search_quality.py` — Search Quality panel API, still maintenance-key protected |
 | SSE Interfaces | `/sse` and `/messages` | `backend/run_sse.py` — reusable ASGI auth middleware and SSE transport, used both by standalone `run_sse.py` and by mounts inside `backend/main.py` |
 
 > 📖 `GET` requests for `/browse/node` are also within the scope of authentication; please include `X-MCP-API-Key` or `Authorization: Bearer`.
@@ -127,6 +130,9 @@ The above authentication logic is covered in the following test files in the cur
 - `backend/tests/test_reflection_workflow_api.py` — verifies reflection rollback still checks an explicitly supplied `session_id`, can recover the original `session_id` when only `job_id` is provided, and still performs best-effort namespace cleanup after the review rollback path
 - `backend/tests/test_reflection_observability_summary.py` — verifies `reflection_workflow` summary counters stay restart-stable
 - `backend/tests/test_setup_api.py` — verifies loopback access, remote auth, explicit remote embedding-dimension requirements, runtime-default `/setup/status` summary, and Docker fail-closed behavior
+- `backend/tests/test_layering_engine.py` / `backend/tests/test_forgetting_engine.py` — verify the L2 read-only boundary, forgetting candidates, and human-confirmed archive behavior
+- `backend/tests/test_sse_deploy_contracts.py` — verifies the Docker frontend proxy injects `X-MCP-API-Key` only for protected routes, including `/api/layering/*`, `/api/forgetting/*`, and `/api/search/quality-metrics`
+- `backend/tests/test_artifact_stripper.py` / `backend/tests/test_prompt_cache_adapter.py` — verify opt-in adapters default to no-op and only activate when both env flag and host capability are present
 
 ---
 
@@ -149,7 +155,7 @@ The frontend does not hardcode keys at build time; instead, it reads them via ru
 
 1. `readRuntimeMaintenanceAuth()` reads `window.__MEMORY_PALACE_RUNTIME__`
 2. axios request interceptor `isProtectedApiRequest()` determines if the request needs authentication
-3. Automatically injects authentication headers for `/maintenance/*`, `/review/*`, `/browse/*`, and the new `/setup/*`
+3. Automatically injects authentication headers for `/maintenance/*`, `/review/*`, `/browse/*`, `/setup/*`, `/layering/*`, `/forgetting/*`, and `/search/quality-metrics`
 4. Observability now reuses the same auth path for `/sse`: without a browser-side Dashboard key it stays on native `EventSource`; with a key it switches to fetch-based SSE so the same header/bearer auth can be sent without putting the key in the URL; each reconnect also re-resolves the current browser auth while still carrying `Last-Event-ID`, and terminal `4xx` auth failures stop retrying. Changing or clearing browser-side Dashboard auth now also emits a maintenance-auth change event, and the Observability page uses that signal, plus a focus-time recheck, to rebuild its authenticated stream when auth changes or after a terminal `401` stopped retries.
 
 > Compatibility: Also supports the old field name `window.__MCP_RUNTIME_CONFIG__` (see the runtime config fallback logic in `frontend/src/lib/api.js`).
@@ -175,6 +181,7 @@ The current release adds a Dashboard first-run setup assistant, but it is not a 
 - provider API base fields now go through normalization and validation first: common suffixes such as `/embeddings`, `/rerank`, `/chat/completions`, and `/responses` are trimmed automatically; malformed, credential-bearing, or link-local targets are rejected before save. Loopback IP literals such as `127.0.0.1` / `::1`, plus `localhost`, still stay allowed by default; if you intentionally point at another private IP literal, or at a hostname that resolves to a private non-loopback address, add it to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` first.
 - if the runtime later reads an invalid `chat / embedding / reranker` API base from env, it also fails closed on that value: the bad base is ignored and the code falls back / degrades instead of continuing to send requests to it.
 - if a host cannot provide a native confirm dialog, the Memory page now fails closed and keeps the current state instead of silently deleting data or navigating away.
+- `ArtifactStripper` and `PromptCacheAdapter` are both opt-in adapters. The stripper requires `ARTIFACT_STRIPPING_ENABLED` plus host capability `can_strip_tool_artifacts=true`; the prompt-cache split requires `PROMPT_CACHE_SPLIT_ENABLED` plus `can_set_system_context=true`. By default they are no-op and do not change `read_memory("system://boot")` or the MCP tool return contract.
 
 **New validation anchors:**
 
@@ -210,7 +217,7 @@ The following security configurations can be directly verified in the project's 
 |---|---|---|
 | Non-root execution (Backend) | `groupadd --gid 10001 app && useradd --uid 10001` | `deploy/docker/Dockerfile.backend` |
 | Non-root execution (Frontend) | Using `nginxinc/nginx-unprivileged:1.27-alpine` base image | `deploy/docker/Dockerfile.frontend` |
-| Frontend proxy authentication | Nginx forwards `X-MCP-API-Key` at the server side; the real key is not stored on the browser side. The proxy now injects that header only for protected `/api/maintenance/*`, `/api/review/*`, `/api/browse/*`, `/api/setup/*` routes plus `/sse` / `/messages`, instead of attaching it to every `/api/*` request. Special characters in the proxy-held key are escaped before the final config is generated | `deploy/docker/nginx.conf.template` |
+| Frontend proxy authentication | Nginx forwards `X-MCP-API-Key` at the server side; the real key is not stored on the browser side. The proxy now injects that header only for protected `/api/maintenance/*`, `/api/review/*`, `/api/browse/*`, `/api/setup/*`, `/api/layering/*`, `/api/forgetting/*`, the exact `/api/search/quality-metrics` route, plus `/sse` / `/messages`, instead of attaching it to every `/api/*` request. Special characters in the proxy-held key are escaped before the final config is generated | `deploy/docker/nginx.conf.template` |
 | Prohibit privilege escalation | `security_opt: no-new-privileges:true` | `docker-compose.yml` |
 | Data persistence | Docker volumes are isolated per compose project by default: `<compose-project>_data` → `/app/data`, `<compose-project>_snapshots` → `/app/snapshots` | `docker-compose.yml` |
 | Health check (Backend) | `python /usr/local/bin/backend-healthcheck.py`; internally it requests `http://127.0.0.1:8000/health` and requires the payload to report `status == "ok"`. The request timeout can be tuned with `MEMORY_PALACE_BACKEND_HEALTHCHECK_TIMEOUT_SEC`. The backend image now also wires this into Docker `HEALTHCHECK` | `backend.healthcheck` in `docker-compose.yml`, `deploy/docker/backend-healthcheck.py`, `deploy/docker/Dockerfile.backend` |

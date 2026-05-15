@@ -236,6 +236,9 @@ const isProtectedPath = (pathname) => {
   if (normalizedPath.startsWith('/review/')) return true;
   if (normalizedPath.startsWith('/browse/')) return true;
   if (normalizedPath.startsWith('/setup/')) return true;
+  if (normalizedPath.startsWith('/layering/')) return true;
+  if (normalizedPath.startsWith('/forgetting/')) return true;
+  if (normalizedPath === '/search/quality-metrics') return true;
   return false;
 };
 
@@ -662,3 +665,99 @@ export const getOrphanMemoryDetail = (memoryId) =>
 
 export const deleteOrphanMemory = (memoryId) =>
   api.delete(`/maintenance/orphans/${encodeId(memoryId)}`).then(res => res.data);
+
+// ============ Search Quality Observability ============
+
+export const getSearchQualityMetrics = () =>
+  api.get('/search/quality-metrics').then(res => res.data);
+
+// ============ Forgetting / Vitality Decay Review ============
+
+export const simulateForgettingDecay = (params = {}) =>
+  api.get('/forgetting/simulate', { params }).then(res => res.data);
+
+export const getForgettingCandidates = (params = {}) =>
+  api.get('/forgetting/candidates', { params }).then(res => res.data);
+
+export const prepareForgettingArchive = (payload) =>
+  api.post('/forgetting/archive/prepare', payload).then(res => res.data);
+
+export const confirmForgettingArchive = (payload) =>
+  api.post('/forgetting/archive/confirm', payload, {
+    timeout: LONG_RUNNING_REQUEST_TIMEOUT_MS,
+  }).then(res => res.data);
+
+export const archiveForgettingCandidates = (payload) =>
+  api.post('/forgetting/archive', payload).then(res => res.data);
+
+// ============ Layering Hierarchy ============
+
+const normalizeLayerStat = (stat) => {
+  if (!stat || typeof stat !== 'object') return stat;
+  return {
+    ...stat,
+    storage_bytes: stat.storage_bytes ?? stat.storage_budget_bytes ?? 0,
+  };
+};
+
+const normalizeLayerSummary = (summary) => {
+  if (!summary || typeof summary !== 'object') return summary;
+  const sourceIds = Array.isArray(summary.source_memory_ids)
+    ? summary.source_memory_ids
+    : Array.isArray(summary.source_ids)
+      ? summary.source_ids
+      : [];
+  return {
+    ...summary,
+    id: summary.id ?? summary.summary_id,
+    summary: summary.summary ?? summary.summary_text ?? null,
+    storage_bytes: summary.storage_bytes ?? summary.storage_budget_bytes ?? null,
+    source_memory_ids: sourceIds,
+    l1_count: summary.l1_count ?? sourceIds.length,
+    l0_count: summary.l0_count ?? summary.access_log_count ?? 0,
+  };
+};
+
+const normalizeLayerSourceMemory = (source) => {
+  if (!source || typeof source !== 'object') return source;
+  const id = source.id ?? source.memory_id;
+  return {
+    ...source,
+    id,
+    title: source.title ?? source.uri ?? (id !== undefined ? `#${id}` : null),
+    content: source.content ?? source.current_content ?? source.content_snippet ?? null,
+  };
+};
+
+const normalizeLayeringSummaries = (data) => {
+  if (!data || typeof data !== 'object') return data;
+  return {
+    ...data,
+    layer_stats: Array.isArray(data.layer_stats)
+      ? data.layer_stats.map(normalizeLayerStat)
+      : data.layer_stats,
+    summaries: Array.isArray(data.summaries)
+      ? data.summaries.map(normalizeLayerSummary)
+      : [],
+  };
+};
+
+const normalizeLayeringDetail = (data) => {
+  if (!data || typeof data !== 'object') return data;
+  const sources = Array.isArray(data.source_memories)
+    ? data.source_memories
+    : Array.isArray(data.sources)
+      ? data.sources
+      : [];
+  return {
+    ...data,
+    summary: normalizeLayerSummary(data.summary),
+    source_memories: sources.map(normalizeLayerSourceMemory),
+  };
+};
+
+export const getLayeringSummaries = () =>
+  api.get('/layering/summaries').then(res => normalizeLayeringSummaries(res.data));
+
+export const getLayeringSummaryDetail = (summaryId) =>
+  api.get(`/layering/summaries/${encodeId(summaryId)}`).then(res => normalizeLayeringDetail(res.data));

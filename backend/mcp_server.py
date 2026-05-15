@@ -467,30 +467,13 @@ _MCP_SEARCH_QUERY_MAX_CHARS = 8000
 _MCP_CONTENT_MAX_CHARS = 100000
 
 
-def _validate_mcp_text_length(
-    value: Optional[str], *, field_name: str, max_chars: int
-) -> None:
-    if value is None:
-        return
-    if len(value) > max_chars:
-        raise ValueError(f"{field_name} must be at most {max_chars} characters.")
-
-
-def _validate_uri_text(uri: str) -> str:
-    value = str(uri or "").strip()
-    if not value:
-        raise ValueError("URI must not be empty.")
-    for ch in value:
-        category = unicodedata.category(ch)
-        if category == "Cs":
-            raise ValueError(
-                "URI must not contain surrogate characters."
-            )
-        if category in {"Cc", "Cf"}:
-            raise ValueError(
-                "URI must not contain control or invisible format characters."
-            )
-    return value
+# ``_validate_mcp_text_length`` and ``_validate_uri_text`` were extracted to
+# ``security.sanitizers`` in Round 1.  The names below are imported aliases so
+# every existing call site keeps working without modification.
+from security.sanitizers import (
+    _validate_mcp_text_length,  # noqa: F401  (re-export shim)
+    _validate_uri_text,         # noqa: F401  (re-export shim)
+)
 
 
 def parse_uri(uri: str) -> Tuple[str, str]:
@@ -852,30 +835,12 @@ def _to_json(payload: Dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 
-def _safe_int(value: Any, default: int = 0) -> int:
-    if isinstance(value, bool):
-        return default
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _coerce_bool(value: Any, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        lowered = value.strip().lower()
-        if lowered in {"1", "true", "yes", "on", "enabled"}:
-            return True
-        if lowered in {"0", "false", "no", "off", "disabled"}:
-            return False
-        return default
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return default
+# ``_safe_int`` and ``_coerce_bool`` were extracted to ``security.sanitizers``
+# in Round 1.  Re-imported here so every existing call site keeps working.
+from security.sanitizers import (
+    _safe_int,    # noqa: F401  (re-export shim)
+    _coerce_bool, # noqa: F401  (re-export shim)
+)
 
 
 def _event_preview(text: str, max_chars: int = 220) -> str:
@@ -1050,12 +1015,8 @@ async def _record_guard_event(
     )
 
 
-def _normalize_path_prefix(path_prefix: Optional[str]) -> str:
-    raw = str(path_prefix or "").strip().strip("/")
-    if not raw:
-        return "corrections"
-    parts = [part for part in raw.split("/") if part]
-    return "/".join(parts) if parts else "corrections"
+# ``_normalize_path_prefix`` was extracted to ``security.sanitizers`` in Round 1.
+from security.sanitizers import _normalize_path_prefix  # noqa: F401  (re-export shim)
 
 
 async def _record_import_learn_event(
@@ -1106,11 +1067,8 @@ async def _record_import_learn_event(
         pass
 
 
-def _safe_non_negative_int(value: Any) -> int:
-    try:
-        return max(0, int(value))
-    except (TypeError, ValueError):
-        return 0
+# ``_safe_non_negative_int`` was extracted to ``security.sanitizers`` in Round 1.
+from security.sanitizers import _safe_non_negative_int  # noqa: F401  (re-export shim)
 
 
 def _import_learn_summary_core(payload: Any) -> Dict[str, Any]:

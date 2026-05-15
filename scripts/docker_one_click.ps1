@@ -469,7 +469,7 @@ function Append-ProviderAllowlistHostFromApiBase {
     if ([string]::IsNullOrWhiteSpace($providerHost)) {
         return
     }
-    if ($providerHost -in @('127.0.0.1', '::1', 'localhost', 'host.docker.internal')) {
+    if ($providerHost -in @('127.0.0.1', '::1', 'localhost')) {
         return
     }
 
