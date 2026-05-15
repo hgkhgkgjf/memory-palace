@@ -2,7 +2,7 @@
 
 本文档汇总 Memory Palace 各档位（A/B/C/D）的检索质量、延迟与语义质量门禁测试结果。这里保留**摘要表 + 复核说明**；公开仓库会保留 `backend/tests/benchmark/` 下的 benchmark helpers 与测试入口，机器相关的原始 benchmark 日志、一次性门禁草稿、阶段性重测记录以及部分指标 JSON 默认只在开发阶段或本地使用。
 
-> 状态说明（2026-04 / 2026-05）：本页保留 2026-02 的公开基线表格，同时把 2026-04-17 的真实 A/B/C/D 复核、2026-04-18 的当前 rerun、2026-04-21 的修复后复核一起收口到公开口径里。2026-05-15 这轮 review session 里，backend 测试 `1382 passed, 22 skipped`，frontend 测试 `203 passed`，frontend build/typecheck、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过。本轮没有重算本页 benchmark 表格。当前交互默认档位、深检索档位和新的门禁项，请优先看本页第 3 节和第 4 节。
+> 状态说明（2026-04 / 2026-05）：本页保留历史 benchmark 表格，并注明 2026-05-15 没有重算这些表格。当前验证快照见第 5.1 节；档位选择建议见第 3 节和第 4 节。
 
 ---
 

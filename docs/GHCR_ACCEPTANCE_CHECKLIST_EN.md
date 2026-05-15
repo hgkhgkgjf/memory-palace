@@ -1,9 +1,6 @@
 # GHCR Post-Pull User Acceptance Checklist
 
-This checklist is for two situations:
-
-- you want a quick post-release verification for yourself
-- a user wants to confirm "did it really start correctly on my machine"
+This checklist is for users who want to confirm that the GHCR prebuilt images really started correctly.
 
 The default scope is **Profile B + GHCR prebuilt images** only.
 
@@ -14,8 +11,8 @@ The default scope is **Profile B + GHCR prebuilt images** only.
 - Docker is installed
 - the current directory contains:
   - `docker-compose.ghcr.yml`
-  - `.env.example`
   - `scripts/apply_profile.sh` / `scripts/apply_profile.ps1`
+  - the repository env template, which the script reads to generate `.env.docker`
 
 ---
 
@@ -37,7 +34,7 @@ docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it. Do not copy `.env.example` over `.env.docker` first.
+`apply_profile` creates and backs up `.env.docker`. Do not copy `.env.example` over `.env.docker` by hand.
 
 ---
 

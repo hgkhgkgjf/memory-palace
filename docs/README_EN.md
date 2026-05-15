@@ -8,13 +8,24 @@
 >
 > If you want the AI to walk you through installation, start with the standalone repo [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup). The repository stance is: **prefer skills + MCP first, not MCP-only by default**.
 >
-> If you need additional verification of skill smoke tests or the real MCP call chain, you can run `python scripts/evaluate_memory_palace_skill.py` or `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`. They generate local summaries under `docs/skills/`, but those reports are not the primary entry documents. The current scripts also redact common secret-like values, local absolute paths, and session tokens in those reports, and use private file permissions where the host supports them. `evaluate_memory_palace_skill.py` now returns a non-zero exit code whenever any check is `FAIL`; `SKIP` / `PARTIAL` / `MANUAL` do not fail the process by themselves. If `codex exec` does not emit structured output before the smoke timeout, the `codex` item is reported as `PARTIAL` instead of blocking the whole run. In this round, `evaluate_memory_palace_mcp_e2e.py` also gained a re-exec guard so a local Python handoff does not re-enter repeatedly by accident.
+> If you need extra verification of skill smoke tests or the real MCP call chain, run
+> `python scripts/evaluate_memory_palace_skill.py` or `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`.
+> They generate local review summaries, not primary entry docs; the scripts redact common secret-like values,
+> local absolute paths, and session tokens. `FAIL` makes `evaluate_memory_palace_skill.py` return non-zero,
+> while `SKIP` / `PARTIAL` / `MANUAL` do not fail the process by themselves.
 >
 > Also, A/B/C/D are better understood as different configuration profiles, not a seamless hot-switch button. Once you change embedding backend / model / dimension, be ready to re-check whether the existing index still matches; when the runtime detects a dimension mismatch, it asks for reindex instead of pretending the profile switch already succeeded.
 >
-> The frontend restores the saved language first. If there is no saved value, common Chinese browser languages are normalized to `zh-CN`; other first visits fall back to English. The language button in the upper-right corner still switches between English and Chinese with one click, and the browser remembers your choice.
+> The frontend restores the saved language first. If there is no saved value, Chinese browser languages map to `zh-CN`;
+> other browsers default to English. The top-right language button switches between English and Chinese, and the new choice is persisted.
 
-> Current docs in this English set reflect this 2026-05-15 review session: backend `1382 passed / 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts passed. `Profile B` keeps the project's shipped settings; `Profile C/D` runtime-injection contracts were checked with a 1024-dimension external embedding/reranker-style configuration and Docker loopback rewrite. The public A/B/C/D benchmark tables were not recalculated in this pass, and native Windows / native Linux host-runtime paths remain target-environment checks.
+> Public validation snapshot (2026-05-15):
+>
+> - backend `1382 passed / 22 skipped`
+> - frontend `203 passed`
+> - frontend `typecheck/build`, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts passed
+> - `Profile B` uses the project defaults; runtime env injection is only for `Profile C/D`
+> - A/B/C/D benchmark tables were not recalculated; native Windows and native Linux host runtime still need target-environment checks
 
 ![System Architecture Diagram](images/系统架构图.png)
 
@@ -56,12 +67,11 @@
 
 > If you only want to get the service running first, start with the **GHCR prebuilt image** path in `GETTING_STARTED_EN.md`.
 >
-> If you also want to wire `Claude / Codex / Gemini / OpenCode / IDE hosts` into this repository, continue with the docs under `docs/skills/`. Docker starts the service side; it does not automatically rewrite the local skill / MCP configuration on your machine.
+> If you also want to wire `Claude / Codex / Gemini / OpenCode / IDE hosts` into this repository, continue with `docs/skills/`.
+> Docker starts the service side; it does not rewrite local skill / MCP configuration on your machine.
 
 ## 📊 Evaluation and Quality
 
 | Document | Description |
 |---|---|
 | [EVALUATION_EN.md](EVALUATION_EN.md) | Public benchmark methodology, summary of key A/B/C/D metrics, and reproduction commands |
-
-> Verification note: in this review session, backend `1382 passed / 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and the focused Docker/profile/SSE/script contracts passed. The public A/B/C/D benchmark tables were not recalculated in this pass, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.

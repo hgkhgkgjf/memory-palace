@@ -1,5 +1,7 @@
 # Memory Palace Trigger Samples
 
+Canonical path: `docs/skills/memory-palace/references/trigger-samples.md`
+
 This file is the trigger-evaluation sample set for the `memory-palace` skill.
 
 ## What this sample set is for

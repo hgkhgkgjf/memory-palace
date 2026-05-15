@@ -2252,8 +2252,8 @@ body.nav-open {
             <p class="hero-tagline-en" data-i18n="hero.tagline_en">Persistent. Searchable. Auditable.</p>
             <p class="hero-desc" data-i18n="hero.desc">
               Memory Palace gives AI agents a durable memory layer through MCP, SQLite, Write Guard, snapshots,
-              a React dashboard, and bilingual documentation. It is built for Codex, Claude Code, Gemini CLI,
-              OpenCode, and repo-local IDE host integrations.
+              a React dashboard, and bilingual documentation. The docs cover CLI integrations and repo-local
+              IDE host connection paths; target hosts still need their own checks.
             </p>
 
             <div class="hero-pills">
@@ -2291,12 +2291,12 @@ body.nav-open {
                 <span data-i18n="hero.panel_proof">current verified snapshot</span>
               </div>
               <div class="hero-proof">
-                <span class="proof-badge" data-i18n="hero.proof_badge">2026-05-15 review rerun</span>
+                <span class="proof-badge" data-i18n="hero.proof_badge">2026-05-15 validation snapshot</span>
                 <dl class="proof-grid">
                   <div class="metric-card">
                     <dt class="metric-label" data-i18n="hero.metric_backend_label">Backend tests</dt>
                     <dd class="metric-value">1382 passed / 22 skipped</dd>
-                    <dd class="metric-note" data-i18n="hero.metric_backend_note">Full pytest rerun in this working copy.</dd>
+                    <dd class="metric-note" data-i18n="hero.metric_backend_note">Documented validation snapshot; see Docs Center.</dd>
                   </div>
                   <div class="metric-card">
                     <dt class="metric-label" data-i18n="hero.metric_frontend_label">Frontend tests</dt>
@@ -2492,7 +2492,7 @@ body.nav-open {
         <div class="section-head reveal">
           <span class="label" data-i18n="validation.label">Validation and docs</span>
           <h2 id="validationTitle" data-i18n="validation.title">This intro page is tied to the current repository state.</h2>
-          <p data-i18n="validation.desc">The copy below is constrained to what the repo currently exposes in code, docs, and this turn's rerun results.</p>
+          <p data-i18n="validation.desc">The copy below follows the latest documented validation snapshot and keeps unsupported paths explicit.</p>
         </div>
 
         <div class="doc-grid">
@@ -2500,8 +2500,8 @@ body.nav-open {
             <div class="icon-chip chip-good">✓</div>
             <h3 data-i18n="validation.card1_title">Current test snapshot</h3>
             <ul class="doc-list">
-              <li data-i18n="validation.card1_item1">Backend: <span class="mono">1382 passed, 22 skipped</span></li>
-              <li data-i18n="validation.card1_item2">Frontend: <span class="mono">203 passed</span></li>
+              <li data-i18n="validation.card1_item1">Backend and frontend suites passed in the documented snapshot</li>
+              <li data-i18n="validation.card1_item2">Repo-local live MCP e2e and focused Docker/profile/SSE/script contracts passed</li>
               <li data-i18n="validation.card1_item3"><span class="mono">npm run typecheck</span> and <span class="mono">npm run build</span> passed</li>
             </ul>
           </article>
@@ -2520,9 +2520,9 @@ body.nav-open {
             <div class="icon-chip chip-soft">PATH</div>
             <h3 data-i18n="validation.card3_title">What this page does not claim</h3>
             <ul class="doc-list">
-              <li data-i18n="validation.card3_item1">No claim that every host and environment path was rerun in this turn</li>
-              <li data-i18n="validation.card3_item2">No claim that Profile switches are seamless or zero-maintenance</li>
-              <li data-i18n="validation.card3_item3">No claim that MCP-only is the default recommended install path</li>
+              <li data-i18n="validation.card3_item1">A/B/C/D benchmark tables were not recalculated in the latest snapshot</li>
+              <li data-i18n="validation.card3_item2">Native Windows / native Linux host runtime still needs target-environment checks</li>
+              <li data-i18n="validation.card3_item3">OpenCode, Cursor, agent, and Antigravity are not claimed as all-green</li>
             </ul>
           </article>
         </div>
@@ -2620,8 +2620,8 @@ const TEXT = {
     zh: "持久化、可检索、可审计。"
   },
   "hero.desc": {
-    en: "Memory Palace gives AI agents a durable memory layer through MCP, SQLite, Write Guard, snapshots, a React dashboard, and bilingual documentation. It is built for Codex, Claude Code, Gemini CLI, OpenCode, and repo-local IDE host integrations.",
-    zh: "Memory Palace 通过 MCP、SQLite、Write Guard、快照机制、React Dashboard 和双语文档，为 AI Agent 提供可持续运行的长期记忆层。当前仓库已经给出 Codex、Claude Code、Gemini CLI、OpenCode 以及 repo-local IDE 宿主接入路径。"
+    en: "Durable MCP memory for AI agents with SQLite, Write Guard, snapshots, a React dashboard, and bilingual docs. Docs cover CLI integrations and repo-local IDE host paths; target hosts still need checks.",
+    zh: "Memory Palace 通过 MCP、SQLite、Write Guard、快照机制、React Dashboard 和双语文档，为 AI Agent 提供可持续运行的长期记忆层。文档覆盖 CLI 集成和 repo-local IDE 宿主接入路径；目标宿主仍需单独复核。"
   },
   "hero.pill_1": { en: "9 MCP tools", zh: "9 个 MCP 工具" },
   "hero.pill_2": { en: "Write Guard + snapshots", zh: "Write Guard + 快照" },
@@ -2636,9 +2636,9 @@ const TEXT = {
     zh: "create/update 前会经过 Write Guard。检索、审查和维护都留在同一条 repo-local 路径里。"
   },
   "hero.panel_proof": { en: "current verified snapshot", zh: "当前验证快照" },
-  "hero.proof_badge": { en: "2026-05-15 review rerun", zh: "2026-05-15 review 重跑" },
+  "hero.proof_badge": { en: "2026-05-15 validation snapshot", zh: "2026-05-15 验证快照" },
   "hero.metric_backend_label": { en: "Backend tests", zh: "后端测试" },
-  "hero.metric_backend_note": { en: "Full pytest rerun in this working copy.", zh: "本工作副本里完整重跑 pytest。" },
+  "hero.metric_backend_note": { en: "Documented validation snapshot; see Docs Center.", zh: "公开验证快照；详见文档中心。" },
   "hero.metric_frontend_label": { en: "Frontend tests", zh: "前端测试" },
   "hero.metric_frontend_note": { en: "Vitest rerun, plus typecheck and build passed.", zh: "Vitest 重跑通过，typecheck 和 build 也通过。" },
   "hero.status_title": { en: "Docs status:", zh: "文档状态：" },
@@ -2793,21 +2793,21 @@ const TEXT = {
     zh: "这张介绍页绑定的是当前仓库真相。"
   },
   "validation.desc": {
-    en: "The copy below is constrained to what the repo currently exposes in code, docs, and this turn's rerun results.",
-    zh: "下面的文案只引用仓库当前代码、现有文档，以及本轮重新执行得到的验证结果。"
+    en: "The copy below follows the latest documented validation snapshot and keeps unsupported paths explicit.",
+    zh: "下面的文案遵循最新公开验证快照，并明确保留未覆盖路径。"
   },
   "validation.card1_title": { en: "Current test snapshot", zh: "当前测试快照" },
-  "validation.card1_item1": { en: "Backend: <span class=\"mono\">1382 passed, 22 skipped</span>", zh: "后端：<span class=\"mono\">1382 passed, 22 skipped</span>" },
-  "validation.card1_item2": { en: "Frontend: <span class=\"mono\">203 passed</span>", zh: "前端：<span class=\"mono\">203 passed</span>" },
+  "validation.card1_item1": { en: "Backend and frontend suites passed in the documented snapshot", zh: "后端和前端套件已在公开验证快照中通过" },
+  "validation.card1_item2": { en: "Repo-local live MCP e2e and focused Docker/profile/SSE/script contracts passed", zh: "repo-local live MCP e2e 和 Docker/profile/SSE/script 重点契约通过" },
   "validation.card1_item3": { en: "<span class=\"mono\">npm run typecheck</span> and <span class=\"mono\">npm run build</span> passed", zh: "<span class=\"mono\">npm run typecheck</span> 和 <span class=\"mono\">npm run build</span> 都通过" },
   "validation.card2_title": { en: "Current public docs", zh: "当前公开文档面" },
   "validation.card2_item1": { en: "Paired <span class=\"mono\">README.md</span> and <span class=\"mono\">README_CN.md</span>", zh: "成对的 <span class=\"mono\">README.md</span> 与 <span class=\"mono\">README_CN.md</span>" },
   "validation.card2_item2": { en: "Paired docs center and quick start pages", zh: "成对的文档中心与快速开始页" },
   "validation.card2_item3": { en: "Tool reference, deployment profiles, dashboard guide, evaluation docs", zh: "工具参考、部署档位、Dashboard 指南和评测文档" },
   "validation.card3_title": { en: "What this page does not claim", zh: "这张页面不会声称什么" },
-  "validation.card3_item1": { en: "No claim that every host and environment path was rerun in this turn", zh: "不会声称所有宿主和环境路径都在这轮被重跑过" },
-  "validation.card3_item2": { en: "No claim that Profile switches are seamless or zero-maintenance", zh: "不会声称 Profile 切换是无感且零维护的" },
-  "validation.card3_item3": { en: "No claim that MCP-only is the default recommended install path", zh: "不会声称 MCP-only 是默认推荐安装路径" },
+  "validation.card3_item1": { en: "A/B/C/D benchmark tables were not recalculated in the latest snapshot", zh: "A/B/C/D benchmark 表未在最新快照中重算" },
+  "validation.card3_item2": { en: "Native Windows / native Linux host runtime still needs target-environment checks", zh: "原生 Windows / 原生 Linux host runtime 仍需目标环境复核" },
+  "validation.card3_item3": { en: "OpenCode, Cursor, agent, and Antigravity are not claimed as all-green", zh: "OpenCode、Cursor、agent、Antigravity 不声明全绿" },
 
   "start.label": { en: "Start here", zh: "从这里开始" },
   "start.title": { en: "Three practical entry points.", zh: "三个实用入口。" },

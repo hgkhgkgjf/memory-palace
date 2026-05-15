@@ -1,6 +1,6 @@
 # Memory Palace 修复后收口说明（2026-04-21）
 
-这份说明只记录**这次 session 里已经真实修改、已经真实复验**的内容，不把目标环境差异写成统一保证。
+这份说明只记录**2026-04-21 发布后加固验证中已经真实修改、已经真实复验**的内容，不把目标环境差异写成统一保证。
 
 ---
 
@@ -33,14 +33,14 @@
 - 前端全量：`198 passed`
 - 前端 `typecheck`：通过
 - 前端 `build`：通过
-- repo-local live MCP e2e：通过（`docs/skills/MCP_LIVE_E2E_REPORT.md` 全 `PASS`）
-- 同一个 session 里更早一些：repo-local macOS `Profile B` 真实浏览器 smoke 通过
-- 同一个 session 里更早一些：repo-local skill smoke 仍然是：
+- repo-local live MCP e2e 脚本：通过
+- 同轮验证还覆盖：repo-local macOS `Profile B` 真实浏览器 smoke
+- 同轮验证里的 repo-local skill smoke：
   - `structure`、`description_contract`、`mirrors`、`sync_check`、`mcp_bindings`、`claude`、`opencode` 为 `PASS`
   - `gemini` 也为 `PASS`
   - `codex`、`cursor`、`agent`、`antigravity` 为 `PARTIAL`
   - `gemini_live` 为 `SKIP`
-- 同一个 session 里更早一些：小样本 real A/B/C/D 复核仍然是：
+- 同轮验证里的小样本 real A/B/C/D 复核：
   - 数据集：`BEIR NFCorpus`
   - 参数：`sample_size=5`、`extra_distractors=20`、`candidate_multiplier=8`
   - 结果：`Profile D` 的 Phase 6 Gate 继续 `PASS`

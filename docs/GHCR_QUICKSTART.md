@@ -20,6 +20,8 @@
 
 ## 2. 最短命令
 
+`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份。不要先手动把 `.env.example` 复制到 `.env.docker`。
+
 ```bash
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
@@ -42,9 +44,7 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 > 这里默认走的是 **Profile B**。
 >
-> `apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份，所以不要先手动把 `.env.example` 复制到 `.env.docker`。
->
-> 当前这条 GHCR 路径还会额外依赖 backend 镜像里的健康检查脚本。官方发布出来的 backend 镜像现在自带 `/usr/local/bin/backend-healthcheck.py`；如果你用的是自己缓存的旧镜像、私有镜像代理，或者手工 retag 过的镜像，先确认这一份 helper 还在，不然 frontend 可能会一直等 backend 变 healthy。
+> 启动前先 `pull` 最新镜像；如果你使用旧缓存、私有镜像代理或手工 retag 的镜像，优先换回官方最新镜像再排查。
 
 ---
 
@@ -127,6 +127,8 @@ docker compose -f docker-compose.ghcr.yml up -d
 ---
 
 ## 6. 如果容器要访问你宿主机上的模型服务
+
+这一节只适用于你切到 C/D，或显式配置了外部 embedding / reranker / LLM provider 的情况。
 
 不要把地址写成：
 

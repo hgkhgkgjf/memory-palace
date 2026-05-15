@@ -20,6 +20,8 @@ If you just want it to work first, start here.
 
 ## 2. Shortest Commands
 
+`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it. Do not copy `.env.example` over `.env.docker` first.
+
 ```bash
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
@@ -42,9 +44,7 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 > This uses **Profile B** by default.
 >
-> `apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it, so do not copy `.env.example` over `.env.docker` first.
->
-> This GHCR path now also depends on the backend image carrying its healthcheck helper. The official backend image now ships `/usr/local/bin/backend-healthcheck.py`; if you are using an older cached image, a private mirror, or a manually retagged image, verify that helper is still present first, or the frontend can keep waiting on backend health forever.
+> Pull the latest official images before startup. If you use an old cache, private mirror, or manually retagged image, switch back to the latest official image first when troubleshooting.
 
 ---
 
@@ -133,6 +133,8 @@ docker compose -f docker-compose.ghcr.yml up -d
 ---
 
 ## 6. If the Container Must Reach a Model Service on Your Host
+
+This section only applies when you switch to C/D or explicitly configure an external embedding / reranker / LLM provider.
 
 Do not use:
 

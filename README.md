@@ -60,7 +60,11 @@ If you want the AI to guide installation step by step, start with the standalone
 - **Repo-local wrapper rejects more local sqlite misconfigurations now**: the built-in Python and shell wrappers now normalize common slash and case variants, reject relative sqlite paths, and also decode common percent-escaped container paths before deciding whether a local `DATABASE_URL` still points at Docker-internal `/app/...` or `/data/...`. In practice, values such as `sqlite+aiosqlite:///demo.db`, `sqlite+aiosqlite://///app/data/...`, and `sqlite+aiosqlite:////%2Fapp%2Fdata/...` are no longer accepted by accident.
 - **Docker base images are pinned more tightly now**: the repository Dockerfiles now keep explicit digest pins on the shipped base images, so rebuilds are less likely to drift just because an upstream tag moved.
 - **GHCR release images now self-check the backend health helper**: the backend image now ships a Docker-level `HEALTHCHECK`, `docker-compose.ghcr.yml` keeps the backend bound to `0.0.0.0`, and the publish workflow now verifies `/usr/local/bin/backend-healthcheck.py` before it pushes a new backend image.
-- **The current validation note is based on this review session**: on 2026-05-15, backend tests passed with `1382 passed, 22 skipped`, frontend tests passed with `203 passed`, and frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts all passed. `Profile B` keeps the project's shipped settings; `Profile C/D` runtime-injection contracts were checked with a 1024-dimension external embedding/reranker-style configuration and loopback Docker rewrite. The benchmark tables below were not recalculated in this pass, and native Windows / native Linux host-runtime paths remain target-environment checks.
+- **Current public validation snapshot**: on 2026-05-15, backend tests passed with `1382 passed, 22 skipped`,
+  frontend tests passed with `203 passed`, and frontend typecheck/build, i18n audit, bundle budget,
+  repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts passed. `Profile B` keeps
+  the project defaults; runtime env injection is only for `Profile C/D`. The benchmark tables below were
+  not recalculated in this pass, and native Windows / native Linux host-runtime paths still need target-environment checks.
 - **Public MCP contracts are stricter now**: the MCP boundary now rejects control/invisible/surrogate URI characters, blocks overlong `search_memory` / `create_memory` / `update_memory` payloads before DB work starts, and keeps percent-encoded memory URIs predictable: literal percent sequences remain valid path text, existing memories can also be resolved through decoded path variants such as encoded spaces or slashes, and percent-decoded Windows filesystem paths such as `C%3A/...` are rejected as invalid memory URIs. `add_alias` also rolls back the alias path if snapshot capture fails after the DB write.
 - **Search fail-closed behavior is tighter now**: if final path revalidation itself blows up, `search_memory` now drops that result instead of fail-opening with stale data, and surfaces the degradation in the response. Unsafe FTS control syntax (`AND` / `OR` / `NOT` / `NEAR` or wildcard-heavy forms) now falls back per request instead of steering query semantics or surfacing a noisy `fts_query_invalid` for normal user text. Fast-tier temporal queries also keep the fast candidate cap, and the keyword LIKE fallback now escapes literal `%` / `_` instead of treating them as accidental wildcards.
 - **Private provider targets are no longer implicitly trusted**: loopback IP literals such as `127.0.0.1` / `::1`, plus `localhost`, still work out of the box, but other private IP literals, and hostnames that resolve to private non-loopback addresses, now require an explicit allowlist entry through `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`. Link-local and malformed targets remain fail-closed.
@@ -920,7 +924,16 @@ The canonical skill is aligned with the current code contract:
 - when `guard_action=NOOP`, stop writing, inspect the suggested target, and only then decide whether to switch to `update_memory`
 - the trigger sample set lives at `<repo-root>/docs/skills/memory-palace/references/trigger-samples.md`
 
-If you want to re-check skill smoke or the live MCP path, run `python scripts/evaluate_memory_palace_skill.py` and `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`. By default they generate local reports under `docs/skills/`; if you need isolated output during parallel review or CI, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH` first. When those variables use relative paths, the scripts now redirect them under the system temp directory's `memory-palace-reports/` root instead of writing back into the repository; if you want a fully controlled location, prefer an absolute path outside the repo. Those local reports now also redact common secret-like values, absolute local paths, and session tokens, and use private file permissions where the host supports them. `evaluate_memory_palace_skill.py` now returns a non-zero exit code whenever any check is `FAIL`; `SKIP` / `PARTIAL` / `MANUAL` do not fail the process by themselves. If you only want to override the Gemini smoke model locally for one run, set `MEMORY_PALACE_GEMINI_TEST_MODEL`; if you also need a separate fallback model, add `MEMORY_PALACE_GEMINI_FALLBACK_MODEL`. On a clean clone, "workspace mirrors not installed yet" is now reported as `PARTIAL` instead of a hard failure. If `codex exec` starts but does not emit structured output before the smoke timeout, the `codex` item also lands as `PARTIAL` instead of stalling the whole run. If the current machine simply does not have the `Antigravity` host runtime, treat the `antigravity` item as manual host-side follow-up rather than a repository-mainline failure.
+If you want to re-check skill smoke or the live MCP path, run:
+
+```bash
+python scripts/evaluate_memory_palace_skill.py
+cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
+```
+
+These commands generate local review reports. Treat `FAIL` as actionable; treat `SKIP` / `PARTIAL` / `MANUAL` as host or environment boundaries that need targeted follow-up.
+For isolated output during CI or parallel review, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH`.
+Relative paths are redirected under `memory-palace-reports/`; for a fixed location, use an absolute path outside the repo.
 
 The live MCP e2e script now follows the same repo-local wrapper path that users actually connect to. It also covers wrapper behavior and `compact_context` gist persistence instead of only checking the bare tool inventory.
 
@@ -941,7 +954,7 @@ Full guides:
 
 ### Current Verification Snapshot (2026-04-18)
 
-> This narrower rerun is a **current-session maintenance snapshot**, not a replacement for the published release tables below.
+> This narrower rerun is a historical maintenance snapshot, not a replacement for the published release tables below.
 >
 > Parameters: `dataset_scope=squad_v2_dev`, `sample_size=2`, `extra_distractors=20`, `candidate_multiplier=8`, `max_results=10`.
 
@@ -956,7 +969,9 @@ Full guides:
 >
 > Historical note (2026-04-21): the regression-fix rerun also covered the full backend/frontend suites, frontend build/typecheck, repo-local live MCP e2e, Docker readiness/auth checks, repo-local `Profile B` browser smoke, and a smaller `BEIR NFCorpus` A/B/C/D run. The narrower benchmark table above itself was not recalculated in that doc-sync pass.
 >
-> Follow-up note (2026-05-15): this review session reran backend `1382 passed / 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts. The table above was not recalculated in this pass.
+> Follow-up note (2026-05-15): the public validation snapshot covered backend `1382 passed / 22 skipped`,
+> frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e,
+> and focused Docker/profile/SSE/script contracts. The table above was not recalculated in this pass.
 
 ### Retrieval Quality — A/B/C/D Real Run
 

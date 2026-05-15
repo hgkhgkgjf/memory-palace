@@ -189,11 +189,12 @@ If you adopt the direct connection method, note one boundary first:
 - On each run, it first generates a Docker env file from `deploy/profiles/docker/profile-*.env`, and only then decides whether to inject runtime overrides based on the script arguments.
 - So if you only write your final direct-API settings into the repository-root `.env` and then run `bash scripts/docker_one_click.sh --profile c`, the actual startup still uses the profile template path, not necessarily the final values you just wrote.
 
-> As rechecked in the current validation, the local `profile c/d + --allow-runtime-env-injection` path now follows the intended order: generate the Docker env from the template first, defer template placeholder validation for that run, write the injected runtime values, and then still fail closed if the required external settings remain unresolved. In plain language: template placeholders no longer block local debugging before your real values land, but missing injected values are still treated as a hard stop.
+> Runtime env injection is only for `profile c/d`, and it is meant for local debugging or explicit API configuration.
+> `profile a/b` reject the same flag so lightweight profiles cannot be rewritten by host environment variables.
 >
-> On the native Windows PowerShell path, later env rewrites in `docker_one_click.ps1` now also keep that generated Docker env file in UTF-8 without BOM, so the same file can continue to be handed to Docker Compose without a PowerShell 5.1 encoding mismatch.
->
-> One more boundary to keep explicit after this rerun: on the one-click `profile c/d + --allow-runtime-env-injection` path, loopback provider bases from your current shell (`127.0.0.1` / `localhost` / `::1`) are now rewritten to `host.docker.internal` inside the generated Docker env, so host-side local router / chat services stay reachable from the container. That rewritten host is also appended to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for this run because the backend still validates provider bases under the private-address rules. Other private IP literals are kept as-is and only append their exact host instead of widening the trust range. The script does not append unresolved `host:PORT` placeholder strings as trusted hosts. If you bypass the one-click path and prepare the Docker env yourself, you still need to write the container-reachable address explicitly.
+> For `profile c/d`, the script generates the Docker env first, writes explicit injected values, and still fails closed if required external settings are missing.
+> Loopback provider bases are rewritten to `host.docker.internal` for container reachability.
+> If you bypass one-click and prepare the Docker env yourself, you must still write a container-reachable address.
 
 The minimum verification path should therefore be split into two cases:
 
@@ -386,7 +387,9 @@ cd <project-root>
 >
 > When `RETRIEVAL_EMBEDDING_API_*` / `RETRIEVAL_RERANKER_API_*` are not explicitly provided, it prioritizes `ROUTER_API_BASE/ROUTER_API_KEY` from the current process as the fallback source for embedding / reranker API base+key. When `RETRIEVAL_RERANKER_MODEL` is not explicitly provided, it also falls back to `ROUTER_RERANKER_MODEL`.
 >
-> Current validation snapshot (2026-05-15): Docker/Linux `Profile B/C/D` were rerun. `Profile B` used the project's existing settings; backend/frontend health passed, `/sse` returned an endpoint event, and browser smoke on the Memory / Observability / Maintenance pages had no console errors. The same pass verified the protected frontend proxy routes for `/api/layering/*`, `/api/forgetting/*`, and `/api/search/quality-metrics`. `Profile C/D` used explicit runtime injection with a 1024-dimension external embedding / reranker setup; the generated container env rewrote the host-side loopback chat base to `host.docker.internal` and added that host to the run allowlist. Create/search/delete smoke passed for both profiles, search returned `degrade_reasons=None`, and SSE plus browser smoke passed. This pass did not recalculate the native Windows / native Linux host-runtime benchmark tables.
+> Current validation snapshot (2026-05-15): Docker/Linux `Profile B/C/D` passed focused smoke checks.
+> `Profile B` used the project defaults; `Profile C/D` used explicit runtime injection.
+> Native Windows / native Linux host-runtime benchmark tables were not recalculated in this pass.
 >
 > The local build path now also uses checkout-scoped stable image names. The practical effect is simple: once this checkout has completed one successful build, `--no-build` can keep reusing those local images even if you change `COMPOSE_PROJECT_NAME`; you only need to build again on the first run or after deleting the local images.
 
@@ -401,14 +404,11 @@ cd <project-root>
 
 ### What the One-Click Script Does
 
-1.  Calls the profile script to generate the Docker env file for this run from the template (per-run temporary file by default; reuses the specified path only if `MEMORY_PALACE_DOCKER_ENV_FILE` is explicitly set).
-2.  Disables runtime environment injection by default to avoid implicit template overwriting; parameters are only overridden when injection is explicitly enabled for `profile c/d`. The same flag is rejected for `profile a/b`. For `profile c/d`, injection mode additionally forces `RETRIEVAL_EMBEDDING_BACKEND=api` for local debugging; if explicit `RETRIEVAL_*` is not provided, it prioritizes reusing `ROUTER_API_BASE/ROUTER_API_KEY` as a fallback for the embedding / reranker API base+key, while also passing through explicit retrieval parameters such as `RETRIEVAL_EMBEDDING_DIM` and the optional `INTENT_LLM_*`. On that same one-click path, loopback router / chat-style API bases from the current shell are now rewritten to `host.docker.internal` in the generated Docker env, and that host is appended to the run allowlist; non-loopback private provider literals keep their original value and only append their exact host to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that generated env.
-3.  Automatically detects port conflicts; if the default port is occupied, it automatically increments to find an idle port.
-4.  Detects and injects Docker persistent volumes: by default they are isolated per compose project (`<compose-project>_data` for the database and `<compose-project>_snapshots` for Review snapshots); old volumes are reused only when `MEMORY_PALACE_DATA_VOLUME` / `MEMORY_PALACE_SNAPSHOTS_VOLUME` is explicitly set.
-5.  Fails fast before startup if backend `/app/data` has been changed to a bind mount on NFS/CIFS/SMB or another network filesystem while WAL would still be enabled.
-6.  Adds a deployment lock to concurrent deployments under the same checkout to prevent multiple `docker_one_click` instances from overwriting each other.
-7.  On the macOS / Linux shell path, retries transient `docker compose up` failures a few times with short backoff before giving up.
-8.  Uses `docker compose` to build and start the backend plus frontend containers; SSE is served by the backend and exposed through the frontend proxy in the default topology.
+1.  Generates this run's Docker env file from the profile template; it reuses a path only when `MEMORY_PALACE_DOCKER_ENV_FILE` is explicitly set.
+2.  Disables runtime env injection by default; only `profile c/d` can enable it, while `profile a/b` reject it.
+3.  Checks ports, persistent volumes, and risky network-filesystem bind mounts.
+4.  Adds a deployment lock so concurrent runs under the same checkout do not overwrite each other.
+5.  Starts backend and frontend; in the default topology, backend serves SSE and frontend exposes it through the proxy.
 
 ### Security Notes
 

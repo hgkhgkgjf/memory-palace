@@ -12,7 +12,7 @@ The frontend restores a saved language first; without one, Chinese browser langu
 
 ## 2. Changes Perceptible to the User
 
-- When opening the Dashboard, the interface language is English by default
+- Saved language takes priority; without a saved value, the initial language follows the browser-language rule
 - A language toggle button has been added to the top-right corner
 - Common static text switches accordingly after changing to Chinese
 - Common date / number formats switch based on the current language
@@ -72,7 +72,7 @@ Current implementation scope:
 
 ## 5. Completed Verifications
 
-This document only includes verification results that have been actually executed:
+2026-03-09 i18n validation snapshot:
 
 - Frontend `npm test`: `68 passed`
 - Frontend `npm run build`: Passed
@@ -83,7 +83,7 @@ This document only includes verification results that have been actually execute
 Note:
 
 - "Passed" here means the functional paths and the frontend i18n changes themselves did not reveal any new blocking issues
-- The previous false positive for `docs.skills_mcp_contract` has been corrected in the current `i18n` branch and is no longer a blocking item in these i18n conclusions
+- The previous false positive for `docs.skills_mcp_contract` was fixed before publication and is no longer a blocking item in these i18n conclusions
 
 ---
 

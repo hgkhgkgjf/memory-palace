@@ -1,8 +1,8 @@
 # Memory Palace Post-Release Hardening Follow-up (2026-04-21)
 
 This note records only what was **actually changed and actually re-verified**
-in this session. It does not turn target-environment caveats into blanket
-guarantees.
+in the 2026-04-21 post-release hardening validation. It does not turn
+target-environment caveats into blanket guarantees.
 
 ---
 
@@ -71,16 +71,15 @@ auth changes.
 - Full frontend suite: `198 passed`
 - Frontend `typecheck`: passed
 - Frontend `build`: passed
-- Repo-local live MCP e2e: passed (`docs/skills/MCP_LIVE_E2E_REPORT.md` is all
-  `PASS`)
-- Earlier in the same session: repo-local macOS `Profile B` real-browser smoke
-  passed
-- Earlier in the same session: repo-local skill smoke still shows:
+- Repo-local live MCP e2e script: passed
+- The same validation round also covered repo-local macOS `Profile B`
+  real-browser smoke
+- Repo-local skill smoke in that validation round:
   - `structure`, `description_contract`, `mirrors`, `sync_check`,
     `mcp_bindings`, `claude`, `gemini`, and `opencode` are `PASS`
   - `codex`, `cursor`, `agent`, and `antigravity` remain `PARTIAL`
   - `gemini_live` remains `SKIP`
-- Earlier in the same session: a small real A/B/C/D rerun was completed:
+- A small real A/B/C/D rerun in that validation round:
   - dataset: `BEIR NFCorpus`
   - parameters: `sample_size=5`, `extra_distractors=20`,
     `candidate_multiplier=8`

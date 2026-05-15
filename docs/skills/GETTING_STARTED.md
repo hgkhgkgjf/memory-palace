@@ -2,19 +2,17 @@
 
 > 如果你只想把当前仓库这条 skill + MCP 链路接通，按这份做就够了。
 >
-> 如果你当前只是通过 GHCR / Docker 把 `Dashboard / API / SSE` 跑起来，但还没打算接本机客户端，这份不是第一入口。那种情况下，服务已经能用；只有当你还要让 `Claude / Codex / Gemini / OpenCode / IDE host` 真正接到当前仓库时，才继续按这里做。
+> 如果你只是通过 GHCR / Docker 跑 `Dashboard / API / SSE`，这份不是第一入口；只有要把本机客户端接到当前 checkout 时才继续读。
 >
 > 如果你希望 **AI 直接一步一步带你安装**，更推荐先从独立仓库 [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup) 开始。当前统一口径是：**优先走 skills + MCP，不要默认走 MCP-only**。装好后直接说：`使用 $memory-palace-setup 帮我一步步安装配置 Memory Palace，优先走 skills + MCP。默认先按 Profile B 起步，但如果环境允许，请主动推荐我升级到 C/D。`
 >
-> 这份长文档保留的定位是：**手工 repo-local 接通、逐步校验、以及更细的排障说明**。如果你只是想先跑通，优先看 `memory-palace-setup` 或 `SKILLS_QUICKSTART.md`。
+> 这份长文档用于手工 repo-local 接通、逐步校验和排障。如果只是想先跑通，优先看 `memory-palace-setup` 或 `SKILLS_QUICKSTART.md`。
 >
-> **先补一个边界说明**：当前仓库里的 repo-local MCP 启动链路已经分成两条。原生 Windows 默认走 `backend/mcp_wrapper.py`；macOS / Linux / `Git Bash` / `WSL` 仍走 `scripts/run_memory_palace_mcp_stdio.sh`。它们都会优先复用当前仓库的本地 `.env` 和本地 `backend/.venv`。所以下面这些 shell 示例，默认更接近 POSIX 路径；如果你是原生 Windows，请优先用安装脚本生成的 MCP 配置，不要把这些 `bash` 示例硬当成“PowerShell 直接可用”。
+> repo-local MCP launcher 规则只有两条：原生 Windows 使用 `backend/mcp_wrapper.py`；
+> macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin 使用 `scripts/run_memory_palace_mcp_stdio.sh`。
+> `install_skill.py`、`render_ide_host_config.py` 和 repo-local 自检都按这条规则生成配置。
 >
-> 这一层现在也按宿主边界收紧了：`install_skill.py` 只有在**真正的原生 Windows** 上才会给 `Claude / Codex / Gemini / OpenCode` 写 `backend/mcp_wrapper.py` 这条 launcher；如果你是在 Windows 上的 `Git Bash` / `WSL` / MSYS / Cygwin 里运行安装脚本，它仍然会继续写 `bash + scripts/run_memory_palace_mcp_stdio.sh`，不会误切到 native Python wrapper。
->
-> 这条边界现在也不只体现在 `install_skill.py`。`render_ide_host_config.py` 生成 IDE host 片段、repo-local `stdio` 自检，以及下面这份 quick start 默认给你的 launcher 结论，走的也是同一条规则：只有**真正的原生 Windows** 才切到 `python-wrapper`；`Git Bash` / `WSL` / MSYS / Cygwin 这一类都继续按 POSIX shell 宿主处理。
->
-> **再补一条很容易踩坑的边界**：这个 wrapper 只服务于“当前 checkout + 本地 `.env` + 本地 `backend/.venv`”这条 repo-local 路径，不会复用 Docker 容器里的 `/app/data`。如果仓库里只有 `.env.docker` 而没有本地 `.env`，它会明确拒绝回退到 `demo.db`；如果你把 `.env.docker` 里的 `DATABASE_URL` 原样抄进本地 `.env`，或者显式 `DATABASE_URL` 在把常见斜杠和大小写变体归一化后，仍是 `/app/...` 或 `/data/...` 这类容器路径（例如 `sqlite+aiosqlite://///app/data/...` 或大写 `/APP/...` 变体），它也会直接拒绝启动，并提示你改成本机绝对路径或 Docker `/sse`。
+> repo-local wrapper 只服务于“当前 checkout + 本地 `.env` + 本地 `backend/.venv`”，不会复用 Docker 容器里的 `/app/data`。如果只有 `.env.docker`，或本地 `DATABASE_URL` 仍指向 `/app/...` / `/data/...` 容器路径，它会拒绝启动，并提示改成本机绝对路径或 Docker `/sse`。
 >
 > **再补一条范围说明**：这份主要写给 `Claude Code / Gemini CLI / Codex / OpenCode` 这类 CLI 客户端。`Cursor / Windsurf / VSCode-host / Antigravity` 这类 IDE 宿主，请直接看 `IDE_HOSTS.md`。
 
@@ -372,7 +370,7 @@ docs/skills/MCP_LIVE_E2E_REPORT.md
 同样地，这份报告默认也是“运行后才会出现”的本地产物；公开 GitHub 仓库里暂时没有，不代表接法有问题。
 如果你在并行 review 或 CI 里不想覆盖默认文件，也可以先设置 `MEMORY_PALACE_MCP_E2E_REPORT_PATH`。如果你写的是相对路径，脚本现在会自动把报告落到系统临时目录下的 `memory-palace-reports/`；如果你想完全自己控制落点，优先传仓库外的绝对路径。
 它默认使用隔离临时库，不会碰你的正式库；但失败时仍可能把 stderr、日志或临时目录路径写进报告。准备转发给别人前，先自己看一遍内容。
-现在这条脚本会跟用户实际连接时一样，优先走 repo-local wrapper。它也会把 wrapper 行为和 `compact_context` 的 gist 持久化一起带上复核，而不只是检查工具清单。2026-05-15 这轮 review session 里，backend `1382 passed, 22 skipped`、frontend `203 passed`，前端 build/typecheck、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过；原生 Windows / 原生 Linux 宿主 runtime 仍保留目标环境复核边界。
+这条脚本会跟用户实际连接时一样走 repo-local wrapper，并覆盖 wrapper 行为和 `compact_context` gist 持久化。最终结果以本机生成的报告为准；原生 Windows / 原生 Linux host runtime 仍需在目标环境复核。
 
 这两份报告主要用来复核当前环境的结果，不是主入口文档。
 

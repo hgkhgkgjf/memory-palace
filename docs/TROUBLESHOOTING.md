@@ -206,7 +206,9 @@ DATABASE_URL="sqlite+aiosqlite:////absolute/path/to/demo.db" # local db
 - **前端页面**：也可以直接点右上角的 `设置 API 密钥` / `更新 API 密钥`（英文模式下分别显示 `Set API key` / `Update API key`）
   - 当前版本会先打开首启配置向导
   - 如果你只是想先让 Dashboard 通过鉴权，优先使用“只保存 Dashboard 密钥”
-  - 浏览器已经保存 Dashboard key 时，Observability 会改走带 header/bearer 的 fetch-based SSE；如果你刚更新了浏览器里保存的 Dashboard key，下一次非终态重连会重新读取当前 key / mode，不需要为了这件事整页刷新；如果是明确的 `4xx` 鉴权失败，它会停止重试，优先按 key/session 问题排查。修正 key 后，重新聚焦这个标签页会重建带当前鉴权的 `/sse` 连接
+  - 浏览器已经保存 Dashboard key 时，Observability 会改走可带 header/bearer 的 fetch-based SSE。
+  - 非终态断流会在下次重连时重新读取当前 key / mode，不需要整页刷新。
+  - 明确的终态 `4xx` 鉴权失败会停止重试；修正 key/session 后，重新聚焦这个标签页会用当前鉴权重建 `/sse` 连接。
   - `.env` 写入只建议在本地 checkout + 非 Docker 运行时使用
   - 如果当前还没有任何 Dashboard 鉴权，而你第一次本地保存就同时带上了远端/provider-chain 配置，后端会先只做 auth bootstrap；远端 embedding/reranker/LLM 字段要等下一次带鉴权的保存再真正落盘
 
@@ -220,7 +222,7 @@ DATABASE_URL="sqlite+aiosqlite:////absolute/path/to/demo.db" # local db
 - **如果你明明改了仓库 `.env`，服务却还在使用旧 key / 错 key**：
   - 先检查当前终端有没有额外导出过 `MCP_API_KEY` 或 `MCP_API_KEY_ALLOW_INSECURE_LOCAL`
   - 当前实现里，**进程环境变量优先级高于仓库 `.env`**
-  - 我们在真实本地复测里就遇到过：`run_sse.py` 读取到了外层 shell 里的 `MCP_API_KEY`，结果即使仓库 `.env` 里写的是另一把 key，`/sse` 仍然按外层环境变量鉴权，表现成 `401 invalid_or_missing_api_key`
+  - 如果当前 shell 已经 export 了 `MCP_API_KEY`，`run_sse.py` 会优先使用它。即使仓库 `.env` 里写了另一把 key，`/sse` 也会按外层环境变量鉴权，可能表现为 `401 invalid_or_missing_api_key`。
 
   ```bash
   env | rg '^MCP_API_KEY=|^MCP_API_KEY_ALLOW_INSECURE_LOCAL='

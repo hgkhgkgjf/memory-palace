@@ -380,7 +380,9 @@ docs/skills/MCP_LIVE_E2E_REPORT.md
 这两份报告主要用来补做验证，不作为主入口文档。它们默认都是“运行后才出现”的本地产物，所以公开 GitHub 仓库里暂时没有也正常。
 如果你在并行 review 或 CI 里不想覆盖默认文件，也可以先设置 `MEMORY_PALACE_MCP_E2E_REPORT_PATH`。如果你写的是相对路径，脚本现在会自动把报告落到系统临时目录下的 `memory-palace-reports/`；如果你想完全自己控制落点，优先传仓库外的绝对路径。
 `MCP_LIVE_E2E_REPORT.md` 默认使用隔离临时库，不会碰你的正式库；但失败时仍可能把 stderr、日志或临时目录路径带进报告，转发前同样建议先自己看一遍内容。
-现在这条 live e2e 会跟用户实际连接时一样，优先走 repo-local wrapper，而且 launcher 规则已经和 `install_skill.py`、`render_ide_host_config.py` 对齐：原生 Windows 走 `backend/mcp_wrapper.py`，macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin 走 `scripts/run_memory_palace_mcp_stdio.sh`。它也会把 wrapper 行为和 `compact_context` 的 gist 持久化一起带上复核，而不只是检查工具清单。2026-05-15 这轮 review session 里，backend `1382 passed, 22 skipped`、frontend `203 passed`，前端 build/typecheck、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过；原生 Windows / 原生 Linux 宿主 runtime 仍保留目标环境复核边界。
+这条 live e2e 会跟用户实际连接时一样走 repo-local wrapper。launcher 规则与 `install_skill.py` / `render_ide_host_config.py` 对齐：
+原生 Windows 走 `backend/mcp_wrapper.py`，macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin 走 `scripts/run_memory_palace_mcp_stdio.sh`。
+验证结果以本机生成的报告为准；原生 Windows / 原生 Linux host runtime 仍需目标环境复核。
 
 ## 正向 / 反向 prompt
 

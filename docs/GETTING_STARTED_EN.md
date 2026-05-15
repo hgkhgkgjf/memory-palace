@@ -522,7 +522,10 @@ If you just cloned the GitHub repository, it is normal if you don't see these tw
 
 > The checks here focus on "getting the system running"; if you need additional local Markdown validation summaries, run the validation scripts mentioned above.
 >
-> Current real verification wording: this 2026-05-15 review session reran backend `1382 passed, 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts. The public A/B/C/D benchmark tables were not recalculated in this pass, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.
+> Current public validation snapshot (2026-05-15): backend `1382 passed, 22 skipped`, frontend `203 passed`;
+> frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e,
+> and focused Docker/profile/SSE/script contracts passed. Real A/B/C/D benchmark tables were not recalculated,
+> and native Windows / Linux host runtime still needs target-environment checks.
 
 ### 5.1 Health Check
 

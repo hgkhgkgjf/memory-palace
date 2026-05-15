@@ -7,17 +7,9 @@ benchmark helpers and test entries under `backend/tests/benchmark/`, while
 machine-specific raw benchmark logs, one-off gate drafts, periodic re-test
 records, and some metric JSONs are typically for development or local use only.
 
-> Status Note (2026-04 / 2026-05): This page keeps the 2026-02 public baseline tables,
-> folds the 2026-04-17 real A/B/C/D verification into the current public-facing
-> conclusion, records a narrower 2026-04-18 maintenance rerun, and also keeps a
-> 2026-04-21 post-fix validation note for the later review-driven fixes. In this
-> 2026-05-15 review session, backend tests passed with `1382 passed, 22 skipped`,
-> frontend tests passed with `203 passed`, and frontend build/typecheck,
-> i18n audit, bundle budget, repo-local live MCP e2e, and focused
-> Docker/profile/SSE/script contracts passed. It did **not** recalculate these
-> benchmark tables. For the current default
-> interaction profile, the explicit deep-retrieval profiles, and the newest
-> public-facing re-check notes, start with Sections 3, 4, and 5 on this page.
+> Status Note (2026-04 / 2026-05): This page keeps historical benchmark tables
+> and states that they were not recalculated on 2026-05-15. See Section 5.1 for
+> the current validation snapshot, and Sections 3 and 4 for profile guidance.
 
 ---
 

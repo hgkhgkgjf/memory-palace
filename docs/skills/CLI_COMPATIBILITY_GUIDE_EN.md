@@ -409,7 +409,10 @@ docs/skills/MCP_LIVE_E2E_REPORT.md
 These two reports are mainly used for supplemental verification and are not intended as primary entry documentation. They are local products that "appear only after running" by default, so it's normal if they aren't in the public GitHub repository.
 If you do not want to overwrite the default file during parallel review or CI, set `MEMORY_PALACE_MCP_E2E_REPORT_PATH` first. When you use a relative path, the script now redirects it under the system temp directory's `memory-palace-reports/` root; if you want a fully controlled destination, prefer an absolute path outside the repository.
 `MCP_LIVE_E2E_REPORT.md` defaults to using an isolated temporary database and won't touch your official database; however, upon failure, it might still include stderr, logs, or temporary directory paths in the report, so it's also recommended to review the content yourself before forwarding.
-This live e2e now follows the same repo-local wrapper path that users actually connect to, and its launcher rule is aligned with `install_skill.py` and `render_ide_host_config.py`: native Windows uses `backend/mcp_wrapper.py`, while macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin use `scripts/run_memory_palace_mcp_stdio.sh`. It also covers wrapper behavior and `compact_context` gist persistence instead of only checking the bare tool inventory. In this 2026-05-15 review session, backend tests were `1382 passed, 22 skipped`, frontend tests were `203 passed`, and frontend build/typecheck, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts passed. Native Windows and native Linux host-runtime paths still keep explicit target-environment recheck boundaries.
+This live e2e follows the same repo-local wrapper path that users actually connect to.
+Its launcher rule matches `install_skill.py` / `render_ide_host_config.py`: native Windows uses `backend/mcp_wrapper.py`,
+while macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin use `scripts/run_memory_palace_mcp_stdio.sh`.
+Treat the generated local report as the result for your machine; native Windows / native Linux host runtime still needs target-environment rechecks.
 
 ## Positive / Negative Prompts
 

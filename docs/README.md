@@ -8,13 +8,22 @@
 >
 > 如果你想让 AI 直接带你一步一步安装，优先从独立仓库 [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup) 开始。当前统一口径是：**优先走 skills + MCP，不要默认只配 MCP-only**。
 >
-> 如需额外复核 skill smoke 或真实 MCP 调用链，可运行 `python scripts/evaluate_memory_palace_skill.py` 或 `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`。它们会在 `docs/skills/` 下生成本地摘要，但这些报告不是主入口文档。当前脚本还会自动脱敏常见 secret、session token 和本地绝对路径，并在宿主支持时改用更私有的文件权限。`evaluate_memory_palace_skill.py` 现在只要任一检查是 `FAIL` 就会返回非零退出码；`SKIP` / `PARTIAL` / `MANUAL` 不会单独让进程失败。如果 `codex exec` 在 smoke 超时前没有产出结构化输出，`codex` 那一项会记成 `PARTIAL`，而不是把整轮卡住。`evaluate_memory_palace_mcp_e2e.py` 这轮还补了一层 re-exec guard，避免在本地 Python 解释器切换场景里重复重入。
+> 如需额外复核 skill smoke 或真实 MCP 调用链，可运行 `python scripts/evaluate_memory_palace_skill.py`
+> 或 `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`。它们生成的是本地复核摘要，
+> 不是主入口文档；脚本会脱敏常见 secret、session token 和本地绝对路径。`FAIL` 会让
+> `evaluate_memory_palace_skill.py` 返回非零，`SKIP` / `PARTIAL` / `MANUAL` 不会单独判失败。
 >
 > 另外，A/B/C/D 更适合理解成不同配置档，不是“无感热切换按钮”。只要你切了 embedding backend / model / dimension，就要准备检查索引是否仍然匹配；当前运行时如果发现维度不一致，会明确要求重建索引，而不是假装切档已经成功。
 >
-> 当前前端会在 React 挂载前先按浏览器已保存语言同步首帧 `lang` 和页面标题；右上角语言按钮可在英文和中文之间一键切换，浏览器会记住你的选择。
+> 前端会先恢复浏览器里已保存的语言；没有保存值时，中文浏览器语言映射到 `zh-CN`，其它语言默认 English。右上角语言按钮可在英文和中文之间切换，切换后会持久化。
 >
-> 当前公开复核口径以 2026-05-15 这轮 review session 为准：backend `1382 passed / 22 skipped`，frontend `203 passed`，前端 `typecheck/build`、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过。`Profile B` 保持项目原本设置；`Profile C/D` 的运行时注入契约按 1024 维外部 embedding/reranker 风格配置和 Docker loopback 改写做了复核。真实 A/B/C/D benchmark 公开表格没有在本轮重算；原生 Windows 宿主 runtime 与原生 Linux host runtime 仍保留目标环境复核边界。
+> 公开验证快照（2026-05-15）：
+>
+> - backend `1382 passed / 22 skipped`
+> - frontend `203 passed`
+> - 前端 `typecheck/build`、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 重点契约通过
+> - `Profile B` 使用项目默认设置；runtime env injection 只用于 `Profile C/D`
+> - A/B/C/D benchmark 表未重算；原生 Windows 与原生 Linux host runtime 仍需目标环境复核
 
 ![系统架构图](images/系统架构图.png)
 
@@ -56,7 +65,7 @@
 
 > 如果你只是想先把服务跑起来，优先看 `GETTING_STARTED.md` 里的 **GHCR 预构建镜像** 路径。
 >
-> 如果你还想把 `Claude / Codex / Gemini / OpenCode / IDE host` 真正接到当前仓库，再继续看 `docs/skills/` 里的文档。Docker 负责跑服务，不会自动改你本机客户端的 skill / MCP 配置。
+> 如果你还想把 `Claude / Codex / Gemini / OpenCode / IDE host` 接到当前仓库，再继续看 `docs/skills/`。Docker 只负责跑服务，不会自动改本机客户端的 skill / MCP 配置。
 
 ## 📊 测评与质量
 

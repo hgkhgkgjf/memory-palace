@@ -430,7 +430,9 @@ Related files:
 - Backup scripts: `scripts/backup_memory.sh`, `scripts/backup_memory.ps1` (keep the latest `20` backups by default; adjust with `--keep` / `-Keep`; backup filenames use UTC timestamps so host/container runs sort consistently)
 - Pre-publishing check: `scripts/pre_publish_check.sh` (blocks tracked `.audit` / `.playwright-mcp` artifacts and scans tracked files for local-only endpoint/key patterns such as `sk-local-*` plus loopback/private provider bases with ports; the repository's own frontend loopback health probe is intentionally excluded from that leak scan)
 
-The current validate path treats frontend typecheck as a first-class check alongside frontend tests and the frontend build. In this 2026-05-15 review session, backend `1382 passed, 22 skipped`, frontend `203 passed`, frontend build/typecheck, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts passed. The narrower benchmark table was not recalculated in this review pass, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries here.
+The current validate path treats frontend typecheck as a first-class check alongside frontend tests and the frontend build.
+Public validation results live in [EVALUATION_EN.md](EVALUATION_EN.md); the A/B/C/D benchmark tables were not recalculated
+on 2026-05-15, and native Windows / Linux host runtime still needs target-environment checks.
 
 ---
 

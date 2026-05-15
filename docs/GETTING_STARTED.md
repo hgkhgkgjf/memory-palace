@@ -528,7 +528,10 @@ cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 
 > 这里的检查以“先跑通系统”为主；如果你需要额外的本地 Markdown 验证摘要，再运行上面的验证脚本即可。
 >
-> 当前真实验证口径：2026-05-15 这轮 review session 重跑了 backend `1382 passed, 22 skipped`、frontend `203 passed`、前端 typecheck/build、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试。真实 A/B/C/D benchmark 的公开表格没有在本轮重算；原生 Windows / Linux 宿主 runtime 仍保留目标环境复核边界。
+> 当前公开验证快照（2026-05-15）：backend `1382 passed, 22 skipped`，frontend `203 passed`；
+> 前端 typecheck/build、i18n audit、bundle budget、repo-local live MCP e2e，
+> 以及 Docker/profile/SSE/script 重点契约通过。真实 A/B/C/D benchmark 表未重算；
+> 原生 Windows / Linux host runtime 仍需目标环境复核。
 
 ### 5.1 健康检查
 

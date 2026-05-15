@@ -1,9 +1,6 @@
 # GHCR 拉镜像后的用户验收清单
 
-这份清单写给两类人：
-
-- 你自己在发布后做一次快速复验
-- 用户照着这份检查“我是不是已经真的跑起来了”
+这份清单写给用户，用来确认 GHCR 预构建镜像是否已经真的跑起来。
 
 默认口径只针对 **Profile B + GHCR 预构建镜像**。
 
@@ -14,8 +11,8 @@
 - 已安装 Docker
 - 当前目录里有：
   - `docker-compose.ghcr.yml`
-  - `.env.example`
   - `scripts/apply_profile.sh` / `scripts/apply_profile.ps1`
+  - 仓库自带 env 模板（脚本会读取模板并生成 `.env.docker`）
 
 ---
 
@@ -37,7 +34,7 @@ docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份，所以不要先手动把 `.env.example` 复制到 `.env.docker`。
+`apply_profile` 会生成并备份 `.env.docker`，所以不要手动把 `.env.example` 复制到 `.env.docker`。
 
 ---
 
