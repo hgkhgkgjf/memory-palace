@@ -646,6 +646,57 @@ exit 0
     assert "INTENT_LLM_API_BASE mapped loopback host to host.docker.internal" in result.stdout
 
 
+def test_docker_one_click_shell_rejects_runtime_injection_for_profile_b(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "repo"
+    shutil.copytree(PROJECT_ROOT / "scripts", project_root / "scripts")
+    shutil.copy2(PROJECT_ROOT / ".env.example", project_root / ".env.example")
+    _write_shell_script(
+        project_root / "bin" / "docker",
+        """#!/usr/bin/env bash
+if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
+  echo "Docker Compose version v2.0.0"
+  exit 0
+fi
+exit 0
+""",
+    )
+    (project_root / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    target_env = project_root / ".env.docker"
+
+    result = _run_command(
+        [
+            "bash",
+            "scripts/docker_one_click.sh",
+            "--profile",
+            "b",
+            "--allow-runtime-env-injection",
+            "--no-build",
+        ],
+        cwd=project_root,
+        env={
+            **os.environ,
+            "PATH": f"{project_root / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}",
+            "COMPOSE_PROJECT_NAME": "mp-test-profile-b-injection",
+            "MEMORY_PALACE_DOCKER_ENV_FILE": str(target_env),
+            "ROUTER_API_BASE": "http://127.0.0.1:8318/v1",
+        },
+    )
+
+    assert result.returncode == 1
+    assert "--allow-runtime-env-injection is only supported for profile c/d" in result.stderr
+    assert not target_env.exists()
+
+
+def test_docker_one_click_shell_avoids_bash4_case_conversion() -> None:
+    script_text = (PROJECT_ROOT / "scripts" / "docker_one_click.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert ",," not in script_text
+
+
 def test_apply_profile_shell_injects_runtime_auto_flush_default_when_profile_omits_it(
     tmp_path: Path,
 ) -> None:
@@ -1283,6 +1334,32 @@ def test_repo_local_stdio_wrapper_prefers_env_file_remote_timeout_when_runtime_e
 
     assert result.returncode == 0, result.stderr
     assert result.stdout == "30"
+
+
+def test_repo_local_stdio_wrapper_rejects_empty_database_url_in_env_file(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "repo"
+    script_path = project_root / "scripts" / "run_memory_palace_mcp_stdio.sh"
+    backend_python = project_root / "backend" / ".venv" / "bin" / "python"
+
+    _copy_script(PROJECT_ROOT / "scripts" / "run_memory_palace_mcp_stdio.sh", script_path)
+    backend_python.parent.mkdir(parents=True, exist_ok=True)
+    _write_shell_script(
+        backend_python,
+        "#!/usr/bin/env bash\nprintf 'should-not-run'\n",
+    )
+    (project_root / ".env").write_text("DATABASE_URL=\n", encoding="utf-8")
+
+    result = _run_command(
+        ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
+        cwd=project_root,
+        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+    )
+
+    assert result.returncode == 1
+    assert "empty DATABASE_URL" in result.stderr
+    assert result.stdout == ""
 
 
 def test_repo_local_stdio_wrapper_reads_env_without_python_dotenv(

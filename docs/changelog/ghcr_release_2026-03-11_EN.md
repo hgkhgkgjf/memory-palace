@@ -83,7 +83,6 @@ In other words:
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull

@@ -495,7 +495,9 @@ append_provider_allowlist_host_from_api_base() {
   if [[ -z "${provider_host}" ]]; then
     return 0
   fi
-  case "${provider_host,,}" in
+  local provider_host_lower=""
+  provider_host_lower="$(printf '%s' "${provider_host}" | tr '[:upper:]' '[:lower:]')"
+  case "${provider_host_lower}" in
     127.0.0.1|::1|localhost)
       return 0
       ;;
@@ -1402,6 +1404,10 @@ env_file="$(resolve_stable_env_file_path "${env_file}")"
 chmod 600 "${env_file}" >/dev/null 2>&1 || true
 export MEMORY_PALACE_DOCKER_ENV_FILE="${env_file}"
 echo "[env-file] using ${env_file}"
+if [[ "${allow_runtime_env_injection}" -eq 1 && "${profile}" != "c" && "${profile}" != "d" ]]; then
+  echo "[override] --allow-runtime-env-injection is only supported for profile c/d; profile ${profile} keeps its documented defaults." >&2
+  exit 1
+fi
 if [[ "${allow_runtime_env_injection}" -eq 1 && ( "${profile}" == "c" || "${profile}" == "d" ) ]]; then
   MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS=1 \
     bash "${SCRIPT_DIR}/apply_profile.sh" docker "${profile}" "${env_file}"

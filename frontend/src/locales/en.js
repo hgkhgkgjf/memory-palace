@@ -122,7 +122,7 @@ const en = {
         'Profile A is the untouched baseline: keyword search with embedding disabled (none). Profile B upgrades to documented hybrid + local hash, and Profile C/D keep the existing router + reranker presets for deeper retrieval once those services are ready.',
       presets: {
         a: 'Profile A · keyword only',
-        b: 'Profile B · hash only',
+        b: 'Profile B · hybrid + hash',
         c: 'Profile C · router + reranker (local/private)',
         d: 'Profile D · router + reranker (remote)',
       },

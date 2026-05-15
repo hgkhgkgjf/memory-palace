@@ -45,6 +45,55 @@ def _load_skill_eval_module():
     return module
 
 
+def _load_mcp_e2e_module():
+    project_root = Path(__file__).resolve().parents[2]
+    script_path = project_root / "scripts" / "evaluate_memory_palace_mcp_e2e.py"
+    spec = importlib.util.spec_from_file_location("evaluate_memory_palace_mcp_e2e", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_skill_report_sanitizer_redacts_colon_single_quote_and_sk_tokens() -> None:
+    module = _load_skill_eval_module()
+
+    sanitized = module._sanitize_report_text(
+        "OPENAI_API_KEY: sk-test-12345678 "
+        "{'MCP_API_KEY':'sk-secret-abcdef'} "
+        "DATABASE_URL: sqlite+aiosqlite:////tmp/secret.db "
+        "/home/alice/memory-palace/report.log /tmp/memory-palace-live/run.log"
+    )
+
+    assert "sk-test-12345678" not in sanitized
+    assert "sk-secret-abcdef" not in sanitized
+    assert "sqlite+aiosqlite:////tmp/secret.db" not in sanitized
+    assert "/home/alice/memory-palace/report.log" not in sanitized
+    assert "/tmp/memory-palace-live/run.log" not in sanitized
+    assert "OPENAI_API_KEY: <redacted>" in sanitized
+    assert "'MCP_API_KEY':'<redacted>'" in sanitized
+
+
+def test_mcp_e2e_report_sanitizer_redacts_colon_single_quote_and_sk_tokens() -> None:
+    module = _load_mcp_e2e_module()
+
+    sanitized = module._sanitize_report_text(
+        "RERANKER_API_KEY: sk-test-abcdefgh "
+        "{'MCP_API_KEY':'sk-secret-abcdefgh'} "
+        "DATABASE_URL: sqlite+aiosqlite:////tmp/secret.db "
+        "/home/alice/memory-palace/report.log /tmp/memory-palace-live/run.log"
+    )
+
+    assert "sk-test-abcdefgh" not in sanitized
+    assert "sk-secret-abcdefgh" not in sanitized
+    assert "sqlite+aiosqlite:////tmp/secret.db" not in sanitized
+    assert "/home/alice/memory-palace/report.log" not in sanitized
+    assert "/tmp/memory-palace-live/run.log" not in sanitized
+    assert "RERANKER_API_KEY: <redacted>" in sanitized
+    assert "'MCP_API_KEY':'<redacted>'" in sanitized
+
+
 def test_read_repo_database_url_parses_quoted_value_and_trailing_comment(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -433,7 +433,7 @@ Docker 端口环境变量：
 - 备份脚本：`scripts/backup_memory.sh`、`scripts/backup_memory.ps1`（默认保留最近 `20` 份备份，可通过 `--keep` / `-Keep` 调整；备份文件名统一使用 UTC 时间戳，方便宿主机和容器环境混用时按时间排序）
 - 分享前检查：`scripts/pre_publish_check.sh`（会拦截已跟踪的 `.audit` / `.playwright-mcp` 工件，也会扫描 tracked 文件里的本地 endpoint / key 模式，例如 `sk-local-*`、以及带端口的 loopback / private provider 地址；仓库自己的前端 loopback health probe 不会被误报）
 
-当前 validate 链路已经把 frontend `typecheck` 纳入和前端测试 / build 同级的检查。2026-04 那轮全量快照里，backend `1136 passed, 22 skipped`、frontend `198 passed`、前端 typecheck / build 和 repo-local live MCP e2e 都通过；2026-05-15 又补跑了 Docker/Linux `Profile B/C/D`，三档 health、SSE、浏览器 smoke 都通过，C/D create/search/delete 也通过，查询 `degrade_reasons=None`。更早那张 2026-04-18 的 benchmark 表在这轮 Docker 复验里没有重算；原生 Windows / Linux 宿主 runtime 这里继续保留目标环境复核边界。
+当前 validate 链路已经把 frontend `typecheck` 纳入和前端测试 / build 同级的检查。2026-05-15 这轮 review session 里，backend `1382 passed, 22 skipped`、frontend `203 passed`，前端 typecheck / build、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过。更早那张 benchmark 表在本轮没有重算；原生 Windows / Linux 宿主 runtime 这里继续保留目标环境复核边界。
 
 ---
 

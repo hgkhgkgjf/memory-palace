@@ -2,7 +2,7 @@
 
 本文档汇总 Memory Palace 各档位（A/B/C/D）的检索质量、延迟与语义质量门禁测试结果。这里保留**摘要表 + 复核说明**；公开仓库会保留 `backend/tests/benchmark/` 下的 benchmark helpers 与测试入口，机器相关的原始 benchmark 日志、一次性门禁草稿、阶段性重测记录以及部分指标 JSON 默认只在开发阶段或本地使用。
 
-> 状态说明（2026-04 / 2026-05）：本页保留 2026-02 的公开基线表格，同时把 2026-04-17 的真实 A/B/C/D 复核、2026-04-18 的当前 rerun、2026-04-21 的修复后复核，以及 2026-05-15 的 Docker/Linux `Profile B/C/D` 复核一起收口到公开口径里。2026-04-21 这轮修复后复核重跑了完整 backend 测试（`1136 passed, 22 skipped`）、frontend 测试（`198 passed`）、frontend build、frontend typecheck、repo-local live MCP e2e（`PASS`）和一轮 repo-local `Profile B` 真实浏览器 smoke；同一轮还补做了一次 `BEIR NFCorpus` 小样本 real A/B/C/D 复核（`sample_size=5`，`Profile D` 的 Phase 6 Gate 继续 `PASS`）。2026-05-15 这轮补验只覆盖 Docker/Linux `Profile B/C/D` 启动、受保护代理路由、SSE、浏览器 smoke 和 C/D 的 create/search/delete，不重算本页 benchmark 表格。当前交互默认档位、深检索档位和新的门禁项，请优先看本页第 3 节和第 4 节。
+> 状态说明（2026-04 / 2026-05）：本页保留 2026-02 的公开基线表格，同时把 2026-04-17 的真实 A/B/C/D 复核、2026-04-18 的当前 rerun、2026-04-21 的修复后复核一起收口到公开口径里。2026-05-15 这轮 review session 里，backend 测试 `1382 passed, 22 skipped`，frontend 测试 `203 passed`，frontend build/typecheck、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过。本轮没有重算本页 benchmark 表格。当前交互默认档位、深检索档位和新的门禁项，请优先看本页第 3 节和第 4 节。
 
 ---
 
@@ -333,16 +333,13 @@ curl -fsS http://127.0.0.1:8000/health
 
 ### 5.1 本 session 已实际复核到哪里
 
-- Backend 非 benchmark 全量：`1136 passed / 22 skipped`
-- Frontend 全量：`198 passed`
+- Backend 非 benchmark 全量：`1382 passed / 22 skipped`
+- Frontend 全量：`203 passed`
 - Frontend `typecheck` / `build`：通过
-- repo-local `Profile B` 真实浏览器 smoke：通过
-- repo-local live MCP e2e：通过（`docs/skills/MCP_LIVE_E2E_REPORT.md` 全 `PASS`）
-- `BEIR NFCorpus` 小样本 real A/B/C/D rerun：通过（`sample_size=5`，`extra_distractors=20`，`candidate_multiplier=8`，`Profile D` 的 Phase 6 Gate = `PASS`）
-- Docker/Linux `Profile B`：使用项目原本设置重跑，backend/frontend healthy，`/sse` 返回 endpoint event，Memory / Observability / Maintenance 浏览器 smoke 无 console error；新增受保护代理路由 `/api/layering/*`、`/api/forgetting/*`、`/api/search/quality-metrics` 返回正常
-- Docker/Linux `Profile C/D`：使用显式运行时注入和 1024 维外部 embedding / reranker 组合重跑；两档 create/search/delete smoke 通过，查询 `degrade_reasons=None`，SSE 与浏览器 smoke 通过
-- Docker / profile / SSE 合同测试：`backend/tests/test_profile_script_regressions.py`、`backend/tests/test_docker_one_click_contracts.py`、`backend/tests/test_sse_deploy_contracts.py` 合计 `67 passed, 10 skipped`
-- 真实 A/B/C/D benchmark：本 session 早些时候已重跑；这轮收口未重算，继续沿用第 3 节表格
+- Frontend i18n audit 与 bundle budget：通过
+- repo-local live MCP e2e：`14/14 PASS`
+- Docker / profile / SSE / script 重点契约测试：本轮复核通过
+- 真实 A/B/C/D benchmark：本轮未重算，继续沿用第 3 节表格
 - Search Quality Dashboard 面板：当前后端 endpoint 是真实鉴权接口，但因为尚未持久化带标签的质量样本，会明确返回 `is_mock=true` / `status=unavailable`；这里不能把面板里的示例 MRR/Recall 当成 benchmark 结果
 - `skills+MCP` / `single-MCP`：skill smoke 的公开说明仍沿用更早那轮专门宿主验证的结果：`claude` / `codex` / `gemini` 为 `PASS`，`cursor` / `agent` / `antigravity` 为 `PARTIAL`，`gemini_live` 为 `SKIP`。`OpenCode` 在整轮脚本里出现过一次 timeout，但单独重跑通过；这里更适合按宿主波动理解，不把它写成稳定全绿。本次 2026-04-21 文档刷新没有重新跑这组 host-bound smoke。
 

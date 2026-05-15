@@ -71,7 +71,7 @@ _SENSITIVE_ENV_NAME_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _ABSOLUTE_PATH_PATTERN = re.compile(
-    r"(/Users/[^\s\"']+|/private/var/[^\s\"']+|[A-Za-z]:[\\/][^\s\"']+)"
+    r"(/Users/[^\s\"']+|/home/[^\s\"']+|/tmp/[^\s\"']+|/var/tmp/[^\s\"']+|/private/var/[^\s\"']+|[A-Za-z]:[\\/][^\s\"']+)"
 )
 _SESSION_TOKEN_PATTERN = re.compile(r"\b(?:mcp_ctx_[\w-]+|session-[\w-]+)\b")
 
@@ -237,9 +237,15 @@ def _python_command() -> str:
 
 def _sanitize_report_text(text: str) -> str:
     sanitized = str(text or "")
+    sanitized = re.sub(r"\bsk-[A-Za-z0-9._-]{6,}", "sk-<redacted>", sanitized)
     sanitized = re.sub(
         r'("?[A-Za-z0-9_]*DATABASE_URL"?\s*:\s*)"[^"]*"',
         r'\1"<redacted>"',
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"('?[A-Za-z0-9_]*DATABASE_URL'?\s*:\s*)'[^']*'",
+        r"\1'<redacted>'",
         sanitized,
     )
     sanitized = re.sub(
@@ -248,8 +254,23 @@ def _sanitize_report_text(text: str) -> str:
         sanitized,
     )
     sanitized = re.sub(
+        r"('?[A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD)'?\s*:\s*)'[^']*'",
+        r"\1'<redacted>'",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"\bDATABASE_URL\s*:\s*[^,\s}\]]+",
+        "DATABASE_URL: <redacted>",
+        sanitized,
+    )
+    sanitized = re.sub(
         r"\bDATABASE_URL=[^\s]+",
         "DATABASE_URL=<redacted>",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"\b([A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD))\s*:\s*[^,\s}\]]+",
+        r"\1: <redacted>",
         sanitized,
     )
     sanitized = re.sub(

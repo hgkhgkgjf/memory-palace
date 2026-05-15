@@ -68,6 +68,7 @@ scripts/mcp_stdio_trace_wrapper.py
 # Local-only docs and benchmark notes
 PUSH_CHECKLIST.md
 code_review_report.md
+SECURITY_AUDIT_*.md
 security_best_practices_report.md
 docs/improvement/
 docs/superpowers/

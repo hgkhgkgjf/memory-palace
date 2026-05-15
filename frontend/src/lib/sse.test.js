@@ -82,6 +82,14 @@ describe('resolveSseUrl', () => {
       'http://127.0.0.1:5173/memory-palace/sse'
     );
   });
+
+  it('uses the configured cross-origin API base for relative SSE paths', () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.test/memory-palace/api/');
+
+    expect(resolveSseUrl('/sse', 'http://127.0.0.1:5173')).toBe(
+      'https://api.example.test/memory-palace/sse'
+    );
+  });
 });
 
 describe('createEventSource', () => {

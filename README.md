@@ -60,7 +60,7 @@ If you want the AI to guide installation step by step, start with the standalone
 - **Repo-local wrapper rejects more local sqlite misconfigurations now**: the built-in Python and shell wrappers now normalize common slash and case variants, reject relative sqlite paths, and also decode common percent-escaped container paths before deciding whether a local `DATABASE_URL` still points at Docker-internal `/app/...` or `/data/...`. In practice, values such as `sqlite+aiosqlite:///demo.db`, `sqlite+aiosqlite://///app/data/...`, and `sqlite+aiosqlite:////%2Fapp%2Fdata/...` are no longer accepted by accident.
 - **Docker base images are pinned more tightly now**: the repository Dockerfiles now keep explicit digest pins on the shipped base images, so rebuilds are less likely to drift just because an upstream tag moved.
 - **GHCR release images now self-check the backend health helper**: the backend image now ships a Docker-level `HEALTHCHECK`, `docker-compose.ghcr.yml` keeps the backend bound to `0.0.0.0`, and the publish workflow now verifies `/usr/local/bin/backend-healthcheck.py` before it pushes a new backend image.
-- **The current validation wording separates old full-suite checks from the latest Docker rerun**: the earlier 2026-04 validation snapshot had backend `1136 passed, 22 skipped`, frontend `198 passed`, frontend build/typecheck, and repo-local live MCP e2e passing. The 2026-05-15 follow-up reran Docker/Linux `Profile B/C/D`: `Profile B` used the project's existing settings, while `Profile C/D` used explicit runtime injection with a 1024-dimension external embedding/reranker setup. B/C/D all passed health/SSE/browser smoke, and C/D also passed create/search/delete with `degrade_reasons=None`. The benchmark tables below were not recalculated in that follow-up.
+- **The current validation note is based on this review session**: on 2026-05-15, backend tests passed with `1382 passed, 22 skipped`, frontend tests passed with `203 passed`, and frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts all passed. `Profile B` keeps the project's shipped settings; `Profile C/D` runtime-injection contracts were checked with a 1024-dimension external embedding/reranker-style configuration and loopback Docker rewrite. The benchmark tables below were not recalculated in this pass, and native Windows / native Linux host-runtime paths remain target-environment checks.
 - **Public MCP contracts are stricter now**: the MCP boundary now rejects control/invisible/surrogate URI characters, blocks overlong `search_memory` / `create_memory` / `update_memory` payloads before DB work starts, and keeps percent-encoded memory URIs predictable: literal percent sequences remain valid path text, existing memories can also be resolved through decoded path variants such as encoded spaces or slashes, and percent-decoded Windows filesystem paths such as `C%3A/...` are rejected as invalid memory URIs. `add_alias` also rolls back the alias path if snapshot capture fails after the DB write.
 - **Search fail-closed behavior is tighter now**: if final path revalidation itself blows up, `search_memory` now drops that result instead of fail-opening with stale data, and surfaces the degradation in the response. Unsafe FTS control syntax (`AND` / `OR` / `NOT` / `NEAR` or wildcard-heavy forms) now falls back per request instead of steering query semantics or surfacing a noisy `fts_query_invalid` for normal user text. Fast-tier temporal queries also keep the fast candidate cap, and the keyword LIKE fallback now escapes literal `%` / `_` instead of treating them as accidental wildcards.
 - **Private provider targets are no longer implicitly trusted**: loopback IP literals such as `127.0.0.1` / `::1`, plus `localhost`, still work out of the box, but other private IP literals, and hostnames that resolve to private non-loopback addresses, now require an explicit allowlist entry through `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`. Link-local and malformed targets remain fail-closed.
@@ -356,18 +356,18 @@ If your local build environment keeps failing, use the prebuilt GHCR images firs
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
+`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it, so do not copy `.env.example` over `.env.docker` first.
+
 ```powershell
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -663,7 +663,7 @@ bash scripts/docker_one_click.sh --profile c --allow-runtime-env-injection
 >
 > On both the shell and PowerShell one-click paths, those local readiness checks now also force a loopback `NO_PROXY` / `no_proxy` bypass for `127.0.0.1`, `localhost`, `::1`, and `host.docker.internal`. In plain language: a host proxy is less likely to make a healthy local `/health` or proxied `/sse` probe look broken.
 >
-> On the same one-click `profile c/d + --allow-runtime-env-injection` path, loopback provider bases coming from the current shell are now rewritten to `host.docker.internal` inside the generated Docker env. Non-loopback private provider literals still stay unchanged, but the generated Docker env now appends their exact host to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that run so the backend keeps the normal fail-closed validation without dropping a valid local-private target by mistake.
+> On the same one-click path, runtime env injection is intentionally limited to `profile c/d`. If you pass it with `profile a/b`, the script stops before changing the Docker env because those profiles are supposed to keep their documented defaults. For `profile c/d + --allow-runtime-env-injection`, loopback provider bases coming from the current shell are rewritten to `host.docker.internal` inside the generated Docker env. Non-loopback private provider literals stay unchanged, and the generated Docker env appends their exact host to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that run so the backend keeps the normal fail-closed validation without dropping a valid local-private target by mistake.
 >
 > The Docker frontend also serves `/index.html` with `Cache-Control: no-store, no-cache, must-revalidate` to reduce the chance that a browser keeps an old entry page after a frontend update. If you still see an obviously old page after upgrading the image, first confirm the new container is actually running, then refresh the page once. Only continue checking cache behavior if you also put your own reverse proxy or CDN in front of it.
 >
@@ -743,7 +743,7 @@ RETRIEVAL_RERANKER_WEIGHT=0.40
 > For a quick local smoke test, it is usually faster to hit the real `/embeddings` and `/rerank` endpoints with the same model/key you plan to use before blaming the backend. The troubleshooting guide includes copyable `curl` examples.
 > If you use `docker_one_click.sh/.ps1` for `profile c/d`, unresolved placeholder model IDs are treated the same as placeholder endpoint/key values: the script stops before `docker compose` until you replace them with real values.
 >
-> If you use `--allow-runtime-env-injection` for local `profile c/d` debugging, the script switches that run into explicit API mode, forwards explicit `RETRIEVAL_EMBEDDING_*` (including `RETRIEVAL_EMBEDDING_DIM`), `RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`, and optional `WRITE_GUARD_LLM_*` / `COMPACT_GIST_LLM_*` / `INTENT_LLM_*` values, reuses `ROUTER_API_BASE/ROUTER_API_KEY` as the fallback source for embedding / reranker API base+key when the explicit `RETRIEVAL_*` values are not set, and falls back to `ROUTER_RERANKER_MODEL` when `RETRIEVAL_RERANKER_MODEL` is still missing. On that same one-click path, loopback router / chat-style API bases from the current shell are now rewritten to `host.docker.internal`, while non-loopback private provider literals stay explicit and are only appended to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that generated Docker env.
+> If you use `--allow-runtime-env-injection` for local `profile c/d` debugging, the script switches that run into explicit API mode, forwards explicit `RETRIEVAL_EMBEDDING_*` (including `RETRIEVAL_EMBEDDING_DIM`), `RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`, and optional `WRITE_GUARD_LLM_*` / `COMPACT_GIST_LLM_*` / `INTENT_LLM_*` values, reuses `ROUTER_API_BASE/ROUTER_API_KEY` as the fallback source for embedding / reranker API base+key when the explicit `RETRIEVAL_*` values are not set, and falls back to `ROUTER_RERANKER_MODEL` when `RETRIEVAL_RERANKER_MODEL` is still missing. This option is rejected for `profile a/b` so the lightweight profiles cannot be accidentally changed by local provider environment variables. On the same one-click path, loopback router / chat-style API bases from the current shell are rewritten to `host.docker.internal`, while non-loopback private provider literals stay explicit and are only appended to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that generated Docker env.
 >
 > For local Docker builds, the one-click path now also uses stable checkout-scoped image names. In practice this means `--no-build` can reuse images built earlier in the same checkout even if you change `COMPOSE_PROJECT_NAME`; the only time you still need `--build` is the first run or after deleting those local images.
 >
@@ -954,9 +954,9 @@ Full guides:
 
 > In the earlier 2026-04 session, Docker `Profile B` smoke, repo-local live MCP e2e, and the real A/B/C/D benchmark were also rerun. Native Windows and native Linux host runtime paths were not rerun in that round.
 >
-> Follow-up note (2026-04-21): after the regression-fix reruns, the repository reran the full backend suite (`1136 passed, 22 skipped`), the full frontend suite (`198 passed`), frontend build/typecheck, and repo-local live MCP e2e (`docs/skills/MCP_LIVE_E2E_REPORT.md`, full `PASS`). Earlier in the same session, the Docker readiness/auth recheck (`/` `200`, `/health` `200`, protected setup/SSE requests still fail-closed), the repo-local `Profile B` browser smoke, and a smaller real A/B/C/D rerun on `BEIR NFCorpus` (`sample_size=5`, `Profile D` gate still `PASS`) were also completed. The narrower benchmark table above itself was not recalculated in that final doc-sync pass.
+> Historical note (2026-04-21): the regression-fix rerun also covered the full backend/frontend suites, frontend build/typecheck, repo-local live MCP e2e, Docker readiness/auth checks, repo-local `Profile B` browser smoke, and a smaller `BEIR NFCorpus` A/B/C/D run. The narrower benchmark table above itself was not recalculated in that doc-sync pass.
 >
-> Follow-up note (2026-05-15): Docker/Linux `Profile B/C/D` were rerun. B used the project defaults; C/D used explicit runtime injection with 1024-dimension external embedding/reranker settings. Health, SSE, and browser smoke passed for all three; C/D create/search/delete also passed with `degrade_reasons=None`. The table above was not recalculated in that follow-up.
+> Follow-up note (2026-05-15): this review session reran backend `1382 passed / 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts. The table above was not recalculated in this pass.
 
 ### Retrieval Quality — A/B/C/D Real Run
 

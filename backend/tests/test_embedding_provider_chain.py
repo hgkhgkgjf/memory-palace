@@ -4,9 +4,10 @@ from pathlib import Path
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 import db.sqlite_client as sqlite_client_module
-from db.sqlite_client import EmbeddingCache, SQLiteClient
+from db.sqlite_client import EmbeddingCache, MemoryChunkVec, SQLiteClient
 
 
 def _sqlite_url(db_path: Path) -> str:
@@ -507,6 +508,160 @@ async def test_single_provider_remote_recovery_does_not_reuse_hash_fallback_cach
         ("https://api.example/v1", "api-model", False),
         ("https://api.example/v1", "api-model", True),
     ]
+
+
+@pytest.mark.asyncio
+async def test_hash_fallback_index_degrades_after_remote_provider_recovers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _clear_embedding_env(monkeypatch)
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "api")
+    monkeypatch.setenv("EMBEDDING_PROVIDER_CHAIN_ENABLED", "false")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_BASE", "https://api.example/v1")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_KEY", "api-key")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_MODEL", "api-model")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "16")
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "fallback-index-model.db"))
+    await client.init_db()
+
+    remote_available = {"value": False}
+
+    async def _fake_post_json(*_args, **_kwargs):
+        if not remote_available["value"]:
+            return None
+        return {"data": [{"embedding": [0.9] * 16}]}
+
+    monkeypatch.setattr(client, "_post_json", _fake_post_json)
+
+    await client.create_memory(
+        parent_path="",
+        content="fallback indexed sample",
+        priority=1,
+        title="fallback-indexed",
+        domain="core",
+    )
+
+    async with client.session() as session:
+        vector_models = [
+            row[0]
+            for row in (
+                await session.execute(select(MemoryChunkVec.model))
+            ).all()
+        ]
+
+    remote_available["value"] = True
+    payload = await client.search_advanced(
+        query="fallback indexed sample",
+        mode="semantic",
+        max_results=3,
+    )
+    await client.close()
+
+    assert vector_models == ["hash:16"]
+    assert payload["mode"] == "keyword"
+    assert "vector_hash_fallback_requires_reindex" in payload["degrade_reasons"]
+
+
+@pytest.mark.asyncio
+async def test_reindex_memory_marks_hash_fallback_vector_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _clear_embedding_env(monkeypatch)
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "api")
+    monkeypatch.setenv("EMBEDDING_PROVIDER_CHAIN_ENABLED", "false")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_BASE", "https://api.example/v1")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_KEY", "api-key")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_MODEL", "api-model")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "16")
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "fallback-reindex-model.db"))
+    await client.init_db()
+
+    remote_available = {"value": True}
+
+    async def _fake_post_json(*_args, **_kwargs):
+        if not remote_available["value"]:
+            return None
+        return {"data": [{"embedding": [0.9] * 16}]}
+
+    monkeypatch.setattr(client, "_post_json", _fake_post_json)
+
+    created = await client.create_memory(
+        parent_path="",
+        content="fallback reindex sample",
+        priority=1,
+        title="fallback-reindexed",
+        domain="core",
+        index_now=False,
+    )
+
+    remote_available["value"] = False
+    await client.reindex_memory(int(created["id"]))
+
+    async with client.session() as session:
+        vector_models = [
+            row[0]
+            for row in (
+                await session.execute(select(MemoryChunkVec.model))
+            ).all()
+        ]
+
+    remote_available["value"] = True
+    payload = await client.search_advanced(
+        query="fallback reindex sample",
+        mode="semantic",
+        max_results=3,
+    )
+    await client.close()
+
+    assert vector_models == ["hash:16"]
+    assert payload["mode"] == "keyword"
+    assert "vector_hash_fallback_requires_reindex" in payload["degrade_reasons"]
+
+
+@pytest.mark.asyncio
+async def test_write_guard_fails_closed_when_embedding_provider_degrades(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _clear_embedding_env(monkeypatch)
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "api")
+    monkeypatch.setenv("EMBEDDING_PROVIDER_CHAIN_ENABLED", "false")
+    monkeypatch.setenv("EMBEDDING_PROVIDER_FAIL_OPEN", "false")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_BASE", "https://api.example/v1")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_API_KEY", "api-key")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_MODEL", "api-model")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "16")
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "write-guard-provider-down.db"))
+    await client.init_db()
+
+    remote_available = {"value": True}
+
+    async def _fake_post_json(*_args, **_kwargs):
+        if not remote_available["value"]:
+            return None
+        return {"data": [{"embedding": [0.25] * 16}]}
+
+    monkeypatch.setattr(client, "_post_json", _fake_post_json)
+    await client.create_memory(
+        parent_path="",
+        content="existing provider indexed memory",
+        priority=1,
+        title="provider-indexed",
+        domain="core",
+    )
+
+    remote_available["value"] = False
+    decision = await client.write_guard(
+        content="completely new memory while provider is unavailable",
+        domain="core",
+    )
+    await client.close()
+
+    assert decision["action"] == "NOOP"
+    assert decision["reason"] == "write_guard_embedding_provider_degraded"
+    assert "embedding_fallback_hash" in decision["degrade_reasons"]
 
 
 @pytest.mark.asyncio

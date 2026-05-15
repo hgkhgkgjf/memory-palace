@@ -3699,18 +3699,28 @@ class SQLiteClient:
         vec_knn_rows: List[Dict[str, Any]] = []
         for chunk in chunk_rows:
             if self._vector_available:
+                chunk_degrade_reasons: List[str] = []
                 embedding = await self._get_embedding(
                     session,
                     chunk.chunk_text,
-                    degrade_reasons=degrade_reasons,
+                    degrade_reasons=chunk_degrade_reasons,
                 )
+                vector_model = self._embedding_model
+                for reason in chunk_degrade_reasons:
+                    self._append_degrade_reason(degrade_reasons, reason)
+                if (
+                    (self._embedding_backend or "").strip().lower()
+                    in {"hash", "local", "none", "off", "disabled", "false", "0"}
+                    or "embedding_fallback_hash" in chunk_degrade_reasons
+                ):
+                    vector_model = f"hash:{len(embedding)}"
                 vector_payload = json.dumps(embedding, separators=(",", ":"))
                 vec_rows.append(
                     MemoryChunkVec(
                         chunk_id=chunk.id,
                         memory_id=memory_id,
                         vector=vector_payload,
-                        model=self._embedding_model,
+                        model=vector_model,
                         dim=len(embedding),
                     )
                 )
@@ -3846,6 +3856,37 @@ class SQLiteClient:
                 dims.append(dim)
         dims.sort()
         return dims
+
+    async def _get_indexed_vector_models(
+        self,
+        session: AsyncSession,
+        *,
+        where_clause: str,
+        where_params: Dict[str, Any],
+    ) -> List[str]:
+        result = await session.execute(
+            text(
+                "SELECT DISTINCT mcv.model "
+                "FROM memory_chunks_vec mcv "
+                "JOIN memory_chunks mc ON mc.id = mcv.chunk_id "
+                "JOIN memories m ON m.id = mc.memory_id "
+                "JOIN paths p ON p.memory_id = mc.memory_id "
+                f"WHERE {where_clause} "
+                "AND mcv.model IS NOT NULL AND TRIM(mcv.model) != '' "
+                "LIMIT 8"
+            ),
+            where_params,
+        )
+        models: List[str] = []
+        for row in result.all():
+            try:
+                model = str(row[0] or "").strip()
+            except (TypeError, IndexError, KeyError):
+                model = ""
+            if model and model not in models:
+                models.append(model)
+        models.sort()
+        return models
 
     async def _fetch_semantic_rows_vec_native_topk(
         self,
@@ -5528,6 +5569,7 @@ class SQLiteClient:
         path: str,
         domain: str = "core",
         *,
+        expected_memory_id: Optional[int] = None,
         before_delete: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
     ) -> Dict[str, Any]:
         """
@@ -5551,6 +5593,15 @@ class SQLiteClient:
                 raise ValueError(f"Path '{domain}://{path}' not found")
 
             memory, path_obj = row
+            if (
+                expected_memory_id is not None
+                and int(path_obj.memory_id) != int(expected_memory_id)
+            ):
+                raise ValueError(
+                    f"Path '{domain}://{path}' now points to "
+                    f"memory_id={path_obj.memory_id} instead of expected "
+                    f"memory_id={expected_memory_id}"
+                )
 
             safe_path = (
                 path.replace("\\", "\\\\")
@@ -6314,6 +6365,34 @@ class SQLiteClient:
                 if isinstance(reason, str):
                     self._append_degrade_reason(degrade_reasons, reason)
 
+        provider_degraded = any(
+            reason == "embedding_fallback_hash"
+            or reason.startswith("embedding_config_missing")
+            or reason.startswith("embedding_remote_error")
+            or reason.startswith("embedding_response_dim_mismatch")
+            or reason.startswith("vector_hash_fallback_requires_reindex")
+            for reason in degrade_reasons
+        )
+        if (
+            provider_degraded
+            and not self._embedding_provider_fail_open
+            and self._embedding_backend not in {
+                "hash",
+                "local",
+                "none",
+                "off",
+                "disabled",
+                "false",
+                "0",
+            }
+        ):
+            return self._build_guard_decision(
+                action="NOOP",
+                reason="write_guard_embedding_provider_degraded",
+                method="degraded",
+                degrade_reasons=degrade_reasons,
+            )
+
         semantic_candidates = self._collect_guard_candidates(
             semantic_payload,
             exclude_memory_id=exclude_memory_id,
@@ -6733,7 +6812,13 @@ class SQLiteClient:
                     where_clause=where_clause,
                     where_params=where_params,
                 )
+                indexed_vector_models = await self._get_indexed_vector_models(
+                    session,
+                    where_clause=where_clause,
+                    where_params=where_params,
+                )
                 vector_engine_metadata["indexed_vector_dims"] = indexed_vector_dims
+                vector_engine_metadata["indexed_vector_models"] = indexed_vector_models
                 if not indexed_vector_dims:
                     vector_engine_metadata["indexed_vector_dim_status"] = "empty"
                 elif len(indexed_vector_dims) > 1:
@@ -6760,6 +6845,31 @@ class SQLiteClient:
                     )
                 else:
                     vector_engine_metadata["indexed_vector_dim_status"] = "aligned"
+                    if (
+                        self._embedding_backend not in {
+                            "hash",
+                            "local",
+                            "none",
+                            "off",
+                            "disabled",
+                            "false",
+                            "0",
+                        }
+                        and any(
+                            str(model or "").strip().lower().startswith("hash:")
+                            for model in indexed_vector_models
+                        )
+                    ):
+                        vector_engine_metadata["indexed_vector_model_status"] = (
+                            "hash_fallback_mismatch"
+                        )
+                        mode_value = "keyword"
+                        self._append_degrade_reason(
+                            degrade_reasons,
+                            "vector_hash_fallback_requires_reindex",
+                        )
+                    else:
+                        vector_engine_metadata["indexed_vector_model_status"] = "aligned"
 
             if mode_value in {"keyword", "hybrid"}:
                 if self._fts_available:

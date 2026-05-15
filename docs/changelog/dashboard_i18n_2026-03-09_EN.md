@@ -6,7 +6,7 @@ This manual only records **already implemented and verified** frontend i18n chan
 
 ## 1. One-sentence Conclusion
 
-The frontend defaults to English, supporting one-click switching between English / Chinese in the top-right corner; the browser remembers your selection.
+The frontend restores a saved language first; without one, Chinese browser languages map to `zh-CN` and other first visits fall back to English. The top-right button still switches between English / Chinese, and the browser remembers your selection.
 
 ---
 

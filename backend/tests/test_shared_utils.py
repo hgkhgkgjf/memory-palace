@@ -121,6 +121,21 @@ def test_normalize_http_api_base_allows_private_hostnames_when_allowlisted(
     )
 
 
+def test_normalize_http_api_base_rejects_partially_allowlisted_private_hostname(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(PRIVATE_PROVIDER_TARGETS_ENV, "10.0.0.0/8")
+    monkeypatch.setattr(
+        "shared_utils.socket.getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.8", 11435)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.9", 11435)),
+        ],
+    )
+    with pytest.raises(ValueError, match="private-address hostname"):
+        normalize_http_api_base("http://router.internal:11435/v1")
+
+
 def test_utc_iso_now_returns_utc_z_suffix() -> None:
     assert utc_iso_now().endswith("Z")
 

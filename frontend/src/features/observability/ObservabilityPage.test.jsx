@@ -729,6 +729,111 @@ describe('ObservabilityPage', () => {
     expect(await screen.findByText(/queue depth:\s*8/i)).toBeInTheDocument();
   });
 
+  it('re-establishes authenticated SSE after a terminal 401 when the page regains focus', async () => {
+    const encoder = new TextEncoder();
+    const maintenanceAuth = {
+      key: 'focused-maintenance-key',
+      mode: 'header',
+      source: 'runtime',
+    };
+    api.getMaintenanceAuthState.mockReturnValue(maintenanceAuth);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          body: new ReadableStream({
+            start(controller) {
+              controller.close();
+            },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          body: new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                encoder.encode('event: endpoint\ndata: /messages?session_id=focus-recovered\n\n')
+              );
+              controller.close();
+            },
+          }),
+        })
+    );
+    api.getObservabilitySummary
+      .mockResolvedValueOnce(buildSummary({ queueDepth: 2, timestamp: '2026-01-01T00:00:00Z' }))
+      .mockResolvedValueOnce(buildSummary({ queueDepth: 9, timestamp: '2026-01-01T00:00:09Z' }));
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByText(/queue depth:\s*2/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/sse'),
+        expect.objectContaining({
+          headers: { 'X-MCP-API-Key': 'focused-maintenance-key' },
+        })
+      );
+    });
+    await waitFor(() => {
+      expect(api.getObservabilitySummary).toHaveBeenCalledTimes(2);
+    });
+    expect(await screen.findByText(/queue depth:\s*9/i)).toBeInTheDocument();
+  });
+
+  it('does not rebuild a healthy authenticated SSE stream when the page regains focus', async () => {
+    const encoder = new TextEncoder();
+    const maintenanceAuth = {
+      key: 'healthy-maintenance-key',
+      mode: 'header',
+      source: 'runtime',
+    };
+    api.getMaintenanceAuthState.mockReturnValue(maintenanceAuth);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode('event: endpoint\ndata: /messages?session_id=focus-stable\n\n')
+            );
+          },
+        }),
+      })
+    );
+    api.getObservabilitySummary
+      .mockResolvedValueOnce(buildSummary({ queueDepth: 3, timestamp: '2026-01-01T00:00:00Z' }))
+      .mockResolvedValueOnce(buildSummary({ queueDepth: 4, timestamp: '2026-01-01T00:00:04Z' }));
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByText(/queue depth:\s*3/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByText(/queue depth:\s*4/i)).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks diagnostic search when max priority is not an integer', async () => {
     const user = userEvent.setup();
     render(<ObservabilityPage />);

@@ -24,7 +24,6 @@
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -35,7 +34,6 @@ docker compose -f docker-compose.ghcr.yml up -d
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -43,6 +41,8 @@ docker compose -f docker-compose.ghcr.yml up -d
 ```
 
 > 这里默认走的是 **Profile B**。
+>
+> `apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份，所以不要先手动把 `.env.example` 复制到 `.env.docker`。
 >
 > 当前这条 GHCR 路径还会额外依赖 backend 镜像里的健康检查脚本。官方发布出来的 backend 镜像现在自带 `/usr/local/bin/backend-healthcheck.py`；如果你用的是自己缓存的旧镜像、私有镜像代理，或者手工 retag 过的镜像，先确认这一份 helper 还在，不然 frontend 可能会一直等 backend 变 healthy。
 

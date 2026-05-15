@@ -538,7 +538,7 @@ async def test_search_advanced_invalid_weight_env_falls_back_defaults_and_runs(
 
 
 @pytest.mark.asyncio
-async def test_search_advanced_embedding_fallback_then_cache_hit_is_observable(
+async def test_search_advanced_hash_index_requires_reindex_after_backend_switch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "hash")
@@ -584,10 +584,8 @@ async def test_search_advanced_embedding_fallback_then_cache_hit_is_observable(
     status_payload = await client.get_index_status()
     await client.close()
 
-    assert "embedding_request_failed" in first_payload.get("degrade_reasons", [])
-    assert "embedding_fallback_hash" in first_payload.get("degrade_reasons", [])
-    assert post_call_count["value"] == 2
-    assert "embedding_request_failed" in second_payload.get("degrade_reasons", [])
-    assert "embedding_fallback_hash" in second_payload.get("degrade_reasons", [])
+    assert "vector_hash_fallback_requires_reindex" in first_payload.get("degrade_reasons", [])
+    assert "vector_hash_fallback_requires_reindex" in second_payload.get("degrade_reasons", [])
+    assert post_call_count["value"] == 0
     assert second_payload["degraded"] is True
     assert int(status_payload["counts"]["embedding_cache"]) >= 1

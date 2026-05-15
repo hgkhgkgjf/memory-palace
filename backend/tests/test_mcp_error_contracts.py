@@ -84,8 +84,17 @@ class _SnapshotFailureCreateClient:
             return dict(self._memory)
         return None
 
-    async def delete_path_atomically(self, path: str, domain: str, *, before_delete=None):
+    async def delete_path_atomically(
+        self,
+        path: str,
+        domain: str,
+        *,
+        expected_memory_id=None,
+        before_delete=None,
+    ):
         _ = before_delete
+        if expected_memory_id is not None and expected_memory_id != 41:
+            raise ValueError("unexpected memory id")
         if self._memory and self._memory["path"] == path and self._memory["domain"] == domain:
             self.rollback_calls += 1
             removed = dict(self._memory)
@@ -119,9 +128,16 @@ class _SnapshotFailureAliasClient:
         }
 
     async def delete_path_atomically(
-        self, path: str, domain: str, *, before_delete=None
+        self,
+        path: str,
+        domain: str,
+        *,
+        expected_memory_id=None,
+        before_delete=None,
     ):
         _ = before_delete
+        if expected_memory_id is not None and expected_memory_id != 41:
+            raise ValueError("unexpected memory id")
         if self.alias_exists and (domain, path) == ("core", "alias-node"):
             self.alias_exists = False
             self.rollback_calls += 1

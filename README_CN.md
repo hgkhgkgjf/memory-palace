@@ -56,7 +56,7 @@
 - **repo-local wrapper 现在会更一致地拦住本地 sqlite 误配**：仓库自带的 Python / shell wrapper 现在会先把常见的斜杠和大小写变体归一化，拒绝相对 sqlite 路径，也会把常见的 URL 编码容器路径先解开，再判断本地 `DATABASE_URL` 是否还指着 Docker 内部的 `/app/...` 或 `/data/...`。说人话就是：像 `sqlite+aiosqlite:///demo.db`、`sqlite+aiosqlite://///app/data/...`、`sqlite+aiosqlite:////%2Fapp%2Fdata/...` 这类值，现在都不会再被误放过。
 - **Docker 基础镜像现在也收得更紧了**：仓库自带的 Dockerfile 现在把基础镜像 digest 一起锁住了，后面重建时不容易再因为上游 tag 漂了而悄悄变样。
 - **GHCR 发布镜像现在会先自查 backend 健康脚本了**：backend 镜像现在自带 Docker 级别的 `HEALTHCHECK`，`docker-compose.ghcr.yml` 里的 backend 也继续明确绑在 `0.0.0.0`，发布工作流还会在 push 前先检查 `/usr/local/bin/backend-healthcheck.py` 是否真的在镜像里而且可执行。
-- **当前验证口径把旧的全量测试和最新 Docker 复验分开写**：2026-04 那轮全量快照里，backend `1136 passed, 22 skipped`、frontend `198 passed`、前端 build/typecheck 和 repo-local live MCP e2e 都通过。2026-05-15 又补跑了 Docker/Linux `Profile B/C/D`：B 使用项目原本设置，C/D 使用显式运行时注入和 1024 维外部 embedding/reranker 组合；三档 health、SSE、浏览器 smoke 都通过，C/D create/search/delete 也通过，查询 `degrade_reasons=None`。下面的 benchmark 表格没有在这轮 Docker 复验里重算。
+- **当前验证口径以本轮 review 为准**：2026-05-15 这轮复核里，backend `1382 passed, 22 skipped`，frontend `203 passed`，前端 typecheck/build、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试都通过。`Profile B` 保持项目原本设置；`Profile C/D` 的运行时注入契约按 1024 维外部 embedding/reranker 风格配置和 Docker loopback 改写做了复核。下面的 benchmark 表格没有在本轮重算；原生 Windows / 原生 Linux host runtime 仍保留目标环境复核边界。
 - **公开 MCP 契约现在更严格了**：MCP 入口会直接拒绝带控制字符 / 不可见字符 / surrogate 的 URI，也会在真正进库前拦住超长的 `search_memory` / `create_memory` / `update_memory` payload；对 percent-encoded 记忆 URI 的处理现在也更可预期：字面 `%20` 这类路径文本仍然合法，已有记忆也可以通过编码空格 / 编码斜杠这类解码变体去兼容查找，而像 `C%3A/...` 这种解码后变成 Windows 文件路径的输入会继续被当成非法记忆 URI 直接拒绝。如果 `add_alias` 已经写入数据库，但 snapshot 补记失败，也会把 alias path 一起回滚掉。
 - **搜索 fail-close 这条链也更收口了**：如果最终 path 状态复核自己出错，`search_memory` 现在会直接丢掉那条结果，而不是把可能已经过期的 URI 继续当正常命中返回。像 `AND` / `OR` / `NOT` / `NEAR` 这类 FTS 控制词，或者 wildcard 很重的查询，也会改成当前请求内回退，而不是让控制语义悄悄改掉匹配结果，或把正常用户输入打成一条吵人的 `fts_query_invalid`。
 - **private provider 目标现在不会再被默认信任**：像 `127.0.0.1` / `::1` 这类 loopback IP 字面量，再加上 `localhost`，仍然默认可用；其它 private IP 字面量，以及解析后会落到 private 非 loopback 地址的 hostname，现在都必须通过 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` 显式 allowlist 才能继续使用。link-local 和格式错误地址仍然会 fail-close。
@@ -343,18 +343,18 @@ memory-palace/
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
+`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份，所以不要先手动把 `.env.example` 复制到 `.env.docker`。
+
 ```powershell
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -644,7 +644,7 @@ bash scripts/docker_one_click.sh --profile c --allow-runtime-env-injection
 >
 > 现在 Docker 前端会先等 `backend` 的 `/health` 通过，同时一键脚本还会额外检查前端代理出来的 `/sse` 是否可达，才算真正 ready。backend 容器侧的检查也不再是“`/health` 只要回 `200` 就算好”，而是会继续确认返回 payload 里的 `status == "ok"`。容器刚起来时如果页面还没完全可用，先多等几秒，再按控制台打印出的地址重试即可。
 >
-> 对 one-click 的 `profile c/d + --allow-runtime-env-injection` 路径来说，当前 shell 里传进来的 loopback provider base 现在也会在生成的 Docker env 里自动改成 `host.docker.internal`。其它 non-loopback private provider 字面量地址仍然保持原值，但脚本会把它们的精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`，让 backend 继续按原来的 fail-closed 规则工作，而不是把一条本来可用的本地 private 目标误判成非法地址。
+> 运行时环境注入只给 `profile c/d` 使用。如果你把 `--allow-runtime-env-injection` / `-AllowRuntimeEnvInjection` 传给 `profile a/b`，脚本会在改动 Docker env 之前直接停止，因为这两个轻量档位应该保留文档里的默认设置。对 one-click 的 `profile c/d + --allow-runtime-env-injection` 路径来说，当前 shell 里传进来的 loopback provider base 会在生成的 Docker env 里自动改成 `host.docker.internal`。其它 non-loopback private provider 字面量地址仍然保持原值，但脚本会把它们的精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`，让 backend 继续按原来的 fail-closed 规则工作，而不是把一条本来可用的本地 private 目标误判成非法地址。
 >
 > 当前 Docker 前端还会对 `/index.html` 返回 `Cache-Control: no-store, no-cache, must-revalidate`，尽量减少“前端已经更新，但浏览器还拿着旧入口页面”的情况。如果你刚升级完镜像仍看到明显旧页面，先确认容器已经是新版本，再手动刷新一次页面；只有在你额外接了自己的反向代理或 CDN 时，才需要继续检查这些中间层是否改写了缓存头。
 >
@@ -752,7 +752,7 @@ COMPACT_GIST_LLM_MODEL=your-chat-model-id
 
 > 上面这些模型名只是占位示例，不是项目硬依赖。Memory Palace 不绑定某个固定 provider 或模型家族；请直接填写你自己的 OpenAI-compatible 服务里实际可用的 embedding / reranker / chat model id。如需调整 Intent LLM、CORS、自定义 MMR、sqlite-vec rollout 或运行时审计上限，请直接参考 `.env.example`；README 只保留最常用主配置。
 >
-> 如果你在本地用 `--allow-runtime-env-injection` 调试 `profile c/d`，脚本会把这次运行切到显式 API 模式；它现在会一起透传显式的 `RETRIEVAL_EMBEDDING_*`（包括 `RETRIEVAL_EMBEDDING_DIM`）、`RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`，以及可选的 `WRITE_GUARD_LLM_*` / `COMPACT_GIST_LLM_*` / `INTENT_LLM_*`。当 `RETRIEVAL_EMBEDDING_API_*` / `RETRIEVAL_RERANKER_API_*` 没填时，会把 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源；如果 `RETRIEVAL_RERANKER_MODEL` 还没显式填写，也会优先回退到 `ROUTER_RERANKER_MODEL`。对同一条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 现在也会自动改成 `host.docker.internal`；其它 non-loopback private provider 字面量地址则保持显式写法，只会追加到这次生成的 Docker env allowlist 里。
+> 如果你在本地用 `--allow-runtime-env-injection` 调试 `profile c/d`，脚本会把这次运行切到显式 API 模式；它现在会一起透传显式的 `RETRIEVAL_EMBEDDING_*`（包括 `RETRIEVAL_EMBEDDING_DIM`）、`RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`，以及可选的 `WRITE_GUARD_LLM_*` / `COMPACT_GIST_LLM_*` / `INTENT_LLM_*`。当 `RETRIEVAL_EMBEDDING_API_*` / `RETRIEVAL_RERANKER_API_*` 没填时，会把 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源；如果 `RETRIEVAL_RERANKER_MODEL` 还没显式填写，也会优先回退到 `ROUTER_RERANKER_MODEL`。这个选项现在会拒绝 `profile a/b`，避免本地 provider 环境变量意外改掉轻量档位默认值。对同一条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 会自动改成 `host.docker.internal`；其它 non-loopback private provider 字面量地址则保持显式写法，只会追加到这次生成的 Docker env allowlist 里。
 >
 > 对本地 Docker build 路径来说，一键脚本现在还会使用按 checkout 固定的本地镜像名。实际效果就是：只要这个 checkout 里之前已经 build 过一次，即使你换了 `COMPOSE_PROJECT_NAME`，`--no-build` 也还能继续复用这些本地镜像；只有第一次启动或你手动删掉本地镜像时，才需要重新走 `--build`。
 

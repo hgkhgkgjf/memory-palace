@@ -676,7 +676,7 @@ describe('App routing', () => {
       within(translatedDialog).getByRole('button', { name: '档位 A · 纯关键词' })
     ).toBeInTheDocument();
     expect(
-      within(translatedDialog).getByRole('button', { name: '档位 B · 仅 hash' })
+      within(translatedDialog).getByRole('button', { name: '档位 B · 混合检索 + hash' })
     ).toBeInTheDocument();
     expect(
       within(translatedDialog).queryByRole('button', { name: /^(Profile B|Profile C|Profile D)\b/ })

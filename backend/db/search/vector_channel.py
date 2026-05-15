@@ -114,6 +114,26 @@ class VectorChannel(BaseChannel):
                     "vector_dim_mismatch_requires_reindex"
                 )
                 return []
+            indexed_vector_models = await self._client._get_indexed_vector_models(
+                session,
+                where_clause=where_clause,
+                where_params=where_params,
+            )
+            embedding_backend = str(
+                getattr(self._client, "_embedding_backend", "") or ""
+            ).strip().lower()
+            if (
+                embedding_backend
+                not in {"hash", "local", "none", "off", "disabled", "false", "0"}
+                and any(
+                    str(model or "").strip().lower().startswith("hash:")
+                    for model in indexed_vector_models
+                )
+            ):
+                self.last_degrade_reasons.append(
+                    "vector_hash_fallback_requires_reindex"
+                )
+                return []
 
             # Resolve or compute the query embedding.
             local_reasons: List[str] = []

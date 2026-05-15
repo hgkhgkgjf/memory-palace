@@ -298,7 +298,6 @@ INTENT_LLM_MODEL=your-chat-model-id
 
 ```bash
 cd <project-root>
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -307,12 +306,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 ```powershell
 cd <project-root>
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份。
 
 这条路径的定位是**先把服务跑起来**：
 
@@ -374,7 +374,7 @@ cd <project-root>
 >
 > WAL 安全边界：仓库默认只把 **named volume + WAL** 当成受支持的 Docker 路径。如果你把 backend `/app/data` 改成 NFS/CIFS/SMB 或其它网络文件系统 bind mount，就必须显式切回 `MEMORY_PALACE_DOCKER_WAL_ENABLED=false` 与 `MEMORY_PALACE_DOCKER_JOURNAL_MODE=delete`。`docker_one_click.sh/.ps1` 现在会在 `docker compose up` 前做这层 preflight，并在发现高风险组合时直接拒绝启动；如果你绕过一键脚本，自己手动跑 `docker compose up`，则需要自己执行同样的检查。
 >
-> 如果你对 `profile c/d` 开启 `--allow-runtime-env-injection`，脚本会把这次运行切到显式 API 模式，并额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api`。当前这条注入链路会一起覆盖：
+> 运行时环境注入只给 `profile c/d` 使用。如果你把 `--allow-runtime-env-injection` / `-AllowRuntimeEnvInjection` 传给 `profile a/b`，脚本会在改动 Docker env 之前停止，避免轻量档位被本机 provider 环境变量意外改写。对 `profile c/d`，脚本会把这次运行切到显式 API 模式，并额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api`。当前这条注入链路会一起覆盖：
 >
 > - 显式传入的 `RETRIEVAL_EMBEDDING_*`
 > - 显式传入的 `RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`
@@ -398,7 +398,7 @@ cd <project-root>
 ### 一键脚本做了什么
 
 1. 调用 profile 脚本从模板生成本次运行使用的 Docker env 文件（默认是 per-run 临时文件；仅当显式设置 `MEMORY_PALACE_DOCKER_ENV_FILE` 时才复用指定路径）
-2. 默认禁用运行时环境注入，避免隐式覆盖模板；仅在显式开关注入时才覆盖运行参数。对 `profile c/d`，注入模式会额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api` 用于本地联调；若显式 `RETRIEVAL_*` 未提供，则优先复用 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源，并同步透传显式的 `RETRIEVAL_EMBEDDING_DIM` 与可选的 `INTENT_LLM_*`。对这条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 现在还会在生成的 Docker env 里自动改成 `host.docker.internal`，并把这个 host 追加进本次 allowlist；non-loopback private provider 字面量地址则保持原值，只把精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`。
+2. 默认禁用运行时环境注入，避免隐式覆盖模板；只有 `profile c/d` 可以显式开启注入，`profile a/b` 会直接拒绝这个开关。对 `profile c/d`，注入模式会额外强制 `RETRIEVAL_EMBEDDING_BACKEND=api` 用于本地联调；若显式 `RETRIEVAL_*` 未提供，则优先复用 `ROUTER_API_BASE/ROUTER_API_KEY` 作为 embedding / reranker API base+key 的兜底来源，并同步透传显式的 `RETRIEVAL_EMBEDDING_DIM` 与可选的 `INTENT_LLM_*`。对这条 one-click 路径来说，当前 shell 里的 loopback router / chat 类 API base 现在还会在生成的 Docker env 里自动改成 `host.docker.internal`，并把这个 host 追加进本次 allowlist；non-loopback private provider 字面量地址则保持原值，只把精确 host 追加进这次运行的 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`。
 3. 自动检测端口占用，若默认端口被占用则自动递增寻找空闲端口
 4. 检测并注入 Docker 持久化卷：默认按 compose project 生成隔离卷名（数据库 `<compose-project>_data`，snapshot `<compose-project>_snapshots`）；如需复用旧卷，必须显式设置 `MEMORY_PALACE_DATA_VOLUME` / `MEMORY_PALACE_SNAPSHOTS_VOLUME`
 5. 若 backend `/app/data` 被改成 NFS/CIFS/SMB 等网络文件系统 bind mount，且本次配置仍会启用 WAL，则在启动前直接 fail-fast

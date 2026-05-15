@@ -636,12 +636,16 @@ def _strip_codex_memory_palace_block(text: str) -> str:
     lines = text.splitlines()
     kept: list[str] = []
     skipping = False
+    target_headers = {
+        "[mcp_servers.memory-palace]",
+        "[mcp_servers.memory-palace.env]",
+    }
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("[mcp_servers.memory-palace"):
+        if stripped in target_headers:
             skipping = True
             continue
-        if skipping and stripped.startswith("[") and not stripped.startswith("[mcp_servers.memory-palace"):
+        if skipping and stripped.startswith("["):
             skipping = False
         if not skipping:
             kept.append(line)

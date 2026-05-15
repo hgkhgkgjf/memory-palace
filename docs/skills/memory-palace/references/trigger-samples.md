@@ -41,7 +41,7 @@ For each sample:
 
 - Prompt: `最近 search_memory 结果不太对，帮我看看要不要 rebuild_index。`
 - Why: explicit retrieval degradation diagnosis
-- Expected first move: inspect retrieval state, usually `index_status()`
+- Expected first move: `read_memory("system://boot")`, then inspect retrieval state, usually `index_status()`
 
 ### T05
 
@@ -71,7 +71,7 @@ For each sample:
 
 - Prompt: `请排查 index_status 里的 degrade_reasons，并给出恢复顺序。`
 - Why: explicit maintenance / recovery semantics
-- Expected first move: `index_status()`
+- Expected first move: `read_memory("system://boot")`, then `index_status()`
 
 ### T10
 

@@ -318,7 +318,6 @@ If your local build environment keeps failing, use the prebuilt GHCR images firs
 
 ```bash
 cd <project-root>
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -327,12 +326,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 ```powershell
 cd <project-root>
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it.
 
 Default access addresses:
 
@@ -522,7 +522,7 @@ If you just cloned the GitHub repository, it is normal if you don't see these tw
 
 > The checks here focus on "getting the system running"; if you need additional local Markdown validation summaries, run the validation scripts mentioned above.
 >
-> Current real verification wording: the 2026-04 full snapshot had backend `1136 passed, 22 skipped`, frontend `198 passed`, frontend typecheck/build, and repo-local live MCP e2e passing. The 2026-05-15 follow-up reran Docker/Linux `Profile B/C/D`: B used the project's existing settings, while C/D used explicit runtime injection with a 1024-dimension external embedding/reranker setup. Health, SSE, and browser smoke passed for all three; C/D create/search/delete also passed with `degrade_reasons=None`. The public A/B/C/D benchmark tables were not recalculated in that Docker follow-up, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.
+> Current real verification wording: this 2026-05-15 review session reran backend `1382 passed, 22 skipped`, frontend `203 passed`, frontend typecheck/build, i18n audit, bundle budget, repo-local live MCP e2e, and focused Docker/profile/SSE/script contracts. The public A/B/C/D benchmark tables were not recalculated in this pass, and native Windows / native Linux host runtime paths still keep explicit target-environment recheck boundaries.
 
 ### 5.1 Health Check
 

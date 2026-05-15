@@ -514,6 +514,76 @@ def test_delete_snapshot_keeps_resource_file_when_manifest_save_fails(
     assert resource_path.exists()
 
 
+def test_create_snapshot_removes_resource_file_when_manifest_save_fails(
+    tmp_path: Path,
+) -> None:
+    manager = SnapshotManager(str(tmp_path / "snapshots"))
+    session_id = "create-order"
+    uri = "notes://created"
+
+    def _failing_save_manifest(
+        _session_id: str,
+        _manifest: dict[str, object],
+        **_kwargs,
+    ) -> None:
+        raise RuntimeError("save_failed")
+
+    manager._save_manifest = _failing_save_manifest  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="save_failed"):
+        manager.create_snapshot(
+            session_id,
+            uri,
+            "path",
+            {"uri": uri, "operation_type": "create"},
+        )
+
+    resources_dir = tmp_path / "snapshots" / session_id / "resources"
+    assert not list(resources_dir.glob("*.json"))
+
+
+def test_force_create_snapshot_restores_previous_resource_when_manifest_save_fails(
+    tmp_path: Path,
+) -> None:
+    manager = SnapshotManager(str(tmp_path / "snapshots"))
+    session_id = "force-create-order"
+    uri = "notes://forced"
+
+    assert manager.create_snapshot(
+        session_id,
+        uri,
+        "path",
+        {"uri": uri, "operation_type": "modify_meta", "content": "before"},
+    )
+    before_snapshot = manager.get_snapshot(session_id, uri)
+    assert before_snapshot is not None
+
+    original_save_manifest = manager._save_manifest
+
+    def _failing_save_manifest(
+        _session_id: str,
+        _manifest: dict[str, object],
+        **_kwargs,
+    ) -> None:
+        raise RuntimeError("save_failed")
+
+    manager._save_manifest = _failing_save_manifest  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="save_failed"):
+        manager.create_snapshot(
+            session_id,
+            uri,
+            "path",
+            {"uri": uri, "operation_type": "delete", "content": "after"},
+            force=True,
+        )
+
+    manager._save_manifest = original_save_manifest  # type: ignore[method-assign]
+    restored_snapshot = manager.get_snapshot(session_id, uri)
+    assert restored_snapshot == before_snapshot
+    assert restored_snapshot["data"]["operation_type"] == "modify_meta"
+
+
 def test_delete_snapshot_removes_manifest_entry_when_resource_file_is_missing(
     tmp_path: Path,
 ) -> None:

@@ -15,7 +15,7 @@ Design Philosophy:
 import difflib
 import inspect
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 from urllib.parse import unquote
 
@@ -97,9 +97,30 @@ def _parse_snapshot_time(value: Any) -> Optional[datetime]:
     if not raw_value:
         return None
     try:
-        return datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _get_snapshot_exact_or_decoded(
+    manager: Any,
+    session_id: str,
+    resource_id: str,
+) -> tuple[str, Optional[Dict[str, Any]]]:
+    snapshot = manager.get_snapshot(session_id, resource_id)
+    if snapshot:
+        return resource_id, snapshot
+
+    decoded_resource_id = unquote(resource_id)
+    if decoded_resource_id != resource_id:
+        snapshot = manager.get_snapshot(session_id, decoded_resource_id)
+        if snapshot:
+            return decoded_resource_id, snapshot
+
+    return resource_id, None
 
 
 def _find_newer_memory_snapshot_conflict(
@@ -207,11 +228,13 @@ async def get_snapshot_detail(session_id: str, resource_id: str):
     - Memory path: "memory-palace", "memory-palace/salem"
     """
     session_id = _validate_session_id_or_400(session_id)
-    # Ensure resource_id is decoded (handling %2F and other encoded chars)
-    resource_id = unquote(resource_id)
     
     manager = get_snapshot_manager()
-    snapshot = manager.get_snapshot(session_id, resource_id)
+    resource_id, snapshot = _get_snapshot_exact_or_decoded(
+        manager,
+        session_id,
+        resource_id,
+    )
     
     if not snapshot:
         raise HTTPException(
@@ -625,10 +648,13 @@ async def get_resource_diff(session_id: str, resource_id: str):
     Handles both new split snapshots (path/memory) and legacy snapshots.
     """
     session_id = _validate_session_id_or_400(session_id)
-    resource_id = unquote(resource_id)
     
     manager = get_snapshot_manager()
-    snapshot = manager.get_snapshot(session_id, resource_id)
+    resource_id, snapshot = _get_snapshot_exact_or_decoded(
+        manager,
+        session_id,
+        resource_id,
+    )
     
     if not snapshot:
         raise HTTPException(
@@ -1184,10 +1210,13 @@ async def rollback_resource(session_id: str, resource_id: str, request: Rollback
     - modify_content -> point the path back to the older memory version
     """
     session_id = _validate_session_id_or_400(session_id)
-    resource_id = unquote(resource_id)
     
     manager = get_snapshot_manager()
-    snapshot = manager.get_snapshot(session_id, resource_id)
+    resource_id, snapshot = _get_snapshot_exact_or_decoded(
+        manager,
+        session_id,
+        resource_id,
+    )
     
     if not snapshot:
         raise HTTPException(
@@ -1281,10 +1310,19 @@ async def delete_snapshot(session_id: str, resource_id: str):
     Delete one snapshot after confirming rollback is no longer needed.
     """
     session_id = _validate_session_id_or_400(session_id)
-    # Ensure resource_id is decoded
-    resource_id = unquote(resource_id)
     
     manager = get_snapshot_manager()
+    resource_id, snapshot = _get_snapshot_exact_or_decoded(
+        manager,
+        session_id,
+        resource_id,
+    )
+    if not snapshot:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+        )
+
     deleted = manager.delete_snapshot(session_id, resource_id)
     
     if not deleted:

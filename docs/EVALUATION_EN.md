@@ -10,16 +10,11 @@ records, and some metric JSONs are typically for development or local use only.
 > Status Note (2026-04 / 2026-05): This page keeps the 2026-02 public baseline tables,
 > folds the 2026-04-17 real A/B/C/D verification into the current public-facing
 > conclusion, records a narrower 2026-04-18 maintenance rerun, and also keeps a
-> 2026-04-21 post-fix validation note for the later review-driven fixes. It also
-> includes the 2026-05-15 Docker/Linux `Profile B/C/D` recheck. That
-> 2026-04-21 round reran the full backend suite (`1136 passed, 22 skipped`),
-> frontend tests (`198 passed`), frontend build, frontend typecheck,
-> repo-local live MCP e2e (`PASS`), and a repo-local Profile B browser smoke;
-> the same round also completed a smaller real A/B/C/D rerun on `BEIR NFCorpus`
-> (`sample_size=5`, `Profile D` Phase 6 Gate still `PASS`). It did **not**
-> recalculate the benchmark tables on this page. The 2026-05-15 pass covered
-> Docker/Linux `Profile B/C/D` startup, protected proxy routes, SSE, browser
-> smoke, and C/D create/search/delete only; it also did not recalculate these
+> 2026-04-21 post-fix validation note for the later review-driven fixes. In this
+> 2026-05-15 review session, backend tests passed with `1382 passed, 22 skipped`,
+> frontend tests passed with `203 passed`, and frontend build/typecheck,
+> i18n audit, bundle budget, repo-local live MCP e2e, and focused
+> Docker/profile/SSE/script contracts passed. It did **not** recalculate these
 > benchmark tables. For the current default
 > interaction profile, the explicit deep-retrieval profiles, and the newest
 > public-facing re-check notes, start with Sections 3, 4, and 5 on this page.
@@ -479,16 +474,13 @@ cd backend
 
 ### 5.1 What Was Actually Rechecked In This Session
 
-- Full non-benchmark backend suite: `1136 passed / 22 skipped`
-- Full frontend suite: `198 passed`
+- Full non-benchmark backend suite: `1382 passed / 22 skipped`
+- Full frontend suite: `203 passed`
 - Frontend `typecheck` / `build`: passed
-- Repo-local `Profile B` real-browser smoke: passed
-- Repo-local live MCP e2e: passed
-- `BEIR NFCorpus` small real A/B/C/D rerun: passed (`sample_size=5`, `extra_distractors=20`, `candidate_multiplier=8`, `Profile D` gate = `PASS`)
-- Docker/Linux `Profile B`: rerun with the project's existing settings; backend/frontend were healthy, `/sse` returned an endpoint event, and browser smoke on Memory / Observability / Maintenance had no console errors; the new protected proxy routes `/api/layering/*`, `/api/forgetting/*`, and `/api/search/quality-metrics` returned normally
-- Docker/Linux `Profile C/D`: rerun with explicit runtime injection and a 1024-dimension external embedding / reranker setup; create/search/delete smoke passed for both profiles, search returned `degrade_reasons=None`, and SSE plus browser smoke passed
-- Docker / profile / SSE contract tests: `backend/tests/test_profile_script_regressions.py`, `backend/tests/test_docker_one_click_contracts.py`, and `backend/tests/test_sse_deploy_contracts.py` passed together with `67 passed, 10 skipped`
-- Real A/B/C/D benchmark: rerun earlier in this session; not recalculated in the final closeout pass
+- Frontend i18n audit and bundle budget checks: passed
+- Repo-local live MCP e2e: `14/14 PASS`
+- Docker / profile / SSE / script contract tests: passed in the focused review reruns
+- Real A/B/C/D benchmark: not recalculated in this review pass
 - Search Quality Dashboard panel: the backend endpoint is a real authenticated API, but because labelled quality samples are not persisted yet, it explicitly returns `is_mock=true` / `status=unavailable`; do not treat the panel's example MRR/Recall values as benchmark results
 - `skills+MCP` / `single-MCP`: the public skill-smoke note still follows the earlier dedicated host-validation round: `claude` / `codex` / `gemini` passed, `cursor` / `agent` / `antigravity` remain `PARTIAL`, and `gemini_live` stays `SKIP`. `OpenCode` hit one timeout in the full multi-CLI sweep but passed on the immediate standalone rerun, so this is better understood as host-side fluctuation rather than a stable all-host `PASS` claim. This 2026-04-21 doc refresh did not rerun that host-bound skill-smoke set.
 

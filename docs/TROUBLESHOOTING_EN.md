@@ -189,7 +189,7 @@ On the shell-wrapper path (`macOS / Linux / Git Bash / WSL`), `run_memory_palace
 - **Frontend Page**: You can also directly click `Set API key` / `Update API key` in the top right corner.
   - The current version opens the first-run setup assistant first.
   - If you only need the Dashboard to authenticate, prefer **Save dashboard key only**.
-  - Once the browser already has a Dashboard key, Observability switches to header/bearer-capable fetch-based SSE; if you just updated the browser-stored Dashboard key, the next non-terminal reconnect re-reads the current key / mode, so you do not need to refresh the whole page just for that. Explicit `4xx` auth failures still stop the retry loop, so treat those as key/session issues first.
+  - Once the browser already has a Dashboard key, Observability switches to header/bearer-capable fetch-based SSE; if you just updated the browser-stored Dashboard key, the next non-terminal reconnect re-reads the current key / mode, so you do not need to refresh the whole page just for that. Explicit `4xx` auth failures still stop the retry loop, so treat those as key/session issues first. After you fix the key, focusing the tab again rebuilds `/sse` with the current auth state.
   - Only use the `.env` write path on a non-Docker local checkout.
   - If there is still no Dashboard auth and that first local save already includes remote/provider-chain settings, the backend first performs only the auth bootstrap; the remote embedding/reranker/LLM fields land on a later authenticated save.
 

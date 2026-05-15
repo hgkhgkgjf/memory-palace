@@ -81,6 +81,33 @@ def test_write_json_file_retries_transient_permission_error_during_commit(
     assert json.loads(config_path.read_text(encoding="utf-8")) == {"new": True}
 
 
+def test_strip_codex_memory_palace_block_keeps_similarly_named_servers() -> None:
+    module = _load_install_skill_module()
+    original = "\n".join(
+        [
+            "[mcp_servers.memory-palace-extra]",
+            'command = "keep"',
+            "",
+            "[mcp_servers.memory-palace]",
+            'command = "remove"',
+            "",
+            "[mcp_servers.memory-palace.env]",
+            'PYTHONUTF8 = "1"',
+            "",
+            "[mcp_servers.other]",
+            'command = "other"',
+        ]
+    )
+
+    stripped = module._strip_codex_memory_palace_block(original)
+
+    assert "[mcp_servers.memory-palace-extra]" in stripped
+    assert 'command = "keep"' in stripped
+    assert "[mcp_servers.memory-palace]" not in stripped
+    assert "[mcp_servers.memory-palace.env]" not in stripped
+    assert "[mcp_servers.other]" in stripped
+
+
 def test_install_target_antigravity_copies_workspace_workflow(
     monkeypatch, tmp_path: Path
 ) -> None:

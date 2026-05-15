@@ -17,7 +17,7 @@ DEFAULT_REPORT_PATH = PROJECT_ROOT / "docs" / "skills" / "MCP_LIVE_E2E_REPORT.md
 REPORT_OVERRIDE_ROOT = Path(tempfile.gettempdir()) / "memory-palace-reports"
 _REEXEC_GUARD_ENV = "MEMORY_PALACE_MCP_E2E_REEXEC_GUARD"
 _ABSOLUTE_PATH_PATTERN = re.compile(
-    r"(/Users/[^\s\"']+|/private/var/[^\s\"']+|[A-Za-z]:[\\/][^\s\"']+)"
+    r"(/Users/[^\s\"']+|/home/[^\s\"']+|/tmp/[^\s\"']+|/var/tmp/[^\s\"']+|/private/var/[^\s\"']+|[A-Za-z]:[\\/][^\s\"']+)"
 )
 _SESSION_TOKEN_PATTERN = re.compile(r"\b(?:mcp_ctx_[\w-]+|session-[\w-]+)\b")
 
@@ -89,7 +89,38 @@ def _repo_local_stdio_command() -> tuple[str, list[str]]:
 
 def _sanitize_report_text(text: str) -> str:
     sanitized = str(text or "")
+    sanitized = re.sub(r"\bsk-[A-Za-z0-9._-]{6,}", "sk-<redacted>", sanitized)
+    sanitized = re.sub(
+        r'("?[A-Za-z0-9_]*DATABASE_URL"?\s*:\s*)"[^"]*"',
+        r'\1"<redacted>"',
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"('?[A-Za-z0-9_]*DATABASE_URL'?\s*:\s*)'[^']*'",
+        r"\1'<redacted>'",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r'("?[A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD)"?\s*:\s*)"[^"]*"',
+        r'\1"<redacted>"',
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"('?[A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD)'?\s*:\s*)'[^']*'",
+        r"\1'<redacted>'",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"\bDATABASE_URL\s*:\s*[^,\s}\]]+",
+        "DATABASE_URL: <redacted>",
+        sanitized,
+    )
     sanitized = re.sub(r"\bDATABASE_URL=[^\s]+", "DATABASE_URL=<redacted>", sanitized)
+    sanitized = re.sub(
+        r"\b([A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD))\s*:\s*[^,\s}\]]+",
+        r"\1: <redacted>",
+        sanitized,
+    )
     sanitized = re.sub(
         r"\b([A-Za-z0-9_]*(?:API_KEY|KEY|TOKEN|SECRET|PASSWORD))=[^\s]+",
         r"\1=<redacted>",

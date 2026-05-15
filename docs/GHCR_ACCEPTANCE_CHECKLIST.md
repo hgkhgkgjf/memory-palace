@@ -22,7 +22,6 @@
 ## 2. 启动命令
 
 ```bash
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -32,12 +31,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 如果你是 Windows PowerShell，按同样思路改用：
 
 ```powershell
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份，所以不要先手动把 `.env.example` 复制到 `.env.docker`。
 
 ---
 

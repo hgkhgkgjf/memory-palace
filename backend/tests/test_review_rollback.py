@@ -625,6 +625,46 @@ class _StubSnapshotManager:
         }
 
 
+class _PercentSnapshotManager:
+    def get_snapshot(self, _session_id: str, resource_id: str):
+        if resource_id != "core://foo%20bar":
+            return None
+        return {
+            "resource_id": resource_id,
+            "resource_type": "path",
+            "snapshot_time": "2026-02-19T00:00:00Z",
+            "data": {
+                "operation_type": "create",
+                "domain": "core",
+                "path": "foo%20bar",
+                "uri": resource_id,
+            },
+        }
+
+
+@pytest.mark.asyncio
+async def test_snapshot_detail_prefers_exact_percent_literal_resource_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        review_api,
+        "get_snapshot_manager",
+        lambda: _PercentSnapshotManager(),
+    )
+
+    detail = await review_api.get_snapshot_detail("s1", "core://foo%20bar")
+
+    assert detail.resource_id == "core://foo%20bar"
+
+
+def test_parse_snapshot_time_normalizes_naive_and_aware_values() -> None:
+    naive = review_api._parse_snapshot_time("2026-03-20T10:00:00")
+    aware = review_api._parse_snapshot_time("2026-03-20T18:00:00+08:00")
+
+    assert naive == aware
+    assert naive.tzinfo is not None
+
+
 def test_rollback_endpoint_returns_5xx_when_internal_error_occurs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

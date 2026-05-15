@@ -24,7 +24,6 @@ If you just want it to work first, start here.
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -35,7 +34,6 @@ docker compose -f docker-compose.ghcr.yml up -d
 git clone https://github.com/AGI-is-going-to-arrive/Memory-Palace.git
 cd Memory-Palace
 
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -43,6 +41,8 @@ docker compose -f docker-compose.ghcr.yml up -d
 ```
 
 > This uses **Profile B** by default.
+>
+> `apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it, so do not copy `.env.example` over `.env.docker` first.
 >
 > This GHCR path now also depends on the backend image carrying its healthcheck helper. The official backend image now ships `/usr/local/bin/backend-healthcheck.py`; if you are using an older cached image, a private mirror, or a manually retagged image, verify that helper is still present first, or the frontend can keep waiting on backend health forever.
 

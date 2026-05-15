@@ -11,6 +11,8 @@
 .mcp.json
 .mcp.json.bak
 .playwright-cli/
+.playwright-mcp/
+.audit/
 .tmp/
 .pytest_cache/
 
@@ -31,7 +33,14 @@ backend/tests/benchmark/.real_profile_cache/
 backend/tests/
 docs/
 snapshots/
+backups/
+assets/
 demo.db
+*.db
+*.sqlite
+*.sqlite3
+*.log
+SECURITY_AUDIT_*.md
 
 # Frontend local artifacts
 frontend/node_modules/

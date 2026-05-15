@@ -22,7 +22,6 @@ The default scope is **Profile B + GHCR prebuilt images** only.
 ## 2. Startup Commands
 
 ```bash
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -32,12 +31,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 If you are using Windows PowerShell, follow the same idea with:
 
 ```powershell
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it. Do not copy `.env.example` over `.env.docker` first.
 
 ---
 

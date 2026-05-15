@@ -302,7 +302,6 @@ If your main problem is "local image build keeps failing," prefer the GHCR path 
 
 ```bash
 cd <project-root>
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -311,12 +310,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 ```powershell
 cd <project-root>
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` creates `.env.docker` from the checked-in template and backs up an existing target before replacing it.
 
 This path is for **running the service quickly**:
 
@@ -378,7 +378,7 @@ cd <project-root>
 >
 > WAL safety boundary: the repository defaults only treat **named volume + WAL** as a supported Docker path. If you replace backend `/app/data` with a bind mount on NFS/CIFS/SMB or another network filesystem, explicitly switch back to `MEMORY_PALACE_DOCKER_WAL_ENABLED=false` and `MEMORY_PALACE_DOCKER_JOURNAL_MODE=delete`. `docker_one_click.sh/.ps1` now performs that preflight before `docker compose up` and aborts on the risky combination; if you bypass the one-click script and run `docker compose up` manually, you need to enforce the same rule yourself.
 >
-> If you enable `--allow-runtime-env-injection` for `profile c/d`, the script switches that run to explicit API mode and additionally forces `RETRIEVAL_EMBEDDING_BACKEND=api`. The current injection path also carries:
+> Runtime env injection is limited to `profile c/d`. If you pass `--allow-runtime-env-injection` / `-AllowRuntimeEnvInjection` with `profile a/b`, the script stops before changing the Docker env so the lightweight profiles keep their documented defaults. For `profile c/d`, the script switches that run to explicit API mode and additionally forces `RETRIEVAL_EMBEDDING_BACKEND=api`. The current injection path also carries:
 >
 > - explicit `RETRIEVAL_EMBEDDING_*`
 > - explicit `RETRIEVAL_RERANKER_ENABLED` / `RETRIEVAL_RERANKER_*`
@@ -402,7 +402,7 @@ cd <project-root>
 ### What the One-Click Script Does
 
 1.  Calls the profile script to generate the Docker env file for this run from the template (per-run temporary file by default; reuses the specified path only if `MEMORY_PALACE_DOCKER_ENV_FILE` is explicitly set).
-2.  Disables runtime environment injection by default to avoid implicit template overwriting; parameters are only overridden when injection is explicitly enabled. For `profile c/d`, the injection mode additionally forces `RETRIEVAL_EMBEDDING_BACKEND=api` for local debugging; if explicit `RETRIEVAL_*` is not provided, it prioritizes reusing `ROUTER_API_BASE/ROUTER_API_KEY` as a fallback for the embedding / reranker API base+key, while also passing through explicit retrieval parameters such as `RETRIEVAL_EMBEDDING_DIM` and the optional `INTENT_LLM_*`. On that same one-click path, loopback router / chat-style API bases from the current shell are now rewritten to `host.docker.internal` in the generated Docker env, and that host is appended to the run allowlist; non-loopback private provider literals keep their original value and only append their exact host to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that generated env.
+2.  Disables runtime environment injection by default to avoid implicit template overwriting; parameters are only overridden when injection is explicitly enabled for `profile c/d`. The same flag is rejected for `profile a/b`. For `profile c/d`, injection mode additionally forces `RETRIEVAL_EMBEDDING_BACKEND=api` for local debugging; if explicit `RETRIEVAL_*` is not provided, it prioritizes reusing `ROUTER_API_BASE/ROUTER_API_KEY` as a fallback for the embedding / reranker API base+key, while also passing through explicit retrieval parameters such as `RETRIEVAL_EMBEDDING_DIM` and the optional `INTENT_LLM_*`. On that same one-click path, loopback router / chat-style API bases from the current shell are now rewritten to `host.docker.internal` in the generated Docker env, and that host is appended to the run allowlist; non-loopback private provider literals keep their original value and only append their exact host to `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` for that generated env.
 3.  Automatically detects port conflicts; if the default port is occupied, it automatically increments to find an idle port.
 4.  Detects and injects Docker persistent volumes: by default they are isolated per compose project (`<compose-project>_data` for the database and `<compose-project>_snapshots` for Review snapshots); old volumes are reused only when `MEMORY_PALACE_DATA_VOLUME` / `MEMORY_PALACE_SNAPSHOTS_VOLUME` is explicitly set.
 5.  Fails fast before startup if backend `/app/data` has been changed to a bind mount on NFS/CIFS/SMB or another network filesystem while WAL would still be enabled.

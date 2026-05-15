@@ -4813,7 +4813,24 @@ async def create_memory(
                 )
             except Exception as snapshot_exc:
                 try:
-                    await client.delete_path_atomically(result["path"], domain)
+                    delete_created_tree = getattr(
+                        client,
+                        "delete_created_tree_atomically",
+                        None,
+                    )
+                    if callable(delete_created_tree):
+                        await delete_created_tree(
+                            root_path=result["path"],
+                            root_domain=domain,
+                            descendant_targets=[],
+                            expected_current_memory_id=result["id"],
+                        )
+                    else:
+                        await client.delete_path_atomically(
+                            result["path"],
+                            domain,
+                            expected_memory_id=result["id"],
+                        )
                 except Exception as rollback_exc:
                     raise RuntimeError(
                         "snapshot_create_failed_after_write:"
@@ -5477,7 +5494,11 @@ async def add_alias(
                 )
             except Exception as snapshot_exc:
                 try:
-                    await client.delete_path_atomically(new_path, new_domain)
+                    await client.delete_path_atomically(
+                        new_path,
+                        new_domain,
+                        expected_memory_id=result["memory_id"],
+                    )
                 except Exception as rollback_exc:
                     raise RuntimeError(
                         "snapshot_create_failed_after_write:"

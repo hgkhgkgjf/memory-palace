@@ -233,7 +233,7 @@ def normalize_http_api_base(
                 )
             if resolved_ip.is_private and not resolved_ip.is_loopback:
                 resolved_private_hosts.append(resolved_ip)
-        if resolved_private_hosts and not any(
+        if resolved_private_hosts and not all(
             _private_provider_target_matches(
                 hostname=str(parsed.hostname or ""),
                 host_ip=resolved_ip,

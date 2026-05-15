@@ -320,7 +320,6 @@ VITE v7.x.x  ready in xxx ms
 
 ```bash
 cd <project-root>
-cp .env.example .env.docker
 bash scripts/apply_profile.sh docker b .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
@@ -329,12 +328,13 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 ```powershell
 cd <project-root>
-Copy-Item .env.example .env.docker
 .\scripts\apply_profile.ps1 -Platform docker -Profile b -Target .env.docker
 
 docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
+
+`apply_profile` 会从仓库模板生成 `.env.docker`，并在覆盖已有目标前先备份。
 
 默认访问地址：
 
@@ -528,7 +528,7 @@ cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 
 > 这里的检查以“先跑通系统”为主；如果你需要额外的本地 Markdown 验证摘要，再运行上面的验证脚本即可。
 >
-> 当前真实验证口径：2026-04 那轮全量快照里，backend `1136 passed, 22 skipped`、frontend `198 passed`、前端 `typecheck` / build 和 repo-local live MCP e2e 都通过。2026-05-15 又补跑了 Docker/Linux `Profile B/C/D`：B 使用项目原本设置，C/D 使用显式运行时注入和 1024 维外部 embedding/reranker 组合；三档 health、SSE、浏览器 smoke 都通过，C/D create/search/delete 也通过，查询 `degrade_reasons=None`。真实 A/B/C/D benchmark 的公开表格没有在这轮 Docker 复验里重算；原生 Windows / Linux 宿主 runtime 仍保留目标环境复核边界。
+> 当前真实验证口径：2026-05-15 这轮 review session 重跑了 backend `1382 passed, 22 skipped`、frontend `203 passed`、前端 typecheck/build、i18n audit、bundle budget、repo-local live MCP e2e，以及 Docker/profile/SSE/script 的重点契约测试。真实 A/B/C/D benchmark 的公开表格没有在本轮重算；原生 Windows / Linux 宿主 runtime 仍保留目标环境复核边界。
 
 ### 5.1 健康检查
 

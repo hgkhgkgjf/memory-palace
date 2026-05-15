@@ -1383,6 +1383,10 @@ if ([string]::IsNullOrWhiteSpace($envFile)) {
 $envFile = Resolve-StableEnvFilePath -Path $envFile
 $env:MEMORY_PALACE_DOCKER_ENV_FILE = $envFile
 Write-Host "[env-file] using $envFile"
+if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -notin @('c', 'd')) {
+    Write-Error "-AllowRuntimeEnvInjection is only supported for profile c/d; profile $profileLower keeps its documented defaults."
+    exit 1
+}
 $previousAllowUnresolvedProfilePlaceholders = [System.Environment]::GetEnvironmentVariable('MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS')
 try {
     if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -in @('c', 'd')) {

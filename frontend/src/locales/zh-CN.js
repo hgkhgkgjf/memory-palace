@@ -122,7 +122,7 @@ const zhCN = {
         '档位 A 是未触碰时的基线：只走关键词检索，embedding 关闭为 none。档位 B 对应文档里的 hybrid + 本地 hash；档位 C/D 继续保留现有的 router + reranker 预设，适合相关服务已经就绪后的深检索场景。',
       presets: {
         a: '档位 A · 纯关键词',
-        b: '档位 B · 仅 hash',
+        b: '档位 B · 混合检索 + hash',
         c: '档位 C · router + reranker（本地/私有）',
         d: '档位 D · router + reranker（远程）',
       },

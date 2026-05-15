@@ -165,6 +165,32 @@ read_env_value() {
   ' "${file_path}"
 }
 
+env_file_has_key() {
+  local file_path="$1"
+  local key="$2"
+  if [[ ! -f "${file_path}" ]]; then
+    return 1
+  fi
+  awk -v key="${key}" '
+    function ltrim(s) { sub(/^[[:space:]]+/, "", s); return s }
+    function rtrim(s) { sub(/[[:space:]]+$/, "", s); return s }
+    function trim(s) { return rtrim(ltrim(s)) }
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line ~ /^[[:space:]]*#/ || index(line, "=") == 0) {
+        next
+      }
+      eq = index(line, "=")
+      current_key = trim(substr(line, 1, eq - 1))
+      if (current_key == key) {
+        found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "${file_path}"
+}
+
 normalize_env_value() {
   local value="${1:-}"
   value="${value//$'\r'/}"
@@ -419,6 +445,11 @@ runtime_database_url="$(normalize_env_value "${DATABASE_URL:-}")"
 effective_database_url="${runtime_database_url}"
 if [[ -z "${runtime_database_url}" && -f "${ENV_FILE}" ]]; then
   effective_database_url="$(normalize_env_value "$(read_env_value "${ENV_FILE}" "DATABASE_URL")")"
+  if [[ -z "${effective_database_url}" ]] && env_file_has_key "${ENV_FILE}" "DATABASE_URL"; then
+    echo "Refusing to start repo-local stdio MCP with empty DATABASE_URL in ${ENV_FILE}." >&2
+    echo "Set DATABASE_URL to a host absolute SQLite URL, or remove the empty line to use the no-.env demo fallback." >&2
+    exit 1
+  fi
   if [[ -n "${effective_database_url}" ]]; then
     export DATABASE_URL="${effective_database_url}"
   fi

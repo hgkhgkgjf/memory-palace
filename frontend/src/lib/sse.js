@@ -30,9 +30,6 @@ const resolvePrefixedSsePath = (path, baseUrl) => {
       (typeof window !== 'undefined' && window.location?.origin) || 'http://localhost';
     const resolvedBaseUrl = new URL(String(baseUrl || originFallback).trim(), originFallback);
     const resolvedApiBase = new URL(configuredApiBase.trim(), resolvedBaseUrl);
-    if (resolvedApiBase.origin !== resolvedBaseUrl.origin) {
-      return path;
-    }
 
     const normalizedApiPath = normalizeBasePath(resolvedApiBase.pathname);
     if (!normalizedApiPath.endsWith('/api')) {
@@ -40,11 +37,16 @@ const resolvePrefixedSsePath = (path, baseUrl) => {
     }
 
     const prefix = normalizedApiPath.slice(0, -'/api'.length);
+    const normalizedSsePath = path.startsWith('/') ? path : `/${path}`;
+    if (resolvedApiBase.origin !== resolvedBaseUrl.origin) {
+      return new URL(`${prefix}${normalizedSsePath}`, resolvedApiBase.origin).toString();
+    }
+
     if (!prefix) {
       return path;
     }
 
-    return `${prefix}${path.startsWith('/') ? path : `/${path}`}`;
+    return `${prefix}${normalizedSsePath}`;
   } catch (_error) {
     return path;
   }

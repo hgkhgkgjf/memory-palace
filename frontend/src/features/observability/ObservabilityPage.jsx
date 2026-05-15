@@ -468,6 +468,7 @@ export default function ObservabilityPage() {
   const summaryRequestSeqRef = useRef(0);
   const maintenanceAuthFingerprint = getMaintenanceAuthFingerprint();
   const maintenanceAuthFingerprintRef = useRef(maintenanceAuthFingerprint);
+  const sseFocusReconnectNeededRef = useRef(false);
   const initialDefaultQuery = coerceTranslationText(
     i18n.t('observability.defaultQuery', { lng: i18n.resolvedLanguage || i18n.language || 'en' }),
   );
@@ -554,27 +555,34 @@ export default function ObservabilityPage() {
   }, [maintenanceAuthFingerprint]);
 
   useEffect(() => {
-    const handleAuthChange = () => {
+    const handleAuthChange = ({ force = false } = {}) => {
       const nextFingerprint = getMaintenanceAuthFingerprint();
-      if (nextFingerprint === maintenanceAuthFingerprintRef.current) {
+      if (!force && nextFingerprint === maintenanceAuthFingerprintRef.current) {
         return;
       }
       maintenanceAuthFingerprintRef.current = nextFingerprint;
       setAuthRefreshToken((value) => value + 1);
     };
+    const handleFocus = () => {
+      if (!sseFocusReconnectNeededRef.current) {
+        return;
+      }
+      handleAuthChange({ force: true });
+    };
 
     const detach = subscribeMaintenanceAuthChanges(handleAuthChange);
-    window.addEventListener('focus', handleAuthChange);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       detach();
-      window.removeEventListener('focus', handleAuthChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
   useEffect(() => {
     let eventSource;
     try {
+      sseFocusReconnectNeededRef.current = false;
       const maintenanceAuth = getMaintenanceAuthState();
       eventSource = createEventSource('/sse', {
         auth: maintenanceAuth
@@ -598,16 +606,25 @@ export default function ObservabilityPage() {
     }
 
     const refreshFromLiveEvent = () => {
+      sseFocusReconnectNeededRef.current = false;
       void loadSummary();
+    };
+    const handleSseError = (event = {}) => {
+      const error = event?.error;
+      if (error?.retryable === false) {
+        sseFocusReconnectNeededRef.current = true;
+      }
     };
     const detachListeners = bindEventSourceListeners(
       eventSource,
       DEFAULT_SSE_REFRESH_EVENT_NAMES,
       refreshFromLiveEvent,
     );
+    eventSource?.addEventListener?.('error', handleSseError);
 
     return () => {
       detachListeners();
+      eventSource?.removeEventListener?.('error', handleSseError);
       if (typeof eventSource?.close === 'function') {
         eventSource.close();
       }

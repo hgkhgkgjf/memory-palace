@@ -194,6 +194,28 @@ def _write_json_atomic(path: str, payload: Dict[str, Any]) -> None:
             _force_remove(tmp_path)
 
 
+def _write_bytes_atomic(path: str, payload: bytes) -> None:
+    """Write bytes through a temp file and atomically replace the target."""
+    parent_dir = os.path.dirname(path)
+    if parent_dir:
+        Path(parent_dir).mkdir(parents=True, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{Path(path).name}.",
+        suffix=".tmp",
+        dir=parent_dir or None,
+    )
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if os.path.exists(tmp_path):
+            _force_remove(tmp_path)
+
+
 class SnapshotManager:
     """
     Manages snapshots for selective rollback functionality.
@@ -974,6 +996,18 @@ class SnapshotManager:
                 "snapshot_time": _utc_iso_now(),
                 "data": snapshot_data,
             }
+            previous_snapshot_existed = os.path.exists(snapshot_path)
+            previous_snapshot_bytes: Optional[bytes] = None
+            if previous_snapshot_existed:
+                try:
+                    with open(snapshot_path, "rb") as handle:
+                        previous_snapshot_bytes = handle.read()
+                except OSError:
+                    logger.warning(
+                        "Failed to read previous snapshot before force overwrite: %s",
+                        snapshot_path,
+                        exc_info=True,
+                    )
             _write_json_atomic(snapshot_path, snapshot)
 
             manifest["resources"][resource_id] = {
@@ -983,12 +1017,35 @@ class SnapshotManager:
                 "file": os.path.basename(snapshot_path),
                 "uri": snapshot_data.get("uri"),
             }
-            self._save_manifest(
-                session_id,
-                manifest,
-                session_dir=session_dir,
-                scope=current_scope,
-            )
+            try:
+                self._save_manifest(
+                    session_id,
+                    manifest,
+                    session_dir=session_dir,
+                    scope=current_scope,
+                )
+            except Exception:
+                if previous_snapshot_bytes is not None:
+                    try:
+                        _write_bytes_atomic(snapshot_path, previous_snapshot_bytes)
+                    except OSError:
+                        logger.warning(
+                            "Failed to restore previous snapshot after manifest save failure: %s",
+                            snapshot_path,
+                            exc_info=True,
+                        )
+                elif not previous_snapshot_existed:
+                    try:
+                        os.remove(snapshot_path)
+                    except FileNotFoundError:
+                        pass
+                    except OSError:
+                        logger.warning(
+                            "Failed to remove snapshot resource after manifest save failure: %s",
+                            snapshot_path,
+                            exc_info=True,
+                        )
+                raise
             self._garbage_collect_sessions(current_session_id=session_id)
             return True
     
