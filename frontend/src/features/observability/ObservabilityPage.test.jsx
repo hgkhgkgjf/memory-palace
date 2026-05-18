@@ -602,6 +602,39 @@ describe('ObservabilityPage', () => {
     expect(liveSource.close).toHaveBeenCalledTimes(1);
   });
 
+  it('shows and clears the SSE connection lost banner from stream lifecycle events', async () => {
+    const liveSource = createMockEventSource();
+    vi.stubGlobal('EventSource', vi.fn(() => liveSource));
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByText(/queue depth:\s*0/i)).toBeInTheDocument();
+
+    await act(async () => {
+      liveSource.emit('error', { error: new Error('transient disconnect') });
+    });
+
+    expect(screen.getByText(i18n.t('common.states.connectionLost'))).toBeInTheDocument();
+
+    await act(async () => {
+      liveSource.emit('open');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(i18n.t('common.states.connectionLost'))).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows the SSE connection lost banner when stream creation fails', async () => {
+    vi.stubGlobal('EventSource', undefined);
+    vi.stubGlobal('fetch', undefined);
+
+    render(<ObservabilityPage />);
+
+    expect(await screen.findByText(/queue depth:\s*0/i)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('common.states.connectionLost'))).toBeInTheDocument();
+  });
+
   it('uses authenticated fetch-based SSE when maintenance auth is present', async () => {
     const encoder = new TextEncoder();
     api.getMaintenanceAuthState.mockReturnValue({
@@ -632,7 +665,7 @@ describe('ObservabilityPage', () => {
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/sse'),
+        expect.stringContaining('/sse/'),
         expect.objectContaining({
           method: 'GET',
           headers: { 'X-MCP-API-Key': 'week6-sse-secret' },
@@ -698,7 +731,7 @@ describe('ObservabilityPage', () => {
     expect(await screen.findByText(/queue depth:\s*1/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/sse'),
+        expect.stringContaining('/sse/'),
         expect.objectContaining({
           headers: { 'X-MCP-API-Key': 'expired-maintenance-key' },
         })
@@ -717,7 +750,7 @@ describe('ObservabilityPage', () => {
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
-        expect.stringContaining('/sse'),
+        expect.stringContaining('/sse/'),
         expect.objectContaining({
           headers: { 'X-MCP-API-Key': 'refreshed-maintenance-key' },
         })
@@ -781,7 +814,7 @@ describe('ObservabilityPage', () => {
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
-        expect.stringContaining('/sse'),
+        expect.stringContaining('/sse/'),
         expect.objectContaining({
           headers: { 'X-MCP-API-Key': 'focused-maintenance-key' },
         })

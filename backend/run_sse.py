@@ -128,9 +128,7 @@ def _is_loopback_port_available(port: int, host: str | None = None) -> bool:
                 continue
             if required:
                 return False
-    if not attempted_required_probe:
-        return True
-    return True
+    return attempted_required_probe
 
 
 def _is_requested_loopback_port_available(host: str, port: int) -> bool:

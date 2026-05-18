@@ -428,26 +428,63 @@ extract_hostname_from_url() {
 
 rewrite_loopback_api_base_for_docker() {
   local raw_url="${1:-}"
+  local provider_host provider_host_lower prefix rest authority path_suffix host_port userinfo suffix
 
   if [[ -z "${raw_url}" ]]; then
     return 1
   fi
 
-  if [[ "${raw_url}" == *"://127.0.0.1"* ]]; then
-    printf '%s\n' "${raw_url/"://127.0.0.1"/"://host.docker.internal"}"
-    return 0
-  fi
-  if [[ "${raw_url}" == *"://localhost"* ]]; then
-    printf '%s\n' "${raw_url/"://localhost"/"://host.docker.internal"}"
-    return 0
-  fi
-  if [[ "${raw_url}" == *"://[::1]"* ]]; then
-    printf '%s\n' "${raw_url/"://[::1]"/"://host.docker.internal"}"
-    return 0
+  provider_host="$(extract_hostname_from_url "${raw_url}" || true)"
+  provider_host_lower="$(printf '%s' "${provider_host}" | tr '[:upper:]' '[:lower:]')"
+  case "${provider_host_lower}" in
+    127.0.0.1|0.0.0.0|localhost|::1) ;;
+    *)
+      printf '%s\n' "${raw_url}"
+      return 1
+      ;;
+  esac
+
+  if [[ "${raw_url}" != *"://"* ]]; then
+    printf '%s\n' "${raw_url}"
+    return 1
   fi
 
-  printf '%s\n' "${raw_url}"
-  return 1
+  prefix="${raw_url%%://*}://"
+  rest="${raw_url#*://}"
+  authority="${rest%%/*}"
+  path_suffix=""
+  if [[ "${rest}" == */* ]]; then
+    path_suffix="/${rest#*/}"
+  fi
+
+  host_port="${authority}"
+  userinfo=""
+  if [[ "${host_port}" == *@* ]]; then
+    userinfo="${host_port%@*}@"
+    host_port="${host_port##*@}"
+  fi
+
+  suffix=""
+  if [[ "${provider_host_lower}" == "::1" ]]; then
+    case "${host_port}" in
+      "[::1]") suffix="" ;;
+      "[::1]:"*) suffix="${host_port#"[::1]"}" ;;
+      *)
+        printf '%s\n' "${raw_url}"
+        return 1
+        ;;
+    esac
+  elif [[ "${host_port}" == "${provider_host}" ]]; then
+    suffix=""
+  elif [[ "${host_port}" == "${provider_host}:"* ]]; then
+    suffix="${host_port#"${provider_host}"}"
+  else
+    printf '%s\n' "${raw_url}"
+    return 1
+  fi
+
+  printf '%s%s%s%s%s\n' "${prefix}" "${userinfo}" "host.docker.internal" "${suffix}" "${path_suffix}"
+  return 0
 }
 
 append_env_csv_value_in_file() {
@@ -498,7 +535,7 @@ append_provider_allowlist_host_from_api_base() {
   local provider_host_lower=""
   provider_host_lower="$(printf '%s' "${provider_host}" | tr '[:upper:]' '[:lower:]')"
   case "${provider_host_lower}" in
-    127.0.0.1|::1|localhost)
+    127.0.0.1|0.0.0.0|::1|localhost)
       return 0
       ;;
   esac

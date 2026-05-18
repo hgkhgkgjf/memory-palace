@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Search,
   TimerReset,
+  WifiOff,
   Wrench,
   Zap,
 } from 'lucide-react';
@@ -465,6 +466,7 @@ export default function ObservabilityPage() {
   const [activeJobLoading, setActiveJobLoading] = useState(false);
   const [detailJobErrorState, setDetailJobErrorState] = useState(/** @type {ObservabilityErrorState | null} */ (null));
   const [inspectedJobId, setInspectedJobId] = useState(/** @type {string | null} */ (null));
+  const [sseConnected, setSseConnected] = useState(true);
   const summaryRequestSeqRef = useRef(0);
   const maintenanceAuthFingerprint = getMaintenanceAuthFingerprint();
   const maintenanceAuthFingerprintRef = useRef(maintenanceAuthFingerprint);
@@ -583,8 +585,9 @@ export default function ObservabilityPage() {
     let eventSource;
     try {
       sseFocusReconnectNeededRef.current = false;
+      setSseConnected(true);
       const maintenanceAuth = getMaintenanceAuthState();
-      eventSource = createEventSource('/sse', {
+      eventSource = createEventSource('/sse/', {
         auth: maintenanceAuth
           ? {
             key: maintenanceAuth.key,
@@ -602,11 +605,17 @@ export default function ObservabilityPage() {
         },
       });
     } catch (_error) {
+      setSseConnected(false);
       return undefined;
     }
 
+    const handleSseOpen = () => {
+      sseFocusReconnectNeededRef.current = false;
+      setSseConnected(true);
+    };
     const refreshFromLiveEvent = () => {
       sseFocusReconnectNeededRef.current = false;
+      setSseConnected(true);
       void loadSummary();
     };
     const handleSseError = (event = {}) => {
@@ -614,16 +623,19 @@ export default function ObservabilityPage() {
       if (error?.retryable === false) {
         sseFocusReconnectNeededRef.current = true;
       }
+      setSseConnected(false);
     };
     const detachListeners = bindEventSourceListeners(
       eventSource,
       DEFAULT_SSE_REFRESH_EVENT_NAMES,
       refreshFromLiveEvent,
     );
+    eventSource?.addEventListener?.('open', handleSseOpen);
     eventSource?.addEventListener?.('error', handleSseError);
 
     return () => {
       detachListeners();
+      eventSource?.removeEventListener?.('open', handleSseOpen);
       eventSource?.removeEventListener?.('error', handleSseError);
       if (typeof eventSource?.close === 'function') {
         eventSource.close();
@@ -984,6 +996,16 @@ export default function ObservabilityPage() {
         </div>
         {rebuildMessage && (
           <p className="mt-3 text-xs text-[color:var(--palace-muted)]">{rebuildMessage}</p>
+        )}
+        {!sseConnected && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-3 inline-flex items-center gap-2 rounded-md border border-amber-300/70 bg-amber-50/90 px-3 py-2 text-xs text-amber-800"
+          >
+            <WifiOff size={13} />
+            {t('common.states.connectionLost')}
+          </div>
         )}
         {summaryError && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-md border border-[rgba(143,106,69,0.45)] bg-[rgba(232,218,198,0.88)] px-3 py-2 text-xs text-[color:var(--palace-accent-2)]">

@@ -252,7 +252,6 @@ resolve_windows_host_path() {
   printf '%s\n' "$(uppercase_windows_drive "${raw_path}")"
 }
 
-target_file="$(normalize_cli_path "${target_file}")"
 TARGET_FILE_LOCK=""
 
 write_lock_owner_metadata() {
@@ -596,7 +595,7 @@ validate_profile_placeholders() {
     normalized_line="${line%$'\r'}"
     if [[ "${normalized_line}" =~ ^[[:space:]]*(ROUTER_API_BASE|RETRIEVAL_EMBEDDING_API_BASE|RETRIEVAL_RERANKER_API_BASE)[[:space:]]*=[[:space:]]*.*:PORT/ ]] \
       || [[ "${normalized_line}" =~ =[[:space:]]*(replace-with-your-key|replace-with-your-embedding-dim|your-embedding-model-id|your-reranker-model-id|<provider-vector-dim>)([[:space:]]+#.*)?[[:space:]]*$ ]] \
-      || [[ "${normalized_line}" =~ =[[:space:]]*https://router\.example\.com/ ]]; then
+      || [[ "${normalized_line}" =~ =[[:space:]]*([[:alpha:]][[:alnum:]+.-]*://)?router\.example\.com([/:?#]|[[:space:]]|$) ]]; then
       unresolved_lines+=("${line}")
     fi
   done < "${file_path}"

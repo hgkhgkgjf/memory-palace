@@ -142,6 +142,8 @@ describe('createEventSource', () => {
       }),
     });
     const listener = vi.fn();
+    const openListener = vi.fn();
+    client.addEventListener('open', openListener);
     client.addEventListener('endpoint', listener);
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -153,6 +155,7 @@ describe('createEventSource', () => {
         headers: { 'X-MCP-API-Key': 'secret-token' },
       })
     );
+    expect(openListener).toHaveBeenCalledWith(expect.objectContaining({ type: 'open' }));
     expect(listener).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'endpoint',

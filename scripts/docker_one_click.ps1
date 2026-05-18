@@ -20,6 +20,7 @@ $script:BackendPortLockDir = $null
 $script:DeploymentLockDir = $null
 $script:GeneratedDockerEnvFile = $null
 $script:PreviousDockerEnvFile = $null
+$script:ProjectRootPushed = $false
 
 function Exit-ValidationError {
     param([string]$Message)
@@ -174,10 +175,12 @@ function Try-AcquirePathLock {
     }
 
     if (Test-Path $ownerFile) {
-        $ownerPid = (Get-Content -Path $ownerFile -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
+        $ownerPidLine = Get-Content -Path $ownerFile -ErrorAction SilentlyContinue | Select-Object -First 1
+        $ownerPid = if ($null -eq $ownerPidLine) { '' } else { ([string]$ownerPidLine).Trim() }
         $ownerProcess = $null
-        if ($ownerPid) {
-            $ownerProcess = Get-Process -Id ([int]$ownerPid) -ErrorAction SilentlyContinue
+        $ownerPidValue = 0
+        if ($ownerPid -and [int]::TryParse($ownerPid, [ref]$ownerPidValue)) {
+            $ownerProcess = Get-Process -Id $ownerPidValue -ErrorAction SilentlyContinue
         }
         if (-not $ownerProcess) {
             Remove-Item -Path $lockDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -199,6 +202,29 @@ function Release-PathLock {
 
     if (-not [string]::IsNullOrWhiteSpace($LockDir)) {
         Remove-Item -Path $LockDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Restore-DockerRuntimeState {
+    Release-PathLock -LockDir $script:DeploymentLockDir
+    Release-PathLock -LockDir $script:FrontendPortLockDir
+    Release-PathLock -LockDir $script:BackendPortLockDir
+    $script:DeploymentLockDir = $null
+    $script:FrontendPortLockDir = $null
+    $script:BackendPortLockDir = $null
+    if ([string]::IsNullOrWhiteSpace($script:PreviousDockerEnvFile)) {
+        Remove-Item Env:MEMORY_PALACE_DOCKER_ENV_FILE -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:MEMORY_PALACE_DOCKER_ENV_FILE = $script:PreviousDockerEnvFile
+    }
+    if (-not [string]::IsNullOrWhiteSpace($script:GeneratedDockerEnvFile) -and (Test-Path $script:GeneratedDockerEnvFile)) {
+        Remove-Item $script:GeneratedDockerEnvFile -Force -ErrorAction SilentlyContinue
+    }
+    $script:GeneratedDockerEnvFile = $null
+    if ($script:ProjectRootPushed) {
+        Pop-Location
+        $script:ProjectRootPushed = $false
     }
 }
 
@@ -397,7 +423,7 @@ function Rewrite-LoopbackApiBaseForDocker {
     }
 
     $host = ([string]$builder.Host).Trim().ToLowerInvariant()
-    if ($host -notin @('127.0.0.1', 'localhost', '::1')) {
+    if ($host -notin @('127.0.0.1', '0.0.0.0', 'localhost', '::1')) {
         return $ApiBase
     }
 
@@ -469,7 +495,7 @@ function Append-ProviderAllowlistHostFromApiBase {
     if ([string]::IsNullOrWhiteSpace($providerHost)) {
         return
     }
-    if ($providerHost -in @('127.0.0.1', '::1', 'localhost')) {
+    if ($providerHost -in @('127.0.0.1', '0.0.0.0', '::1', 'localhost')) {
         return
     }
 
@@ -1374,46 +1400,55 @@ if (-not $script:DeploymentLockDir) {
     throw "[deploy-lock] another docker_one_click deployment is already running for this checkout; wait for it to finish before retrying."
 }
 
-$script:PreviousDockerEnvFile = [System.Environment]::GetEnvironmentVariable('MEMORY_PALACE_DOCKER_ENV_FILE')
-$envFile = $script:PreviousDockerEnvFile
-if ([string]::IsNullOrWhiteSpace($envFile)) {
-    $envFile = Join-Path ([System.IO.Path]::GetTempPath()) ("memory-palace-docker-env-$profileLower-$([System.Guid]::NewGuid().ToString('N')).env")
-    $script:GeneratedDockerEnvFile = $envFile
-}
-$envFile = Resolve-StableEnvFilePath -Path $envFile
-$env:MEMORY_PALACE_DOCKER_ENV_FILE = $envFile
-Write-Host "[env-file] using $envFile"
-if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -notin @('c', 'd')) {
-    Write-Error "-AllowRuntimeEnvInjection is only supported for profile c/d; profile $profileLower keeps its documented defaults."
-    exit 1
-}
-$previousAllowUnresolvedProfilePlaceholders = [System.Environment]::GetEnvironmentVariable('MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS')
+$preflightComplete = $false
 try {
-    if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -in @('c', 'd')) {
-        $env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS = '1'
+    $script:PreviousDockerEnvFile = [System.Environment]::GetEnvironmentVariable('MEMORY_PALACE_DOCKER_ENV_FILE')
+    $envFile = $script:PreviousDockerEnvFile
+    if ([string]::IsNullOrWhiteSpace($envFile)) {
+        $envFile = Join-Path ([System.IO.Path]::GetTempPath()) ("memory-palace-docker-env-$profileLower-$([System.Guid]::NewGuid().ToString('N')).env")
+        $script:GeneratedDockerEnvFile = $envFile
     }
-    & (Join-Path $scriptDir 'apply_profile.ps1') -Platform docker -Profile $profileLower -Target $envFile
-}
-finally {
-    if ([string]::IsNullOrWhiteSpace($previousAllowUnresolvedProfilePlaceholders)) {
-        Remove-Item Env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS -ErrorAction SilentlyContinue
+    $envFile = Resolve-StableEnvFilePath -Path $envFile
+    $env:MEMORY_PALACE_DOCKER_ENV_FILE = $envFile
+    Write-Host "[env-file] using $envFile"
+    if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -notin @('c', 'd')) {
+        throw "-AllowRuntimeEnvInjection is only supported for profile c/d; profile $profileLower keeps its documented defaults."
+    }
+    $previousAllowUnresolvedProfilePlaceholders = [System.Environment]::GetEnvironmentVariable('MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS')
+    try {
+        if ($AllowRuntimeEnvInjection.IsPresent -and $profileLower -in @('c', 'd')) {
+            $env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS = '1'
+        }
+        & (Join-Path $scriptDir 'apply_profile.ps1') -Platform docker -Profile $profileLower -Target $envFile
+    }
+    finally {
+        if ([string]::IsNullOrWhiteSpace($previousAllowUnresolvedProfilePlaceholders)) {
+            Remove-Item Env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS = $previousAllowUnresolvedProfilePlaceholders
+        }
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "apply_profile.ps1 failed with exit code $LASTEXITCODE"
+    }
+    if ($AllowRuntimeEnvInjection.IsPresent) {
+        Apply-ProfileRuntimeOverrides -EnvFile $envFile -SelectedProfile $profileLower
     }
     else {
-        $env:MEMORY_PALACE_ALLOW_UNRESOLVED_PROFILE_PLACEHOLDERS = $previousAllowUnresolvedProfilePlaceholders
+        Write-Host "[override] runtime env injection disabled by default; pass -AllowRuntimeEnvInjection to opt in."
+    }
+    Assert-ProfileExternalSettingsReady -EnvFile $envFile -SelectedProfile $profileLower
+    $preflightComplete = $true
+}
+finally {
+    if (-not $preflightComplete) {
+        Restore-DockerRuntimeState
     }
 }
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
-}
-if ($AllowRuntimeEnvInjection.IsPresent) {
-    Apply-ProfileRuntimeOverrides -EnvFile $envFile -SelectedProfile $profileLower
-}
-else {
-    Write-Host "[override] runtime env injection disabled by default; pass -AllowRuntimeEnvInjection to opt in."
-}
-Assert-ProfileExternalSettingsReady -EnvFile $envFile -SelectedProfile $profileLower
 
 Push-Location $projectRoot
+$script:ProjectRootPushed = $true
 try {
     $composeProjectName = [System.Environment]::GetEnvironmentVariable('COMPOSE_PROJECT_NAME')
     if ([string]::IsNullOrWhiteSpace($composeProjectName)) {
@@ -1514,19 +1549,7 @@ try {
     $reportedBackendPort = Get-ComposePublishedPort -ComposeProjectName $composeProjectName -EnvFile $envFile -Service 'backend' -TargetPort 8000 -FallbackPort ([int]$plannedBackendPort)
 }
 finally {
-    Release-PathLock -LockDir $script:DeploymentLockDir
-    Release-PathLock -LockDir $script:FrontendPortLockDir
-    Release-PathLock -LockDir $script:BackendPortLockDir
-    if ([string]::IsNullOrWhiteSpace($script:PreviousDockerEnvFile)) {
-        Remove-Item Env:MEMORY_PALACE_DOCKER_ENV_FILE -ErrorAction SilentlyContinue
-    }
-    else {
-        $env:MEMORY_PALACE_DOCKER_ENV_FILE = $script:PreviousDockerEnvFile
-    }
-    if (-not [string]::IsNullOrWhiteSpace($script:GeneratedDockerEnvFile) -and (Test-Path $script:GeneratedDockerEnvFile)) {
-        Remove-Item $script:GeneratedDockerEnvFile -Force -ErrorAction SilentlyContinue
-    }
-    Pop-Location
+    Restore-DockerRuntimeState
 }
 
 Write-Host ""

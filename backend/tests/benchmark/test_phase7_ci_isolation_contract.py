@@ -64,6 +64,7 @@ def test_phase7_backend_dockerfile_relies_on_backend_copy_with_dockerignore_guar
     assert "COPY . /app" not in text
     assert "backend/tests" not in text
     assert 'ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]' in text
+    assert "USER app" not in text
 
 
 def test_phase7_scripts_reserve_ports_before_parallel_compose_up() -> None:

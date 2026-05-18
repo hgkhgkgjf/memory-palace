@@ -1,11 +1,12 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { ShieldCheck, Database, LibraryBig, Feather, Eye, Languages } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import FluidBackground from './components/FluidBackground';
+import RootErrorBoundary from './RootErrorBoundary';
 import SetupAssistantModal, {
   SETUP_ASSISTANT_DISMISSED_STORAGE_KEY,
 } from './components/SetupAssistantModal';
@@ -243,6 +244,7 @@ export function buildRoutesKey(authState, authRevision) {
 
 function Layout({ authState, authRevision, onOpenSetup, onClearApiKey }) {
   const { t } = useTranslation();
+  const location = useLocation();
   const routesKey = buildRoutesKey(authState, authRevision);
   const reducedVisualMode = isEdgeBrowserProfile();
 
@@ -292,25 +294,27 @@ function Layout({ authState, authRevision, onOpenSetup, onClearApiKey }) {
       {/* Main Area */}
       <div className="relative z-10 flex-1 min-h-0 overflow-hidden px-6 pb-6 pt-2">
         <div className="h-full w-full max-w-7xl mx-auto">
-          <React.Suspense
-            fallback={(
-              <div
-                role="status"
-                className="flex h-full items-center justify-center rounded-[32px] border border-white/40 bg-white/35 text-sm font-medium text-[color:var(--palace-muted)] backdrop-blur-xl"
-              >
-                {t('common.states.loading')}
-              </div>
-            )}
-          >
-            <Routes key={routesKey}>
-              <Route path="/" element={<Navigate to="/memory" replace />} />
-              <Route path="/review" element={<ReviewPage />} />
-              <Route path="/memory" element={<MemoryBrowser />} />
-              <Route path="/maintenance" element={<MaintenancePage />} />
-              <Route path="/observability" element={<ObservabilityPage />} />
-              <Route path="*" element={<Navigate to="/memory" replace />} />
-            </Routes>
-          </React.Suspense>
+          <RootErrorBoundary resetKeys={[location.pathname, routesKey]}>
+            <React.Suspense
+              fallback={(
+                <div
+                  role="status"
+                  className="flex h-full items-center justify-center rounded-[32px] border border-white/40 bg-white/35 text-sm font-medium text-[color:var(--palace-muted)] backdrop-blur-xl"
+                >
+                  {t('common.states.loading')}
+                </div>
+              )}
+            >
+              <Routes key={routesKey}>
+                <Route path="/" element={<Navigate to="/memory" replace />} />
+                <Route path="/review" element={<ReviewPage />} />
+                <Route path="/memory" element={<MemoryBrowser />} />
+                <Route path="/maintenance" element={<MaintenancePage />} />
+                <Route path="/observability" element={<ObservabilityPage />} />
+                <Route path="*" element={<Navigate to="/memory" replace />} />
+              </Routes>
+            </React.Suspense>
+          </RootErrorBoundary>
         </div>
       </div>
     </div>

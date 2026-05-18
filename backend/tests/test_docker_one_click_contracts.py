@@ -265,6 +265,18 @@ def test_one_click_scripts_resolve_custom_env_file_to_stable_absolute_paths() ->
     assert "Get-Location" in ps1_text
 
 
+def test_powershell_one_click_cleans_runtime_state_on_preflight_failures() -> None:
+    ps1_text = (PROJECT_ROOT / "scripts" / "docker_one_click.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "function Restore-DockerRuntimeState" in ps1_text
+    assert "$preflightComplete = $false" in ps1_text
+    assert "if (-not $preflightComplete) {" in ps1_text
+    assert "Restore-DockerRuntimeState" in ps1_text
+    assert "[int]::TryParse($ownerPid, [ref]$ownerPidValue)" in ps1_text
+
+
 def test_shell_one_click_normalizes_windows_absolute_env_paths_before_shell_io() -> None:
     shell_text = (PROJECT_ROOT / "scripts" / "docker_one_click.sh").read_text(
         encoding="utf-8"

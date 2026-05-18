@@ -391,6 +391,41 @@ def test_apply_profile_shell_can_defer_profile_placeholder_validation_to_caller(
     assert values.get("ROUTER_API_BASE") == "http://host.docker.internal:PORT/v1"
 
 
+def test_apply_profile_shell_accepts_real_router_example_subdomain(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "repo"
+    script_path = project_root / "scripts" / "apply_profile.sh"
+    _copy_script(PROJECT_ROOT / "scripts" / "apply_profile.sh", script_path)
+
+    (project_root / ".env.example").write_text("MCP_API_KEY=\n", encoding="utf-8")
+    profile_path = project_root / "deploy" / "profiles" / "macos" / "profile-c.env"
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_path.write_text(
+        "\n".join(
+            [
+                "DATABASE_URL=sqlite+aiosqlite:////Users/<your-user>/memory_palace/agent_memory.db",
+                "ROUTER_API_BASE=https://my-router.example.com/v1",
+                "ROUTER_API_KEY=real-router-key",
+                "ROUTER_EMBEDDING_MODEL=real-embedding-model",
+                "RETRIEVAL_EMBEDDING_DIM=1024",
+                "RETRIEVAL_RERANKER_MODEL=real-reranker-model",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_command(
+        ["bash", "scripts/apply_profile.sh", "macos", "c", ".env.generated"],
+        cwd=project_root,
+    )
+
+    assert result.returncode == 0, result.stderr
+    values = dotenv_values(project_root / ".env.generated")
+    assert values.get("ROUTER_API_BASE") == "https://my-router.example.com/v1"
+
+
 def test_apply_profile_shell_accepts_windows_absolute_target_path_on_native_windows(
     tmp_path: Path,
 ) -> None:
@@ -617,7 +652,10 @@ exit 0
             "WRITE_GUARD_LLM_API_BASE": "http://10.88.1.144:8318/v1/chat/completions",
             "WRITE_GUARD_LLM_API_KEY": "llm-key",
             "WRITE_GUARD_LLM_MODEL": "gpt-5.4-mini",
-            "INTENT_LLM_API_BASE": "http://localhost:8317/v1/chat/completions",
+            "COMPACT_GIST_LLM_API_BASE": "http://0.0.0.0.evil.com:9321/v1/chat/completions",
+            "COMPACT_GIST_LLM_API_KEY": "compact-key",
+            "COMPACT_GIST_LLM_MODEL": "gpt-5.4-mini",
+            "INTENT_LLM_API_BASE": "http://0.0.0.0:8317/v1/chat/completions",
             "INTENT_LLM_API_KEY": "intent-key",
             "INTENT_LLM_MODEL": "gpt-5.4-mini",
         },
@@ -634,16 +672,25 @@ exit 0
         == "http://host.docker.internal:8317/v1/chat/completions"
     )
     assert (
+        values.get("COMPACT_GIST_LLM_API_BASE")
+        == "http://0.0.0.0.evil.com:9321/v1/chat/completions"
+    )
+    assert (
         values.get("MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS")
-        == "10.88.1.144,host.docker.internal"
+        == "10.88.1.144,0.0.0.0.evil.com,host.docker.internal"
     )
     assert "MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS appended 10.88.1.144" in result.stdout
+    assert (
+        "MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS appended 0.0.0.0.evil.com"
+        in result.stdout
+    )
     assert (
         "MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS appended host.docker.internal"
         in result.stdout
     )
     assert "ROUTER_API_BASE mapped loopback host to host.docker.internal" in result.stdout
     assert "INTENT_LLM_API_BASE mapped loopback host to host.docker.internal" in result.stdout
+    assert "COMPACT_GIST_LLM_API_BASE mapped loopback host to host.docker.internal" not in result.stdout
 
 
 def test_docker_one_click_shell_rejects_runtime_injection_for_profile_b(
@@ -1230,6 +1277,62 @@ def test_apply_profile_powershell_rejects_concurrent_writer_for_same_target(
     assert "writing .env.generated; wait for it to finish before retrying." in stderr_text
 
 
+def test_apply_profile_powershell_recovers_stale_pid_lock(tmp_path: Path) -> None:
+    if shutil.which("pwsh") is None:
+        pytest.skip("pwsh not available")
+
+    project_root = tmp_path / "repo"
+    script_path = project_root / "scripts" / "apply_profile.ps1"
+    _copy_script(PROJECT_ROOT / "scripts" / "apply_profile.ps1", script_path)
+
+    (project_root / ".env.example").write_text("MCP_API_KEY=\n", encoding="utf-8")
+    profile_path = project_root / "deploy" / "profiles" / "macos" / "profile-b.env"
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_path.write_text(
+        "\n".join(
+            [
+                "DATABASE_URL=sqlite+aiosqlite:////Users/<your-user>/memory_palace/agent_memory.db",
+                "SEARCH_DEFAULT_MODE=hybrid",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    stale_lock = project_root / ".env.generated.lock"
+    stale_lock.write_text("99999999\n", encoding="utf-8")
+
+    result = _run_command(
+        [
+            "pwsh",
+            "-NoLogo",
+            "-NoProfile",
+            "-File",
+            "scripts/apply_profile.ps1",
+            "-Platform",
+            "macos",
+            "-Profile",
+            "b",
+            "-Target",
+            ".env.generated",
+        ],
+        cwd=project_root,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert dotenv_values(project_root / ".env.generated").get("SEARCH_DEFAULT_MODE") == "hybrid"
+    assert not stale_lock.exists()
+
+
+def test_apply_profile_powershell_recovers_corrupt_lock_metadata_contract() -> None:
+    script_text = (PROJECT_ROOT / "scripts" / "apply_profile.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$null -eq $ownerPid -and (Test-Path $lockPath)" in script_text
+    assert "Remove-Item -Path $lockPath -Force -ErrorAction SilentlyContinue" in script_text
+    assert "Throw-TargetFileLockBusy -TargetPath $TargetPath" in script_text
+
+
 def test_apply_profile_powershell_rejects_unresolved_database_url_placeholders(
     tmp_path: Path,
 ) -> None:
@@ -1539,6 +1642,7 @@ def test_apply_profile_powershell_declares_utf8_no_bom_and_placeholder_guard() -
     assert "function New-AdjacentTempFile" in script_text
     assert "function Acquire-TargetFileLock" in script_text
     assert "function Release-TargetFileLock" in script_text
+    assert "router\\.example\\.com([/:?#\\s]|$)" in script_text
     assert "function Test-RetryableFileCommitException" in script_text
     assert "function Invoke-FileCommitWithRetry" in script_text
     assert "function Finalize-GeneratedEnvFile" in script_text

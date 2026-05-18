@@ -86,6 +86,7 @@ const zhCN = {
     errorBoundary: {
       title: '页面发生错误。',
       message: '请刷新页面后重试。',
+      tryAgain: '重试',
     },
     auth: {
       setApiKey: '设置 API 密钥',

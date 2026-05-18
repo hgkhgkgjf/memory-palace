@@ -86,6 +86,7 @@ const en = {
     errorBoundary: {
       title: 'Something went wrong.',
       message: 'Please refresh the page and try again.',
+      tryAgain: 'Try Again',
     },
     auth: {
       setApiKey: 'Set API key',

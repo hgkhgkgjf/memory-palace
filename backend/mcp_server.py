@@ -102,7 +102,7 @@ def _refresh_setup_managed_env_from_dotenv(path: str) -> None:
         os.environ[key] = str(value)
 
 if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
+    load_dotenv(dotenv_path, override=False)
     _refresh_setup_managed_env_from_dotenv(dotenv_path)
 
 

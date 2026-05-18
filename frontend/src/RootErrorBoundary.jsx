@@ -1,11 +1,22 @@
 import React from 'react'
 import i18n from './i18n'
 
-export function RootErrorFallback() {
+const resetKeysChanged = (currentKeys = [], previousKeys = []) => {
+  if (!Array.isArray(currentKeys) || !Array.isArray(previousKeys)) {
+    return currentKeys !== previousKeys
+  }
+  if (currentKeys.length !== previousKeys.length) {
+    return true
+  }
+  return currentKeys.some((key, index) => key !== previousKeys[index])
+}
+
+export function RootErrorFallback({ onTryAgain }) {
   const appName = i18n.t('common.appName')
   const title = i18n.t('app.errorBoundary.title')
   const message = i18n.t('app.errorBoundary.message')
   const refreshLabel = i18n.t('common.actions.refresh')
+  const tryAgainLabel = i18n.t('app.errorBoundary.tryAgain')
 
   const handleRefresh = () => {
     if (typeof window === 'undefined') return
@@ -27,13 +38,24 @@ export function RootErrorFallback() {
         <p className="mt-3 text-base leading-7 text-slate-600">
           {message}
         </p>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="mt-6 inline-flex items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
-        >
-          {refreshLabel}
-        </button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {typeof onTryAgain === 'function' ? (
+            <button
+              type="button"
+              onClick={onTryAgain}
+              className="inline-flex items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
+            >
+              {tryAgainLabel}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
+          >
+            {refreshLabel}
+          </button>
+        </div>
       </section>
     </main>
   )
@@ -43,6 +65,7 @@ export default class RootErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false }
+    this.handleTryAgain = this.handleTryAgain.bind(this)
   }
 
   static getDerivedStateFromError() {
@@ -53,9 +76,19 @@ export default class RootErrorBoundary extends React.Component {
     console.error('RootErrorBoundary caught render error', error, errorInfo)
   }
 
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && resetKeysChanged(this.props.resetKeys, prevProps.resetKeys)) {
+      this.setState({ hasError: false })
+    }
+  }
+
+  handleTryAgain() {
+    this.setState({ hasError: false })
+  }
+
   render() {
     if (this.state.hasError) {
-      return <RootErrorFallback />
+      return <RootErrorFallback onTryAgain={this.handleTryAgain} />
     }
 
     return this.props.children

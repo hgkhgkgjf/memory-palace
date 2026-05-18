@@ -351,6 +351,7 @@ const createFetchEventSource = (url, options = {}) => {
         throw new Error('SSE response body is not readable.');
       }
 
+      emit('open');
       const reader = response.body.getReader();
       let buffer = '';
       while (!closed) {

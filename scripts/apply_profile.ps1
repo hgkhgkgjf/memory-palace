@@ -115,26 +115,48 @@ function Acquire-TargetFileLock {
 
     $lockPath = "$TargetPath.lock"
     try {
-        $stream = [System.IO.File]::Open(
-            $lockPath,
-            [System.IO.FileMode]::OpenOrCreate,
-            [System.IO.FileAccess]::ReadWrite,
-            [System.IO.FileShare]::None
-        )
+        $stream = New-TargetFileLockStream -LockPath $lockPath
     }
     catch {
-        throw "[apply-profile-lock] another apply_profile.ps1 process is already writing $TargetPath; wait for it to finish before retrying."
+        $ownerPid = Get-TargetFileLockOwnerPid -LockPath $lockPath
+        if ($null -eq $ownerPid -and (Test-Path $lockPath)) {
+            Remove-Item -Path $lockPath -Force -ErrorAction SilentlyContinue
+            try {
+                $stream = New-TargetFileLockStream -LockPath $lockPath
+            }
+            catch {
+                Throw-TargetFileLockBusy -TargetPath $TargetPath
+            }
+        }
+        elseif ($null -ne $ownerPid) {
+            $ownerProcess = Get-Process -Id $ownerPid -ErrorAction SilentlyContinue
+            if ($null -eq $ownerProcess) {
+                Remove-Item -Path $lockPath -Force -ErrorAction SilentlyContinue
+                try {
+                    $stream = New-TargetFileLockStream -LockPath $lockPath
+                }
+                catch {
+                    Throw-TargetFileLockBusy -TargetPath $TargetPath
+                }
+            }
+        }
+
+        if ($null -eq $stream) {
+            Throw-TargetFileLockBusy -TargetPath $TargetPath
+        }
     }
 
     try {
         $stream.SetLength(0)
-        $payload = [System.Diagnostics.Process]::GetCurrentProcess().Id.ToString()
+        $payload = $PID.ToString()
         $bytes = $utf8NoBom.GetBytes($payload)
         $stream.Write($bytes, 0, $bytes.Length)
         $stream.Flush()
     }
     catch {
-        # Lock ownership metadata is best-effort only.
+        $stream.Dispose()
+        Remove-Item -Path $lockPath -Force -ErrorAction SilentlyContinue
+        throw
     }
 
     return @{
@@ -160,6 +182,48 @@ function Release-TargetFileLock {
             Remove-Item -Path $LockInfo.Path -Force -ErrorAction SilentlyContinue
         }
     }
+}
+
+function New-TargetFileLockStream {
+    param([string]$LockPath)
+
+    return [System.IO.File]::Open(
+        $LockPath,
+        [System.IO.FileMode]::CreateNew,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None
+    )
+}
+
+function Get-TargetFileLockOwnerPid {
+    param([string]$LockPath)
+
+    if (-not (Test-Path $LockPath)) {
+        return $null
+    }
+
+    try {
+        $ownerText = ([System.IO.File]::ReadAllText($LockPath, $utf8NoBom)).Trim()
+    }
+    catch {
+        return $null
+    }
+
+    $ownerPid = 0
+    if (-not [int]::TryParse($ownerText, [ref]$ownerPid)) {
+        return $null
+    }
+    if ($ownerPid -le 0) {
+        return $null
+    }
+
+    return $ownerPid
+}
+
+function Throw-TargetFileLockBusy {
+    param([string]$TargetPath)
+
+    throw "[apply-profile-lock] another apply_profile.ps1 process is already writing $TargetPath; wait for it to finish before retrying."
 }
 
 function Test-RetryableFileCommitException {
@@ -425,7 +489,7 @@ function Assert-ResolvedProfilePlaceholders {
             -or $line -match '=\s*<provider-vector-dim>(\s+#.*)?\s*$' `
             -or $line -match '=\s*your-embedding-model-id(\s+#.*)?\s*$' `
             -or $line -match '=\s*your-reranker-model-id(\s+#.*)?\s*$' `
-            -or $line -match '=\s*https://router\.example\.com/'
+            -or $line -match '=\s*([a-z][a-z0-9+.-]*://)?router\.example\.com([/:?#\s]|$)'
         ) {
             [void]$unresolved.Add($line)
         }

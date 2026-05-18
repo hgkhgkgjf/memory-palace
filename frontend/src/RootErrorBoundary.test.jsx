@@ -9,6 +9,13 @@ function ThrowOnRender() {
   throw new Error('render boom');
 }
 
+function MaybeThrow({ shouldThrow }) {
+  if (shouldThrow) {
+    throw new Error('render boom');
+  }
+  return <div>Recovered content</div>;
+}
+
 describe('RootErrorBoundary', () => {
   it('shows a fallback shell when the child tree crashes during render', () => {
     void i18n.changeLanguage('en');
@@ -68,6 +75,45 @@ describe('RootErrorBoundary', () => {
         value: originalLocation,
       });
     }
+  });
+
+  it('can retry without refreshing the browser', async () => {
+    let shouldThrow = true;
+    const { rerender } = render(
+      <RootErrorBoundary>
+        <MaybeThrow shouldThrow={shouldThrow} />
+      </RootErrorBoundary>
+    );
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    shouldThrow = false;
+    rerender(
+      <RootErrorBoundary>
+        <MaybeThrow shouldThrow={shouldThrow} />
+      </RootErrorBoundary>
+    );
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('app.errorBoundary.tryAgain') }));
+
+    expect(await screen.findByText('Recovered content')).toBeInTheDocument();
+  });
+
+  it('resets automatically when reset keys change', async () => {
+    const { rerender } = render(
+      <RootErrorBoundary resetKeys={['/review']}>
+        <ThrowOnRender />
+      </RootErrorBoundary>
+    );
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    rerender(
+      <RootErrorBoundary resetKeys={['/memory']}>
+        <div>Memory route content</div>
+      </RootErrorBoundary>
+    );
+
+    expect(await screen.findByText('Memory route content')).toBeInTheDocument();
   });
 
   it('reports render crashes through componentDidCatch', () => {
