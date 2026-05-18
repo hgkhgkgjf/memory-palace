@@ -29,7 +29,7 @@
 
 ---
 
-## 🌟 什么是 Memory Palace？
+## 什么是 Memory Palace？
 
 **Memory Palace（记忆宫殿）** 是一套专为 AI Agent 打造的长期记忆操作系统。它为大语言模型提供 **持久化、可检索、可审计** 的外部记忆能力——让你的 Agent 不再"每次对话都从零开始"。
 
@@ -49,65 +49,28 @@
 
 ---
 
-## 🆕 这次版本更新了什么？
+## 这次版本更新了什么
 
-- **多语言检索现在更少丢信号了**：本地 `hash embedding`、`MMR` 去重和 session-first cache 现在都能更一致地保留中日韩与混合 Latin 文本，并会把 `ＡＰＩ` 这类全角 Latin 归一到和 `API` 同一条检索路径里。
-- **本地 C/D 的 Docker 联调不那么脆了**：对 `docker_one_click.sh/.ps1 --allow-runtime-env-injection` 来说，模板占位符校验现在会先延后到运行时注入落盘之后，再继续做 fail-closed 检查；缺失必填值时仍然会直接拦下。对这条 one-click 路径来说，像 `127.0.0.1` / `localhost` / `::1` 这样的 loopback provider base 现在也会在生成的 Docker env 里自动改成 `host.docker.internal`；同一轮里出现的其它 private provider 字面量地址，则只会把精确 host 追加进 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS`，不会顺手放大到整段网段。
-- **repo-local wrapper 现在会更一致地拦住本地 sqlite 误配**：仓库自带的 Python / shell wrapper 现在会先把常见的斜杠和大小写变体归一化，拒绝相对 sqlite 路径，也会把常见的 URL 编码容器路径先解开，再判断本地 `DATABASE_URL` 是否还指着 Docker 内部的 `/app/...` 或 `/data/...`。说人话就是：像 `sqlite+aiosqlite:///demo.db`、`sqlite+aiosqlite://///app/data/...`、`sqlite+aiosqlite:////%2Fapp%2Fdata/...` 这类值，现在都不会再被误放过。
-- **Docker 基础镜像现在也收得更紧了**：仓库自带的 Dockerfile 现在把基础镜像 digest 一起锁住了，后面重建时不容易再因为上游 tag 漂了而悄悄变样。
-- **GHCR 发布镜像现在会先自查 backend 健康脚本了**：backend 镜像现在自带 Docker 级别的 `HEALTHCHECK`，`docker-compose.ghcr.yml` 里的 backend 也继续明确绑在 `0.0.0.0`，发布工作流还会在 push 前先检查 `/usr/local/bin/backend-healthcheck.py` 是否真的在镜像里而且可执行。
-- **当前公开验证快照**：2026-05-15，backend `1382 passed, 22 skipped`，frontend `203 passed`；
-  前端 typecheck/build、i18n audit、bundle budget、repo-local live MCP e2e，以及
-  Docker/profile/SSE/script 重点契约通过。`Profile B` 使用项目默认设置；
-  runtime env injection 只用于 `Profile C/D`。下面的 benchmark 表未重算；
-  原生 Windows / 原生 Linux host runtime 仍需目标环境复核。
-- **公开 MCP 契约现在更严格了**：MCP 入口会直接拒绝带控制字符 / 不可见字符 / surrogate 的 URI，也会在真正进库前拦住超长的 `search_memory` / `create_memory` / `update_memory` payload；对 percent-encoded 记忆 URI 的处理现在也更可预期：字面 `%20` 这类路径文本仍然合法，已有记忆也可以通过编码空格 / 编码斜杠这类解码变体去兼容查找，而像 `C%3A/...` 这种解码后变成 Windows 文件路径的输入会继续被当成非法记忆 URI 直接拒绝。如果 `add_alias` 已经写入数据库，但 snapshot 补记失败，也会把 alias path 一起回滚掉。
-- **搜索 fail-close 这条链也更收口了**：如果最终 path 状态复核自己出错，`search_memory` 现在会直接丢掉那条结果，而不是把可能已经过期的 URI 继续当正常命中返回。像 `AND` / `OR` / `NOT` / `NEAR` 这类 FTS 控制词，或者 wildcard 很重的查询，也会改成当前请求内回退，而不是让控制语义悄悄改掉匹配结果，或把正常用户输入打成一条吵人的 `fts_query_invalid`。
-- **private provider 目标现在不会再被默认信任**：像 `127.0.0.1` / `::1` 这类 loopback IP 字面量，再加上 `localhost`，仍然默认可用；其它 private IP 字面量，以及解析后会落到 private 非 loopback 地址的 hostname，现在都必须通过 `MEMORY_PALACE_ALLOWED_PRIVATE_PROVIDER_TARGETS` 显式 allowlist 才能继续使用。link-local 和格式错误地址仍然会 fail-close。
-- **SQLite 启动和索引补修现在更收口了**：已有的本地 SQLite 文件在启动时如果 `PRAGMA quick_check(1)` 不是 `ok`，现在会直接 fail-close；bootstrap 建索引时也不只会补缺 chunk 的记忆，还会补缺失的 FTS 行；永久删除一条记忆时，也会把这条记忆关联的 chunk/vector/FTS 索引一起清掉，不再留下残留行。
-- **Dashboard 多了层级、遗忘和搜索质量面板**：Memory 页会展示 L0/L1/L2 层级视图，Maintenance 页会展示遗忘模拟和人工归档候选，Observability 页会展示 Search Quality。Search Quality 是真实鉴权接口，但在带标签质量样本持久化前仍会返回 `is_mock=true` / `status=unavailable`。
-- **Review snapshot 不会再默认一直涨下去了**：每次 snapshot 成功写入后，后端现在会按 age/count 做保守的 session 级清理，同时保护当前 session，并跳过拿不到锁的旧 session。
-- **reflection 后台清理现在更收口了**：同一个 session、source、reason、content 的并发 `prepare` 请求，仍然会复用同一个 prepared review；如果最后一个等待方先走掉了，后端现在也会把这条已经没人等的后台 prepare 一起取消，不再让它自己继续跑完。
-- **external import guard 现在会更早、更干净地 fail-close**：`/maintenance/import/prepare` 现在会先按文件 metadata 汇总大小，再决定要不要继续读正文，所以超大单文件或超大批次会在读内容前直接被拒绝。非 UTF-8 文本现在也会稳定返回 `file_read_failed`，不再冒出底层 fd 关闭错误。
-- **前端类型检查现在更容易复现，也更不容易在 CI 里漏掉了**：`frontend/package.json` 现在已经补上正式的 `npm run typecheck`，Docker publish 的校验工作流也会在发布前跑同一条检查。
-- **Review 页清空最后一个 session 后不再残留旧快照列表了**：现在一旦最后一个审查 session 被清空，页面会一起把旧的 snapshot 列表和底部动作区收掉，不会再留下一组看起来还能点的旧控件。
-- **Setup Assistant 和 Dashboard 的本地保存现在更严格了**：带鉴权的非 loopback 请求仍然可以查看 setup 当前状态，但本地 `.env` 写入依旧只保留给“直连回环地址 + 当前项目内 `.env*` 文件”这条路径，所以保存按钮现在会直接禁用并显示原因，不会再看起来能点、点完再失败。如果后端本身已经带着 `MCP_API_KEY` 在跑，这条 loopback 写入路径现在也必须带上同一把有效 key。第一次往本地 `.env` 保存时，现在还要求 `Dashboard API key` 不能为空，不会再把“空 key 首次落盘”当成默认自举路径。如果这次第一次保存里已经带上了远端 embedding/reranker 或 LLM provider 链字段，而当时还没有任何 Dashboard 鉴权配置，后端现在会故意先只落 Dashboard 鉴权相关字段；provider 链字段要等下一次带鉴权的保存再真正写进去。现在就算 setup 状态回来的比较晚，没碰过的检索字段也会按真实状态补齐；先输入 Dashboard key，不会再把已有的 router / reranker 配置偷偷重置回 `hash` / `false`。像 `http://127.0.0.1:8001/v1` 这种真实本地 router 地址仍然可以用，但示例 model id 仍然会被当成占位值拦下；如果你切到直连 `api` / `openai` embedding 路径，本地 `.env` 保存前还必须填一个真实的正整数维度。`/embeddings`、`/rerank`、`/chat/completions` 这类常见 API 后缀现在会自动归一化；格式不对或指到 link-local 的 provider base 会直接拦下，不会再原样写进 `.env`。`Review` / `Maintenance` 在当前运行环境缺少 `confirm` / `prompt` / `alert` 时，也会 fail-close 并改成页内提示。
-- **Dashboard 加载和 SSE 链路现在更顺了**：较大的 Dashboard 路由现在会按需懒加载，前端 bundle 预算也回到了警戒线以下。SSE helper 现在会跟着带前缀的 `VITE_API_BASE_URL` 去解析 `/sse`，不再默认假设站点根路径。浏览器里已经有 Dashboard 鉴权时，Observability 会切到可带同一组鉴权头的 fetch-based SSE，而且每次重连都会重新读取当前浏览器里的 Dashboard 鉴权，再带上去；同一条链路也保留指数退避重连、页面生命周期暂停/恢复和 idle watchdog。现在只要浏览器侧 Dashboard 鉴权发生变化，就会额外发出一条 maintenance-auth 变更事件；Observability 也会在鉴权变更后，或者在终态 `401` 之后用户重新聚焦标签页时，重建带鉴权的 `/sse` 连接。没有浏览器侧鉴权时，仍然走更轻量的原生 `EventSource` 路径。
-- **vitality cleanup 的多条删除现在更保守了**：带确认的多选删除现在会在后端具备 session-backed permanent delete 能力时，放进同一条 DB session 里原子执行；如果做不到这条原子路径，后端会直接拒绝多条 fallback，而不是出现“前几条删掉，后几条失败”的半成功状态。单条删除 fallback 仍然允许继续执行。
-- **Maintenance 里的孤儿记忆清理现在更顺手了**：孤儿记忆卡片现在可以直接用键盘聚焦，并用 `Enter` / `Space` 展开；批量删除也会并行发出少量请求，同时继续保留逐条失败和部分成功的提示。
-- **真实 benchmark 产物现在更诚实地记录降级了**：真实 A/B/C/D runner 现在会同时记录查询阶段和建索引阶段的降级信息；对 D 档位来说，`reranker` 配置缺失或响应无效都不会再被算成“干净通过”。
-- **Benchmark 产物默认不再写回工作树**：benchmark helpers 默认把运行产物写到系统临时目录下的 `memory-palace-benchmark-artifacts/<run-token>/...`，也仍支持显式 `artifact_dir` / `BENCHMARK_ARTIFACT_DIR` 覆盖，方便并行复验时保持隔离。
-- **本地验证报告现在更收口了**：skill / MCP smoke 报告会脱敏常见 secret、session token 和本地绝对路径，并在宿主支持时改用更私有的文件权限。
-- **分享前检查现在会更主动拦住本地工件了**：`scripts/pre_publish_check.sh` 现在会直接拦截已跟踪的 `.audit` / `.playwright-mcp` 工件，也会扫描 tracked 文件里的本地 endpoint/key 模式，比如 `sk-local-*`、以及带端口的 loopback/private provider 地址；仓库自己在 compose 里用来探测前端健康的 `127.0.0.1:8080` 这条合法探针不会再被误报。
-- **Observability 成功提示现在不再把英文词夹进中文里了**：重建、睡眠整合、任务重试这些成功提示现在会先走本地化 token，再拼进最终消息，所以中文界面里不会再看到生硬的 `job` / `sync` 片段。
-- **共用本地 SQLite 时，路径删除更稳了**：`delete_memory` 现在会把当前 path 状态读取、删除前 snapshot 取值和 path 删除都放进同一条 SQLite 写事务，而不是拆成多个独立数据库会话。
-- **回滚不再抹平 alias 自己的 metadata**：`rollback_to_memory(..., restore_path_metadata=True)` 现在只恢复当前选中 path 的 metadata，不会再把 alias 自己的 `priority` / `disclosure` 一起覆盖掉。
-- **metadata-only 回滚现在会按当前 path 状态 fail-close 了**：后端在真正恢复 `priority` / `disclosure` 前，会在 write lane 里再确认一次当前 path 指向和当前 metadata。要是 path 中途没了，现在会直接返回 `404`；要是 path 指向或 metadata 已经先变了，现在会返回 `409`，不再默默覆盖较新的状态，也不会再冒一个笼统的 `500`。
-- **Windows 运维脚本边界更稳了**：`apply_profile.sh` 现在能更安全地规范化从 PowerShell / WSL / Git Bash 传进来的 Windows 绝对目标路径，`docker_one_click.ps1` 现在也会用 UTF-8 without BOM 回写生成出来的 Docker env 文件。
-- **provider-chain 的缓存恢复更合理了**：对 fail-open embedding provider chain 来说，前一次远端失败后，后续请求现在可以复用 fallback/provider 的缓存结果，而不是总把后面的 provider 全部重打一遍。
-- **repo-local 校验现在更偏保守口径**：`evaluate_memory_palace_skill.py` 现在能更正确地解析常见 dotenv 风格的 `DATABASE_URL`，`gemini_live` 改成了显式 opt-in（`MEMORY_PALACE_ENABLE_GEMINI_LIVE=1`），user-scope 绑定漂移或 Gemini 登录/鉴权提示也会被记成环境 `PARTIAL`，而不是直接当成仓库主链路失败。
-- **reflection rollback 现在既更可审计，也更兼容旧调用方式了**：这条回滚现在不再依赖 ambient session。调用方如果已经知道 `session_id`，后端仍然会拿它去和 learn job 做一致性校验；如果 rollback 只带了 learn `job_id`，后端现在会先从这条 job 里恢复出原始 `session_id` 再继续做回滚。明确传入空白或只含空格的 `session_id` 仍然会 fail-close。
-- **公开 `priority` 契约现在统一了**：MCP 工具入口不再先把 `True`、`False`、`1.9` 这类值强转成整数，再交给底层更严格的 SQLite 校验。说人话就是：非整数优先级现在会在公开工具路径上更早被拦下。
-- **Dashboard 鉴权现在会跟着配置好的 API base 走**：如果你把 `VITE_API_BASE_URL` 指到带前缀的路径，或者你自己的 API 域名，浏览器里保存的 Dashboard key 现在也会继续附加到 `/browse`、`/review`、`/maintenance`、`/setup` 这些受保护请求上；但它仍然**不会**被发到无关第三方绝对 URL。
-- **repo-local skill mirrors 已重新对齐**：canonical `memory-palace` skill 和 `.agent/.cursor` mirrors 现在重新一致，`python scripts/sync_memory_palace_skill.py --check` 在当前仓库状态下会返回 `PASS`。
-- **skills + MCP 更像产品了**：现在不只是“有工具”，而是补齐了安装、同步、smoke 和 live e2e。
-- **部署更稳了**：Docker 一键脚本补了 deployment lock，运行时环境注入默认关闭，分享或正式发布前也有自检脚本兜底。
-- **写入链路的恢复能力更强了**：同一 session 的 snapshot 现在改成文件锁，SQLite 短暂锁冲突会做一次小范围重试，后台索引任务也会和前台写入共用同一条写入门控。
-- **审查回滚现在更保守了**：如果同一个 URI 已经在另一条 review session 里留下了更晚的内容快照，旧快照的 rollback 会直接拒绝，不再默默把较新的改动回滚掉。对 create-tree 这类回滚，后端现在也会在同一条删除事务里重新确认当前 head，并把进入 write lane 前已经挂到这次快照下面的 descendants 一起清掉，所以不容易再留下晚到子节点，也不容易误删已经被更新过的新内容。
-- **Dashboard 根入口现在也有最后一层兜底页了**：React 根节点外面现在包了一层全局错误边界。要是某个组件在 render 阶段直接崩掉，页面现在会先落到一个最小恢复页，而不是把整个 SPA 直接卸掉又不给解释。
-- **高干扰检索在当前基准集里表现更稳**：对照旧版本时，`s8,d200` 与 `s100,d200` 这类更容易被干扰的场景，C/D 档位显示出更好的召回。
-- **前端语言切换更直接了**：前端现在会先恢复浏览器里已保存的语言；如果还没有保存值，常见中文浏览器语言会自动归并到 `zh-CN`，其他首次访问场景则回退到英文。右上角仍然可以一键中英切换，浏览器也会记住你的选择。
-- **Edge 下的 Dashboard 渲染现在更保守了**：当前端检测到 Microsoft Edge 时，会自动切到更轻量的视觉模式，改用静态背景、减轻 blur，并收掉一部分卡片动效，优先减少本地卡顿，同时保留同一套 Dashboard 功能。
-- **本地 operator 路径也更稳了**：repo-local stdio wrapper 现在会继续复用 `.env` 里的 `RETRIEVAL_REMOTE_TIMEOUT_SEC`，仓库自带的两条 repo-local wrapper 都会补本地 `NO_PROXY` / `no_proxy` 绕过，stdio 转发也改成了分块而不是逐字节，shell wrapper 这条路径还会先补上 UTF-8 默认编码，Observability 搜索和活力清理确认这类长请求也会给浏览器更长的等待时间。
-- **一些容易卡住的小边界也补齐了**：搜索结果最后一轮会优先批量校验当前 path 状态，Windows 风格宿主如果误把 `backend/mcp_wrapper.py` 跑在 `Git Bash / MSYS / Cygwin` 下也更容易选中正确的 `.venv` 解释器，Docker 前端代理 key 里像制表符这类 ASCII 控制字符现在也会被直接拦下。
-- **公开口径更保守了**：文档现在已经补上原生 Windows 的 repo-local `python-wrapper` 路径，但你自己的远程环境 / GUI 宿主环境仍建议按目标环境再复核一次。
-- **客户端边界写清楚了**：`Claude/Codex/OpenCode/Gemini` 走文档里的 CLI 路径；`Cursor / Windsurf / VSCode-host / Antigravity` 走 `AGENTS.md + MCP 配置片段`；`Gemini live` 和 GUI 宿主验证仍保留边界说明。
+<p align="center">
+  <img src="docs/images/memory_palace_upgrade.png" width="900" alt="Memory Palace 项目升级对比图" />
+</p>
+
+- **Dashboard 多了层级、遗忘和搜索质量三块面板** —— Memory 页加了 L0/L1/L2 层级视图，Maintenance 页加了遗忘模拟和归档候选，Observability 页加了 Search Quality 面板。
+- **多语言检索更不丢信号** —— 本地 hash embedding、MMR 去重和 session-first cache 对中英混合文本更稳定，全角 `ＡＰＩ` 和 `API` 会归一到同一条检索路径。
+- **MCP 公开接口更严格、更安全** —— 拒绝畸形 URI，在真正进库前拦下超长 payload，percent-encoded URI 行为更可预期，`add_alias` 写入失败时也会干净地回滚。
+- **本地 Docker 调试不再脆** —— `docker_one_click.sh/.ps1` 加了部署锁，runtime env injection 改成显式 opt-in，loopback provider base 会自动改写成 `host.docker.internal`，明显有风险的 NFS 挂载组合会直接拦下。
+- **首启 Setup Assistant 更包容** —— 本地 `.env` 写入只针对项目内文件并限定 loopback，检索字段补齐不会重置已有 router/reranker 配置，provider base 自动归一加 private 目标 allowlist，更难写出错误的配置。
+- **Dashboard 链路更顺** —— 大路由按需懒加载、bundle 维持在小体积，SSE helper 跟着 `VITE_API_BASE_URL` 解析 `/sse`，浏览器鉴权变化时 Observability 会自动重建带鉴权的 SSE 连接。
+- **写入与回滚更稳** —— 同 session snapshot 使用文件锁，共享本地 SQLite 时删除保持原子，回滚不再误覆盖 alias 自己的 metadata，旧 snapshot 也不会再悄悄回滚掉更新的内容。
+- **skills + MCP 现在是一条完整的产品路径** —— 安装、同步、smoke、live e2e 都在文档里；`Claude / Codex / OpenCode / Gemini CLI` 走 CLI 路径，`Cursor / Windsurf / VSCode-host / Antigravity` 走仓库内规则 + MCP 配置片段。
+
+需要每个版本的详细变更，可以看 [docs/changelog/](docs/changelog/)。
 
 ---
 
-## ✨ 核心特性
+## 核心特性
 
-### 🔒 可审计写入流水线
+### 可审计写入流水线
 
 每一次记忆写入都经过严格流水线：**Write Guard 预检 → 快照记录 → 异步索引重建**。Write Guard 核心动作为 `ADD`、`UPDATE`、`NOOP`、`DELETE`；`BYPASS` 作为上层 metadata-only 更新场景的流程标记，整体链路每一步均可追溯。
 
@@ -129,7 +92,7 @@
 
 Dashboard / Review / Maintenance 这几组写接口现在在 write lane 等太久时，也会返回结构化的 `503`（`write_lane_timeout`），不再只给一个很难排查的通用 `500`。MCP 写工具遇到同样情况时，也会返回可重试的结构化错误结果。
 
-### 🔍 统一检索引擎
+### 统一检索引擎
 
 三种检索模式——`keyword`（关键词）、`semantic`（语义）、`hybrid`（混合）——支持自动降级。当外部 Embedding 服务不可用时，系统自动回退到关键词搜索，并在发生降级时于响应中报告 `degrade_reasons`。
 
@@ -139,25 +102,25 @@ Embedding 维度不匹配的检查现在会跟着**当前查询作用域**走（
 
 搜索结果最后一轮的“当前状态复核”现在也会优先走批量 path 查询。说人话就是：结果一多时，后端不再为了确认每一条 path 还在不在，就一条一条往 SQLite 来回跑。
 
-### 🧠 意图感知搜索
+### 意图感知搜索
 
 搜索引擎默认按四类核心意图路由——**factual（事实型）**、**exploratory（探索型）**、**temporal（时间型）**、**causal（因果型）**——并匹配对应策略模板（`factual_high_precision`、`exploratory_high_recall`、`temporal_time_filtered`、`causal_wide_pool`）；当无显著信号时默认 `factual_high_precision`，当信号冲突或低信号混合时回退为 `unknown`（模板 `default`）。说人话就是：`why ... after ...` 这类查询，如果 `after/before` 只是描述触发事件，仍会按 **causal** 处理；只有遇到 `when`、`timeline`、`yesterday` 这类更强的时间锚点时，才继续保守回退到 `unknown`。
 
-### ♻️ 记忆治理循环
+### 记忆治理循环
 
 记忆是有生命力的实体，拥有随时间衰减的 **活力值（vitality score）**。治理循环涵盖：审查与回滚、孤儿清理、活力衰减、睡眠整合（自动碎片清理）。
 
-### 🌐 多客户端 MCP 集成
+### 多客户端 MCP 集成
 
 一套协议，多端接入：当前公开文档把 **CLI 客户端** 和 **IDE 宿主** 分开说明。`Claude Code / Codex / Gemini CLI / OpenCode` 走技能文档里的 CLI 路径；`Cursor / Windsurf / VSCode-host / Antigravity` 走 repo-local 规则文件加 MCP 配置片段。
 
-### 📦 灵活部署
+### 灵活部署
 
 四种部署档位（A/B/C/D），从纯本地到云端连接，支持 Docker 部署和一键脚本。当前最完整的大链路验证仍是 `macOS + Docker`；原生 Windows 现在已有通过 `backend/mcp_wrapper.py` 的 repo-local stdio 路径，但远程场景和 GUI 宿主组合仍建议按目标环境再复核一次。
 
 如果你走的是仓库自带的 Docker / GHCR compose 路径，compose 现在会默认在仓库的 **named volume 默认部署路径** 上强制打开 WAL，减少共享 SQLite 数据卷上的 `database is locked` 这类并发写冲突。但这个默认值**不适用于**把 `/app/data` 改成 NFS/CIFS/SMB 之类网络文件系统 bind mount 的场景；如果你这么改，必须显式切回 `MEMORY_PALACE_DOCKER_WAL_ENABLED=false` 和 `MEMORY_PALACE_DOCKER_JOURNAL_MODE=delete`。repo-local 的 `docker_one_click.sh/.ps1` 现在会在检测到这类高风险组合时直接 fail-fast；手动 `docker compose up` 仍然属于你自己负责预检查的路径。
 
-### 📊 内置可观测性仪表盘
+### 内置可观测性仪表盘
 
 基于 React 的四视图仪表盘：**记忆浏览器**、**审查与回滚**、**维护管理**、**可观测性监控**。
 
@@ -173,7 +136,7 @@ Observability 搜索和活力清理确认这类更容易跑久一点的操作，
 
 ---
 
-## 🏗️ 系统架构
+## 系统架构
 
 <p align="center">
   <img src="docs/images/系统架构图.png" width="900" alt="Memory Palace 系统架构" />
@@ -218,7 +181,7 @@ Observability 搜索和活力清理确认这类更容易跑久一点的操作，
 
 ---
 
-## 🛠️ 技术栈
+## 技术栈
 
 ### 后端
 
@@ -277,7 +240,7 @@ Observability 搜索和活力清理确认这类更容易跑久一点的操作，
 
 ---
 
-## 📁 项目结构
+## 项目结构
 
 ```
 memory-palace/
@@ -326,7 +289,7 @@ memory-palace/
 
 ---
 
-## 📋 环境要求
+## 环境要求
 
 | 组件 | 最低版本 | 推荐版本 |
 |---|---|---|
@@ -337,7 +300,7 @@ memory-palace/
 
 ---
 
-## 🚀 快速开始
+## 快速开始
 
 ### 方式一：直接拉取预构建 Docker 镜像（最省事的用户路径）
 
@@ -395,7 +358,7 @@ docker compose -f docker-compose.ghcr.yml down --remove-orphans
 ### 方式二：手动本地搭建（推荐新手使用）
 
 > **💡 提示**：本教程推荐你先以 **档位 B** 为目标，这样可以在**零外部模型服务**的前提下跑通全流程。
-> 如果你希望日常使用时拿到更好的检索效果，**强烈建议后续升级到档位 C**；但请先按 [升级到档位 C/D](#-升级到档位-cd) 中的说明补齐 embedding / reranker / LLM 对应配置。
+> 如果你希望日常使用时拿到更好的检索效果，**强烈建议后续升级到档位 C**；但请先按 [升级到档位 C/D](#升级到档位-cd) 中的说明补齐 embedding / reranker / LLM 对应配置。
 
 #### 第 1 步：克隆仓库
 
@@ -609,7 +572,7 @@ python run_sse.py
 >
 > 上面这个 `HOST=127.0.0.1` 是**只给本机访问**的写法；`python run_sse.py` 会优先尝试回环 `127.0.0.1:8000`，如果本机 `8000` 已被主后端占用，则自动回退到 `127.0.0.1:8010`。如果你显式绑定的是 `HOST=::1`，它会单独检查 `::1:8000`，不会因为 IPv4 的 `8000` 被占用就误回退。如果你绑定的是 `HOST=localhost`，探测逻辑现在会按当前主机实际可用的回环地址分别检查，不会再因为这台机器不支持 IPv6 localhost，就误以为 `8000` 已占用而直接回退到 `8010`。发生真正需要的回退时，当前启动日志还会明确打印最终 `/sse` 地址，并提醒你更新客户端配置或显式设置 `PORT`，所以更应该把它看成“客户端配置要跟着改”的提示，而不是静默故障。真要给远程客户端访问，请改成 `HOST=0.0.0.0`（或你的实际绑定地址）。这一步只是把监听范围放开，**不等于**跳过安全控制；API Key、防火墙、反向代理和传输安全仍然要自己补齐。如果你的远程 hostname / origin 还要通过 MCP 传输层的 host/origin 校验，也要再显式补上 `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`，而不是把非回环监听误解成“默认放开全部来源”。
 
-详细的客户端配置请参阅 [多客户端集成](#-多客户端集成)。
+详细的客户端配置请参阅 [多客户端集成](#多客户端集成)。
 
 ---
 
@@ -673,7 +636,7 @@ COMPOSE_PROJECT_NAME=<控制台打印出的 compose project> docker compose -f d
 
 ---
 
-## ⚙️ 部署档位（A / B / C / D）
+## 部署档位（A / B / C / D）
 
 Memory Palace 提供四种部署档位以匹配你的硬件和需求：
 
@@ -686,7 +649,7 @@ Memory Palace 提供四种部署档位以匹配你的硬件和需求：
 
 > **说明**：档位 C 和 D 共享相同的混合检索流水线（`keyword + semantic + reranker`）。当前仓库附带模板的主要区别是模型服务地址（本地 vs 远程）以及默认 `RETRIEVAL_RERANKER_WEIGHT`（`0.30` vs `0.35`）。
 
-### 🔼 升级到档位 C/D
+### 升级到档位 C/D
 
 **档位 C 是强烈推荐的目标档位**，但它不是“切过去就自动好用”的零配置方案。
 
@@ -703,7 +666,7 @@ RETRIEVAL_EMBEDDING_BACKEND=api
 RETRIEVAL_EMBEDDING_API_BASE=http://localhost:11434/v1   # 例如 Ollama
 RETRIEVAL_EMBEDDING_API_KEY=your-api-key
 RETRIEVAL_EMBEDDING_MODEL=your-embedding-model-id
-RETRIEVAL_EMBEDDING_DIM=1024          # 按 provider 实际返回维度填写
+RETRIEVAL_EMBEDDING_DIM=<provider-vector-dim>   # 必须等于 provider 实际返回维度
 
 # ── Reranker 模型 ───────────────────────────────────────────
 RETRIEVAL_RERANKER_ENABLED=true
@@ -766,7 +729,7 @@ COMPACT_GIST_LLM_MODEL=your-chat-model-id
 
 ---
 
-## 🔌 MCP 工具参考
+## MCP 工具参考
 
 Memory Palace 通过 MCP 协议暴露 **9 个标准化工具**：
 
@@ -814,7 +777,7 @@ cd backend && HOST=127.0.0.1 PORT=8010 python run_sse.py
 
 ---
 
-## 🔄 多客户端集成
+## 多客户端集成
 
 MCP 工具层负责 **确定性执行**；Skills 策略层负责 **策略与时机**。
 
@@ -931,7 +894,7 @@ cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 
 ---
 
-## 📊 评测结果
+## 评测结果
 
 > 这里保留**对用户有用的摘要表**，用于说明当前版本的大致表现。
 >
@@ -1032,7 +995,7 @@ curl -fsS http://127.0.0.1:8000/health
 
 ---
 
-## 🖼️ 仪表盘截图
+## 仪表盘截图
 
 > 📌 下面这些图主要用来帮助你快速认识功能区。
 >
@@ -1086,7 +1049,7 @@ curl -fsS http://127.0.0.1:8000/health
 
 ---
 
-## ⏱️ 记忆写入与审查工作流
+## 记忆写入与审查工作流
 
 <p align="center">
   <img src="docs/images/记忆写入与审查时序图.png" width="900" alt="记忆写入与审查时序图" />
@@ -1108,7 +1071,7 @@ curl -fsS http://127.0.0.1:8000/health
 
 ---
 
-## 📚 文档导航
+## 文档导航
 
 | 文档 | 说明 |
 |---|---|
@@ -1123,7 +1086,7 @@ curl -fsS http://127.0.0.1:8000/health
 
 ---
 
-## 🔐 安全与隐私
+## 安全与隐私
 
 - 仅 `.env.example` 被提交——**实际 `.env` 文件始终被 gitignore**
 - 文档中所有 API Key 均使用占位符
@@ -1138,31 +1101,19 @@ curl -fsS http://127.0.0.1:8000/health
 
 ---
 
-## 🔀 迁移与兼容性
-
-为向后兼容旧版 `nocturne_memory` 部署：
-
-- 脚本仍支持旧版 `NOCTURNE_*` 环境变量前缀
-- Docker 脚本自动检测并复用旧版数据卷
-- 后端启动时通过 `_try_restore_legacy_sqlite_file()` 自动从旧版 SQLite 文件名恢复（`agent_memory.db`、`nocturne_memory.db`、`nocturne.db`）
-
-> 兼容层不影响当前 Memory Palace 品牌和主路径。
-
----
-
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=AGI-is-going-to-arrive/Memory-Palace&type=Date)](https://star-history.com/#AGI-is-going-to-arrive/Memory-Palace&Date)
 
 ---
 
-## 📄 开源协议
+## 开源协议
 
 [MIT](LICENSE) — Copyright (c) 2026 agi
 
 ---
 
-## 🙏 致谢与灵感来源
+## 致谢与灵感来源
 
 - 最初的灵感来源于这条社区讨论帖：<https://linux.do/t/topic/1616409>
 - 最早参考的项目是 `Dataojitori/nocturne_memory`：<https://github.com/Dataojitori/nocturne_memory>

@@ -1,6 +1,6 @@
 # Memory Palace Agent Rules
 
-These rules apply to the `Memory-Palace/` repository.
+These rules apply to AI coding agents working inside this repository.
 
 ## Read First
 
@@ -14,18 +14,16 @@ These rules apply to the `Memory-Palace/` repository.
 - If the target URI is unknown, use `search_memory(..., include_session=true)` before guessing a path.
 - Before `create_memory`, `update_memory`, `delete_memory`, or `add_alias`, read the target or the best matching candidate first.
 - If `guard_action` is `NOOP`, stop the write, inspect `guard_target_uri` / `guard_target_id`, read the suggested target, then decide whether anything should change.
-- Prefer repo-visible references under `docs/skills/memory-palace/` instead of hidden mirror-relative paths.
 
-## Code And Validation
+## Code and Validation
 
-- Keep changes scoped to this repository.
-- Backend validation: `cd backend && .venv/bin/pytest tests -q`
-- Frontend validation: `cd frontend && npm test && npm run build`
-- Skill validation: `python scripts/evaluate_memory_palace_skill.py`
-- Live MCP validation: `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
+- Backend: `cd backend && .venv/bin/pytest tests -q`
+- Frontend: `cd frontend && npm test && npm run build`
+- Skill smoke: `python scripts/evaluate_memory_palace_skill.py`
+- Live MCP e2e: `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
 
 ## MCP Binding
 
-- Use the repo-local MCP binding that matches the host:
-- native Windows: `backend/mcp_wrapper.py`
+- Native Windows: `backend/mcp_wrapper.py`
 - macOS / Linux / `Git Bash` / `WSL`: `scripts/run_memory_palace_mcp_stdio.sh`
+</content>

@@ -15,11 +15,11 @@ def test_getting_started_section_four_numbers_are_unique_and_ordered() -> None:
     assert _extract_section_numbers(
         PROJECT_ROOT / "docs" / "GETTING_STARTED.md",
         chapter="4",
-    ) == ["4.1", "4.2", "4.3", "4.4"]
+    ) == ["4.1", "4.2", "4.3"]
     assert _extract_section_numbers(
         PROJECT_ROOT / "docs" / "GETTING_STARTED_EN.md",
         chapter="4",
-    ) == ["4.1", "4.2", "4.3", "4.4"]
+    ) == ["4.1", "4.2", "4.3"]
 
 
 def test_getting_started_notes_local_shell_database_autofill() -> None:
@@ -52,17 +52,13 @@ def test_skill_install_docs_use_user_scope_as_the_default_recommendation() -> No
 
     assert "User-scope install is the stable default on fresh machines" in readme_en
     assert "新机器上更稳的默认方案是 `user` 级安装" in readme_zh
-    assert "The more stable default is still to start with `--scope user --with-mcp`." in cli_guide_en
-    assert "默认更稳的推荐是先跑 `--scope user --with-mcp`" in cli_guide_zh
+    assert "### User-scope install (recommended default)" in cli_guide_en
+    assert "`Codex / OpenCode` do not get a stable MCP binding under workspace scope; user-scope is their primary path." in cli_guide_en
+    assert "### user-scope 安装（推荐默认）" in cli_guide_zh
+    assert "`Codex / OpenCode` 在 workspace scope 下不会写 MCP 配置，user-scope 才是它们的主路径。" in cli_guide_zh
 
 
 def test_hygiene_docs_list_root_pytest_cache_and_only_current_local_reports() -> None:
-    zh_getting_started = (PROJECT_ROOT / "docs" / "GETTING_STARTED.md").read_text(
-        encoding="utf-8"
-    )
-    en_getting_started = (
-        PROJECT_ROOT / "docs" / "GETTING_STARTED_EN.md"
-    ).read_text(encoding="utf-8")
     zh_security = (PROJECT_ROOT / "docs" / "SECURITY_AND_PRIVACY.md").read_text(
         encoding="utf-8"
     )
@@ -70,10 +66,6 @@ def test_hygiene_docs_list_root_pytest_cache_and_only_current_local_reports() ->
         PROJECT_ROOT / "docs" / "SECURITY_AND_PRIVACY_EN.md"
     ).read_text(encoding="utf-8")
 
-    assert "`.tmp/`、`.pytest_cache/`、`backend/.pytest_cache/`" in zh_getting_started
-    assert "`.tmp/`, `.pytest_cache/`, `backend/.pytest_cache/`" in en_getting_started
-    assert "docs/skills/CLAUDE_SKILLS_AUDIT.md" not in zh_getting_started
-    assert "docs/skills/CLAUDE_SKILLS_AUDIT.md" not in en_getting_started
     assert "`.pytest_cache/`、`backend/.pytest_cache/`" in zh_security
     assert "`.pytest_cache/`, `backend/.pytest_cache/`" in en_security
     assert "docs/skills/CLAUDE_SKILLS_AUDIT.md" not in zh_security
@@ -233,12 +225,15 @@ def test_docs_keep_report_override_guidance_consistent() -> None:
         PROJECT_ROOT / "docs" / "skills" / "SKILLS_QUICKSTART_EN.md"
     ).read_text(encoding="utf-8")
 
-    for text in (readme_zh, skill_readme_zh, skill_getting_started_zh, quickstart_zh):
+    assert "合并到 `SKILLS_QUICKSTART.md`" in skill_getting_started_zh
+    assert "merged into `SKILLS_QUICKSTART_EN.md`" in skill_getting_started_en
+
+    for text in (readme_zh, skill_readme_zh, quickstart_zh):
         assert "memory-palace-reports" in text
         assert "仓库外的绝对路径" in text
         assert "改写到别的本地路径" not in text
 
-    for text in (readme_en, skill_readme_en, skill_getting_started_en, quickstart_en):
+    for text in (readme_en, skill_readme_en, quickstart_en):
         assert "memory-palace-reports" in text
         assert "outside the repository" in text or "outside the repo" in text
         assert "write the reports to another local path" not in text

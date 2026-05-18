@@ -1,8 +1,12 @@
-# Memory Palace Skills 设计与维护说明
+# Memory Palace Skills 设计说明
 
-这份文档不再只是“给人看的策略说明”，而是 `memory-palace` skill 体系的维护基线。
+`memory-palace` skill 体系的结构概览。如果你只是要把客户端接通，看 [`SKILLS_QUICKSTART.md`](SKILLS_QUICKSTART.md) 即可。
 
-当前单一真源位于：
+---
+
+## 1. 单一真源
+
+canonical bundle 在：
 
 ```text
 docs/skills/memory-palace/
@@ -17,186 +21,56 @@ docs/skills/memory-palace/
     │   └── global_workflows/
     │       └── memory-palace.md
     └── gemini/
-        └── SKILL.md
+        ├── SKILL.md
+        └── memory-palace-overrides.toml
 ```
 
-分发脚本位于：
+分发与安装：
 
-```text
-scripts/sync_memory_palace_skill.py
-```
+- `scripts/sync_memory_palace_skill.py` —— 把 canonical bundle 分发到各 CLI 镜像目录
+- `scripts/install_skill.py` —— 安装到 workspace 或 user 目录，可选 `--with-mcp`
+- `scripts/render_ide_host_config.py` —— 给 IDE 宿主生成 MCP 配置片段
 
-安装脚本位于：
+`.claude / .codex / .gemini / .opencode` 等镜像目录都是执行同步或安装后生成的本地产物，公开仓库默认不带。
 
-```text
-scripts/install_skill.py
-```
+---
 
-## 0. 与 Claude Skills 规范的对齐结论（2026-03-07）
+## 2. 与 Claude Skills 规范的对齐
 
-这轮按 `Claude Code` 官方 skills 文档、Anthropic 在 2026-03-03 发布的
-`Improving skill-creator: Test, measure, and refine Agent Skills`，以及
-`anthropics/skills` 仓库里的 `skill-creator` 做了一次对照。
+- **结构对齐**：采用 `skill-name/SKILL.md` 的标准 bundle 结构
+- **触发契约对齐**：`description` 同时写清 “做什么” 和 “什么时候用”
+- **渐进加载对齐**：主 `SKILL.md` 保持短小，工具细节下沉到 `references/`
+- **跨客户端分发对齐**：Claude / Codex / OpenCode 走 mirror；Gemini 用 variant
 
-当前结论可以直接说：
+边界：验证层是工程化的 smoke / e2e，不是 `skill-creator` 那种 `evals.json` + 自动 description 优化 loop。
 
-- **结构上已对齐**：采用 `skill-name/SKILL.md` 的标准 bundle 结构，目录名与 `name` 都是 `memory-palace`
-- **触发契约已对齐**：`description` 同时写清“做什么”和“什么时候用”，而且保留了明确 trigger hints
-- **渐进加载已对齐**：主 `SKILL.md` 保持短小，工具细节下沉到 `references/`
-- **跨客户端分发已对齐**：Claude / Codex / OpenCode 走 mirror，Gemini 保留 variant；当前仓库可直接走项目级入口，跨仓复用时仍优先 user install
+---
 
-但和 `skill-creator` 的完整版工作流相比，当前还有一个明确边界：
+## 3. 目录职责
 
-- **验证层还不是 full eval / benchmark 套件**
+| 路径 | 职责 |
+|---|---|
+| `docs/skills/memory-palace/SKILL.md` | 定义何时触发、最短安全默认流程、硬约束 |
+| `docs/skills/memory-palace/variants/gemini/SKILL.md` | 更短、更强触发的 Gemini variant，把 first move / NOOP / trigger sample path 写成锚点 |
+| `docs/skills/memory-palace/variants/gemini/memory-palace-overrides.toml` | Gemini policy 覆盖：把 MCP tool 改成 `mcpName = "memory-palace"` 规则格式，避免旧 `__` 语法告警 |
+| `docs/skills/memory-palace/references/mcp-workflow.md` | 9 个 MCP 工具的最小安全工作流 + recall / write / compact / rebuild 顺序 |
+| `docs/skills/memory-palace/references/trigger-samples.md` | 稳定的 should-trigger / should-not-trigger / borderline prompt 集 |
+| `docs/skills/memory-palace/variants/antigravity/global_workflows/memory-palace.md` | Antigravity 专属 workflow 投影（兼容层） |
 
-当前仓库里已经整理好：
+---
 
-- `docs/skills/memory-palace/` 这份 canonical bundle
-- `scripts/sync_memory_palace_skill.py`
-- `scripts/install_skill.py`
+## 4. 设计原则
 
-而 `.claude/.codex/.opencode/.cursor/.agent/.gemini/.mcp.json` 这类 hidden mirror / workspace 配置，都是你在本地执行同步或安装后才生成的，不属于公开 GitHub 仓库默认自带内容。
-
-当前工程里已经有这些验证入口：
-
-- trigger smoke
-- mirror drift check
-- live MCP e2e
-- 跨客户端 MCP 绑定检查
-
-但还没有完全做成 `skill-creator` 那种：
-
-- `evals.json`
-- blind comparator
-- benchmark viewer
-- 自动 description optimization loop
-
-所以更准确的说法是：
-
-- **当前 skill 设计已经符合 Claude Skills 的结构规范与触发规范**
-- **当前验证方式更偏工程化 smoke / e2e，还没有走满 skill-creator 的全量评测工作流**
-
-## 1. 为什么要这样收敛
-
-旧设计的核心问题不是“信息太少”，而是结构分散：
-
-- 有策略文档，但缺少仓内可分发的 canonical skill bundle
-- 多 CLI 目录靠手工维护，很容易漂移
-- “什么时候触发”“怎么执行”“怎么验证”没有形成闭环
-
-现在的设计目标是：
-
-- **可直接分发**：canonical bundle 固定落在 `docs/skills/memory-palace/`
-- **可跨 CLI 使用**：通过同步脚本在本地生成 `.claude/.codex/.opencode` 等 mirrors；Gemini 在当前工作区执行 workspace 安装后可用项目级入口，跨仓时仍优先 `user-scope install`
-- **可投影到 IDE 宿主**：`Cursor / Windsurf / VSCode-host / Antigravity` 这类宿主现在统一走 `AGENTS.md + scripts/render_ide_host_config.py`，而不是把 hidden mirrors 当成默认用户入口
-- **可验证**：通过 `sync_memory_palace_skill.py --check` 与仓内门禁持续校验
-- **可迭代**：先优化 `description` 的触发质量，再优化 `SKILL.md` 正文与 reference
-
-Gemini 端当前有一个已知边界：
-
-- workspace-local `.gemini/skills/...` 可以被发现
-- 但真实触发时，Gemini 可能尝试直接读取隐藏 skill 目录
-- 在部分本地策略下，这会被 ignore patterns 拦截
-
-因此当前推荐分两层：
-
-- **默认更稳的推荐**：先跑 `python scripts/install_skill.py --targets gemini --scope user --with-mcp --force`
-- **当前工作区如果还想补项目级入口**：再运行 workspace 安装，补齐项目级 `.gemini/skills/...` + `.gemini/settings.json` + `.gemini/policies/memory-palace-overrides.toml`
-- **跨仓复用 / 复制到别的工作区**：仍然优先 `user-scope install`
-
-公开口径建议：
-
-- 如果你已经执行了 workspace 安装，可以说“workspace 入口已经就位”
-- 不建议直接写成“Gemini 已经完全开箱即用”
-
-## 2. 目录职责
-
-### `docs/skills/memory-palace/SKILL.md`
-
-负责：
-
-- 定义何时触发
-- 给出最短但安全的默认流程
-- 明确哪些情况必须先检查、不能盲写
-
-### `docs/skills/memory-palace/variants/gemini/SKILL.md`
-
-负责：
-
-- 给 Gemini 提供更短、更强触发的技能正文
-- 把 first move、`NOOP` 处理、trigger sample path 直接写成锚点
-- 降低 Gemini 在 skill 自省问题上的 under-trigger 与答非所问
-
-### `docs/skills/memory-palace/variants/gemini/memory-palace-overrides.toml`
-
-负责：
-
-- 给 Gemini 提供当前仓库推荐的 policy 覆盖规则
-- 把 `memory-palace` MCP 工具改成 `mcpName = "memory-palace"` 口径
-- 避免旧 `__` MCP tool 语法在新版本 Gemini CLI 里继续报 warning
-
-### `docs/skills/memory-palace/references/mcp-workflow.md`
-
-负责：
-
-- 维护 9 个 MCP 工具的最小安全工作流
-- 记录 recall / write / compact / rebuild 的安全顺序
-- 给出 should trigger / should not trigger 示例
-
-### `docs/skills/memory-palace/references/trigger-samples.md`
-
-负责：
-
-- 提供稳定的 should-trigger / should-not-trigger / borderline prompt 集
-- 让 `description` 优化有固定对照组，而不是凭感觉改
-- 给后续 trigger regression / human review 留下统一输入集
-
-### `scripts/sync_memory_palace_skill.py`
-
-负责：
-
-- 把 canonical bundle 分发到各 CLI 目录
-- 检查 mirrors 是否漂移
-- 当前工作区镜像包括 `.claude`、`.codex`、`.opencode`、`.cursor`、`.agent`、`.gemini`
-- 如果 `--check` 报 drift，先跑一次同步，再重新跑 `evaluate_memory_palace_skill.py`
-- 如果只剩 `claude(user)` 绑定失败，优先补当前项目在 `~/.claude.json` 下的 project-scoped `mcpServers.memory-palace`，不要直接去改兄弟仓的项目块
-
-这里要特别区分一件事：
-
-- `.cursor/.agent` 这类目录作为**兼容投影**仍然可能存在
-- 但对公开用户口径，它们不再是 IDE 宿主的默认主入口
-- IDE 宿主默认应看 `AGENTS.md + scripts/render_ide_host_config.py`
-
-### `scripts/install_skill.py`
-
-负责：
-
-- 把 canonical bundle 安装到其他工作区或用户目录
-- 支持 `copy` / `symlink`
-- 在需要时补齐 `--with-mcp` 的 CLI 配置，但 MCP 仍绑定到**当前 checkout** 的 repo-local wrapper：原生 Windows 走 `backend/mcp_wrapper.py`，POSIX shell 路径走 `scripts/run_memory_palace_mcp_stdio.sh`
-- 对 Gemini，这也是当前更稳妥的推荐安装路径
-- 当目标是 Gemini 时，自动替换为 `variants/gemini/SKILL.md`
-- 当目标是 Gemini 时，也会同步安装 `variants/gemini/memory-palace-overrides.toml`
-- 对 `cursor / agent / antigravity`，当前更适合作为兼容投影或 workflow 分发入口，而不是公开用户默认路径
-
-### `scripts/render_ide_host_config.py`
-
-负责：
-
-- 为 `Cursor / Windsurf / VSCode-host / Antigravity` 生成 repo-local MCP 配置片段
-- 明确这些 IDE 宿主的主路径是 `AGENTS.md + MCP snippet`
-- 仅在必要时切到 `python-wrapper` 版本（如 `Antigravity` 的 `stdin/stdout` / CRLF 兼容场景）
-
-## 3. 设计原则
-
-1. `description` 是**触发契约**
-2. `SKILL.md` 正文只保留**执行步骤、硬约束、失败处理**
+1. `description` 是触发契约
+2. `SKILL.md` 正文只保留执行步骤、硬约束、失败处理
 3. 工具细节下沉到 `references/`
-4. 分发与校验由仓库脚本负责，不再让用户手抄 skill
-5. 运行时引用优先指向 **repo-visible canonical docs/skills 路径**，不要依赖隐藏 mirror 目录可读
-6. 不只检查“skill 能不能被发现”，还要检查“对应 MCP 是否真的绑到当前项目”
+4. 分发与校验由仓库脚本负责，不让用户手抄 skill
+5. 运行时引用优先指向 repo-visible canonical 路径（不依赖 hidden mirror 可读）
+6. 不只检查 “skill 能不能被发现”，还要检查 “MCP 是否真的绑到当前项目”
 
-## 4. 默认工作流
+---
+
+## 5. 默认工作流
 
 ### Boot
 
@@ -214,20 +88,17 @@ URI 不确定时：
 search_memory(query="...", include_session=True)
 ```
 
+URI 已经明确时优先直接 `read_memory(uri)`，不要先绕回 `search_memory(...)`。
+
 ### Read before write
 
-在以下操作前先读目标或候选目标：
+在 `create_memory` / `update_memory` / `delete_memory` / `add_alias` 前先读目标或候选目标。
 
-- `create_memory`
-- `update_memory`
-- `delete_memory`
-- `add_alias`
+写法默认：
 
-默认写法建议：
-
-- 新建时优先给 `create_memory` 显式填写 `title`
-- 普通改写优先用 `update_memory` 的 patch
-- 只有真的要把一段新内容补到末尾时，再用 `append`
+- 新建时给 `create_memory` 显式填 `title`
+- 普通改写用 `update_memory` 的 patch
+- 真的要在末尾补内容时再用 `append`
 
 ### Guard-aware write
 
@@ -239,115 +110,59 @@ search_memory(query="...", include_session=True)
 - `guard_target_uri`
 - `guard_target_id`
 
-推荐规则：
+规则：
 
-- `NOOP` → 不继续写；先检查 `guard_target_uri` / `guard_target_id`，并先读建议目标再决定是否需要改动
-- `UPDATE` → 先看建议目标；如果你还在 create / 写前判断阶段，通常改走 `update_memory`。如果你已经在明确的当前 URI 上执行 `update_memory`，工具也可能继续完成当前 URI 的原地更新，同时把 `guard_target_*` 留给你复查
-- `DELETE` → 先确认旧记忆确实该被替换
+- `NOOP` -> 停止写；检查 `guard_target_uri / guard_target_id`，读建议目标后再决定是否需要改动
+- `UPDATE` -> 先看建议目标；如果你还在 create / 写前判断阶段，通常改走 `update_memory`
+- `DELETE` -> 先确认旧记忆确实该被替换
 
 ### Compact / Recover
 
-- 长会话、噪声多 → `compact_context(force=false)`
-- 检索退化 → `index_status()`，必要时 `rebuild_index(wait=true)`
+- 长会话、噪声多 -> `compact_context(force=false)`
+- 检索退化 -> `index_status()`，必要时 `rebuild_index(wait=true)`
 
-## 5. Trigger 设计要求
+---
 
-新版 `memory-palace` skill 的 `description` 必须覆盖这些触发信号：
+## 6. Trigger 设计
 
-- 用户明确说 memory / remember / recall / long-term memory
-- 用户用中文说“记住”“回忆”“长期记忆”“跨会话”“压缩上下文”“重建索引”
-- 用户提到 `system://boot`
-- 用户提到 `search_memory` / `compact_context` / `rebuild_index`
-- 用户在问“该 create 还是 update”
+`description` 必须覆盖：
+
+- 英文：memory / remember / recall / long-term memory
+- 中文：记住、回忆、长期记忆、跨会话、压缩上下文、重建索引
+- 明确提到 `system://boot`、`search_memory`、`compact_context`、`rebuild_index`
+- 用户在问 “该 create 还是 update”
 - 用户在做维护、回滚、索引恢复相关动作
 
-同时要明确边界：
+边界：
 
-- 不用于普通 README / UI / benchmark / 通用代码实现任务
-- 不用于与 Memory Palace MCP 无关的泛化“技能设计”任务
+- 不用于普通 README / UI / benchmark / 通用代码实现
+- 不用于与 Memory Palace MCP 无关的泛化 “技能设计” 任务
 
-## 6. Test / Measure / Refine
+`references/trigger-samples.md` 提供 should-trigger / should-not-trigger / borderline 样例集，用于 `description` 迭代时有固定对照组。
 
-这次不是只把 skill 写得更长，而是把维护闭环补齐：
+---
 
-1. 先改 `description`
+## 7. 维护顺序
+
+调整 skill 时按这个顺序：
+
+1. 先改 trigger description
 2. 再改 `SKILL.md` 正文
-3. 运行 `python scripts/sync_memory_palace_skill.py --check`
-4. 再跑 `python scripts/evaluate_memory_palace_skill.py`
-5. 再跑 `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
-6. 再跑 `bash scripts/pre_publish_check.sh`
-7. 只在确实需要时继续扩 `references/`
+3. 跑 `python scripts/sync_memory_palace_skill.py --check`
+4. 跑 `python scripts/evaluate_memory_palace_skill.py`
+5. 跑 `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
+6. 跑 `bash scripts/pre_publish_check.sh`
+7. 真有必要时再扩 `references/`
 
-### Should trigger
+不要回到 “先写长文档，再让用户自己抄成 skill” 的旧模式。
 
-- “帮我把这条用户偏好写进 Memory Palace”
-- “先从 `system://boot` 读一下，再帮我查最近这类记忆”
-- “这个记忆可能重复了，帮我判断是 update 还是 create”
-- “最近 search 降级了，帮我看看要不要 `rebuild_index`”
-- “我想清理长会话，把它压缩成 notes”
+---
 
-### Should not trigger
+## 8. Gemini 兼容边界
 
-- “给我重写 README”
-- “修一下前端按钮样式”
-- “帮我分析 benchmark 结果”
-- “更新与 Memory Palace 无关的 docs/skills 说明文字”
+CLI 可以发现并加载 `memory-palace` skill，但运行时文件读取策略可能跳过 hidden mirror 目录（如 `.gemini/skills/...`）。因此 `SKILL.md` 引用参考文件时统一指向 `docs/skills/memory-palace/...`，不依赖 hidden mirror 可读。
 
-### 样例集的具体作用
-
-`references/trigger-samples.md` 的作用不是“多一份文档”，而是让你能稳定回答四个问题：
-
-1. 这个 skill **会不会该触发时不触发**
-2. 这个 skill **会不会不该触发时乱触发**
-3. 触发之后，它的**第一步动作是否正确**
-4. 改了 `description` 之后，效果到底是变好还是变差
-
-如果没有这套样例集，后续每次调 `description` 都只能靠临时感觉，很容易出现：
-
-- 这次为了减少误触发，把真正该命中的场景也一起打掉
-- 这次为了扩大触发，把普通 docs / coding 任务也吸进来了
-- 触发是触发了，但第一步不是 `boot` / `search before write`，行为仍然错
-
-`evaluate_memory_palace_skill.py` 则把这套样例和实际 smoke / 兼容检查固化成可重复执行的回归入口，用来回答：
-
-- mirrors 还一致吗
-- YAML/frontmatter 还合法吗
-- Claude / Codex / OpenCode / Gemini 现在是通过、部分通过，还是失败
-- 如果 prompt 里已经直接给出具体 URI，skill 还会不会按预期直接走 `read_memory(...)`，而不是先绕回 `search_memory(...)`
-- 当前回归结果是否比上一次更好
-
-注意这里的覆盖重点是：
-
-- CLI 客户端的真实 smoke
-- IDE 宿主（如 `Cursor / Antigravity`）的兼容检查
-
-它不是对所有 IDE 宿主都做 GUI 级 live automation。
-
-`evaluate_memory_palace_mcp_e2e.py` 则进一步回答另一层关键问题：
-
-- skill 规则之外，真实 MCP stdio 调用链能否跑通
-- 9 个工具是否都能在隔离数据库上按设计返回
-- `write_guard NOOP`、`add_alias`、`rebuild_index(wait=true)` 等关键行为是否符合项目设计
-- `runtime-index-worker` 是否还存在跨 event loop 隐性 bug
-
-## 7. Gemini 兼容口径
-
-当前验证里已经出现过一类真实兼容边界：
-
-- CLI 可以发现并加载 `memory-palace` skill
-- 但运行时文件读取策略可能忽略隐藏 mirror 目录（例如 `.gemini/skills/...`）
-
-因此 canonical `SKILL.md` 现在统一要求：
-
-- 引用参考文件时，优先打开 `docs/skills/memory-palace/...`
-- 不把 hidden mirror 路径当作默认参考路径
-
-这样做的收益是：
-
-- Claude / Codex / OpenCode 仍然可用
-- Gemini 与部分 IDE 宿主在引用 repo-visible 路径时也更容易得到一致结果
-
-如果需要做 Gemini CLI 的更稳 smoke，当前更可靠的调用方式是：
+更稳定的 Gemini 调用方式：
 
 ```bash
 gemini -m gemini-3-flash-preview \
@@ -356,15 +171,4 @@ gemini -m gemini-3-flash-preview \
   --allowed-tools activate_skill,read_file
 ```
 
-注意：这是一条**最近验证里更稳定的经验路径**，不是对所有 Gemini 版本都恒真的官方保证。
-
-## 8. 维护边界
-
-后续继续优化时，保持这个顺序：
-
-1. 先调 trigger description
-2. 再调执行正文
-3. 再调 reference
-4. 最后再调同步脚本与门禁
-
-不要再回到“先写长文档，再让用户自己抄成 skill”的旧模式。
+这是经验路径，不是官方保证。

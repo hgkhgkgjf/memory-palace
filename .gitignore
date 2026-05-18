@@ -83,6 +83,34 @@ backend/docs/benchmark_*.md
 backend/tests/benchmark_results.md
 docs/images/IMAGE_PROMPTS_LOCAL.md
 
+# IDE / editor metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Coverage artifacts
+.coverage
+coverage/
+htmlcov/
+*.cover
+
+# OS artifacts (Windows / Linux)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Frontend extras
+frontend/.vite/
+frontend/design-system/
+*.tsbuildinfo
+
 # Generated benchmark outputs (keep local, do not track)
 backend/tests/benchmark/artifacts/
 backend/tests/benchmark/benchmark_results_*.md

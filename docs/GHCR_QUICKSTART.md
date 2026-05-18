@@ -14,8 +14,6 @@
 - 只想先把 Dashboard / API / SSE 跑起来
 - 不想先排 Node / Python / Dockerfile / buildx 环境问题
 
-如果你只是想“先能用起来”，优先走这条。
-
 ---
 
 ## 2. 最短命令
@@ -42,9 +40,7 @@ docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-> 这里默认走的是 **Profile B**。
->
-> 启动前先 `pull` 最新镜像；如果你使用旧缓存、私有镜像代理或手工 retag 的镜像，优先换回官方最新镜像再排查。
+> 默认走 **Profile B**。启动前先 `pull` 最新镜像；如果使用旧缓存或私有镜像代理，优先换回官方最新镜像再排查。
 
 ---
 
@@ -64,18 +60,18 @@ curl -fsS http://127.0.0.1:18000/health
 
 这一步如果还没过，frontend 可能暂时还不会起来。当前 compose 会先等 backend healthcheck 通过，再继续放行 frontend。
 
-如果你想再确认一下 Docker 下的首启向导是不是正常处于“说明模式”：
+确认 Docker 下首启向导处于“说明模式”：
 
 ```bash
 curl -fsS http://127.0.0.1:3000/api/setup/status
 ```
 
-正常结果里应该能看到：
+正常结果包含：
 
 - `"running_in_docker": true`
 - `"apply_supported": false`
 
-这表示它不会假装自己能把容器 `.env` 真正持久化。
+表示它不会假装自己能持久化容器 `.env`。
 
 ---
 
@@ -83,15 +79,13 @@ curl -fsS http://127.0.0.1:3000/api/setup/status
 
 ### 4.1 这条路径解决什么
 
-它解决的是：
-
 - Dashboard
 - Backend API
 - SSE
 
 ### 4.2 这条路径不自动解决什么
 
-它**不会**自动帮你配置本机上的：
+它**不会**自动配置本机上的：
 
 - `Claude / Codex / Gemini / OpenCode`
 - `Cursor / Windsurf / VSCode-host / Antigravity`
@@ -101,9 +95,9 @@ curl -fsS http://127.0.0.1:3000/api/setup/status
 
 - Docker 负责跑服务
 - 客户端接入还是宿主机侧配置
-- 如果你手工把客户端接到 `http://localhost:3000/sse`，`<YOUR_MCP_API_KEY>` 默认就填刚生成的 `.env.docker` 里的 `MCP_API_KEY`
+- 如果你手工把客户端接到 `http://localhost:3000/sse`，`<YOUR_MCP_API_KEY>` 默认填刚生成的 `.env.docker` 里的 `MCP_API_KEY`
 - `scripts/run_memory_palace_mcp_stdio.sh` 不是这条 Docker 路径的客户端入口：它依赖本地 `bash` 和 `backend/.venv`，不会复用容器里的 `/app/data`
-- 如果你后面要切回本机 `stdio` 客户端，本地 `.env` 必须写宿主机可访问的绝对路径；若仓库里只有 `.env.docker` 而没有本地 `.env`，或者 `.env` / 显式 `DATABASE_URL` 仍写成 `/app/...` 或 `/data/...` 这类容器路径，它都会明确拒绝启动，并提示改走本机路径或 Docker 的 `/sse`
+- 如果你后面要切回本机 `stdio` 客户端，本地 `.env` 必须写宿主机可访问的绝对路径
 
 如果你还想把客户端接进当前仓库，再继续看：
 
@@ -121,6 +115,12 @@ curl -fsS http://127.0.0.1:3000/api/setup/status
 ```bash
 export MEMORY_PALACE_FRONTEND_PORT=3300
 export MEMORY_PALACE_BACKEND_PORT=18080
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+```powershell
+$env:MEMORY_PALACE_FRONTEND_PORT = "3300"
+$env:MEMORY_PALACE_BACKEND_PORT = "18080"
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
@@ -170,3 +170,4 @@ docker compose -f docker-compose.ghcr.yml down -v
 - `docs/DEPLOYMENT_PROFILES.md`
 - `docs/TROUBLESHOOTING.md`
 - `docs/GHCR_ACCEPTANCE_CHECKLIST.md`
+</content>

@@ -1,521 +1,190 @@
 # Memory Palace Skills Quick Start
 
-> This document is specifically written for those who want to "get it running and start using it first."
->
-> It doesn't dwell on abstract concepts; it answers three things: **what these skills actually are, how to configure the CLI clients, and which path IDE hosts should use.**
+For users who want to wire `Claude / Codex / Gemini / OpenCode` into this repository as quickly as possible.
 
----
+If you only want to run `Dashboard / API / SSE`, see `docs/GHCR_QUICKSTART_EN.md`. This page is not required.
 
-## 🚀 The Bottom Line
-
-If you currently start the service through GHCR / Docker, split it into two cases first:
-
-- You only want `Dashboard / API / SSE`
-  - then you can stop there; skill installation is not required yet
-- You also want `Claude / Codex / Gemini / OpenCode / IDE hosts` on your machine to actually trigger and call Memory Palace
-  - then continue with the rest of this page
-
-In other words:
-
-- Docker starts the service side
-- this page explains the **repo-local skill + MCP installation path**
-- they are related, but not the same layer
-
-If your current goal is only:
-
-- no repo-local skill install
-- just manually connect an MCP client to Docker's `/sse`
-
-start with:
-
-- `docs/GHCR_QUICKSTART_EN.md`
-- `6.2 SSE mode` in `docs/GETTING_STARTED_EN.md`
-- `6.3 client configuration examples` in `docs/GETTING_STARTED_EN.md`
-
-Those sections provide the **generic SSE MCP skeleton** that is already grounded in this repository. Do not over-read it as "every client's final field names are identical."
-
-If you do not want to manually digest this whole page first and would rather let the AI guide the process step by step, the current preferred path is:
-
-1. Install the standalone setup skill: [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup)
-2. Then tell the AI: `Use $memory-palace-setup to install and configure Memory Palace step by step. Prefer skills + MCP over MCP-only. Start with Profile B if you want the fewest extra requirements, but recommend C/D if the environment is ready.`
-
-If that setup skill is not installed in your client yet, you can still give the repo URL to the AI first and say:
+If you want AI to guide installation step by step, install [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup) in your client and say:
 
 ```text
-Please read the README.md and SKILL.md in this repository first, then guide me step by step to install and configure Memory Palace. Prefer skills + MCP, not MCP-only by default.
+Use $memory-palace-setup to install and configure Memory Palace step by step.
+Prefer skills + MCP.
 ```
-
-This repository has already organized the `memory-palace` **canonical skill**, synchronization scripts, and installation scripts. After executing the commands below, you can connect the skill + MCP main path in your **local workspace**:
-
-| Client | Skill Auto-recognized | MCP Connection Status | What You Should Do |
-|---|---|---|---|
-| `Claude Code` | Available after `sync` + user-scope install | `--scope user --with-mcp` already has a scripted path; workspace entry is optional | Prefer the unified `python scripts/install_skill.py --targets claude,codex,gemini,opencode --scope user --with-mcp --force`; add workspace install only if you also want a project-level entry in this repo |
-| `Gemini CLI` | Available after `sync` + user-scope install | `--scope user --with-mcp` is more reliable; workspace can generate `.gemini/settings.json`, but `live MCP` still has edge cases | Prefer the unified `python scripts/install_skill.py --targets claude,codex,gemini,opencode --scope user --with-mcp --force`; add workspace install only if you also want a project-level entry in this repo |
-| `Codex CLI` | repo-local skill after sync | User-scope MCP has a scripted installation path | Preferred: `python scripts/install_skill.py --targets codex --scope user --with-mcp --force`; manual `codex mcp add` as fallback |
-| `OpenCode` | repo-local skill after sync | User-scope MCP has a scripted installation path | Preferred: `python scripts/install_skill.py --targets opencode --scope user --with-mcp --force`; manual GUI registration as fallback |
-
-In a nutshell:
-
-- **skill** is responsible for "when to enter the Memory Palace workflow"
-- **MCP** is responsible for "actually calling tools like `read_memory / search_memory / update_memory`"
-- You need both for it to "truly trigger and truly work."
-
-> Current status:
->
-> - **Smoke tests** for `Claude / Codex / Gemini` all have passing results in the recent validation environment; for `Codex`, the default assumption is that `user-scope --with-mcp` has already been installed.
-> - For `OpenCode`, the more accurate public wording is: the repo-local skill is in place, and `mcp list` can confirm that `memory-palace` is connected; a real `run` still depends on the current provider credentials.
-> - In the current validation environment, the isolated `install_skill.py --scope user --with-mcp --check` path passed for `Claude / Codex / Gemini / OpenCode`, and the same isolated user-scope run also passed the skills-only `--check` path.
-> - `MCP-only` live e2e is currently a pass as well; the repository-local MCP validation report is grounded in a real run, not only static config inspection.
-> - `Gemini live` is not yet at a stage to be described as "fully passing"; more accurately: if the Gemini configuration cannot resolve the database path, or if a shared live database is mutated by another Gemini live session first, it stops at `PARTIAL`.
-> - `Cursor / Windsurf / VSCode-host / Antigravity` are now grouped as **IDE Hosts**; their primary path is `AGENTS.md + MCP snippet`, not hidden skill mirrors.
->
-> **A prerequisite for Windows users**:
->
-> - Native Windows now defaults to `python + backend/mcp_wrapper.py`.
-> - `install_skill.py --with-mcp` now writes that native path for `Claude / Codex / Gemini / OpenCode` on Windows.
-> - `python scripts/render_ide_host_config.py --host ...` now also defaults to `python-wrapper` on Windows.
-> - The PowerShell-in-Docker equivalence path for the profile/apply scripts was also rechecked, but native Windows host runs should still be re-validated on the target machine.
-> - If you use `Git Bash` or `WSL`, you can still keep using `bash + scripts/run_memory_palace_mcp_stdio.sh`.
-> - So the real split is now: **python-wrapper for native Windows, bash wrapper for POSIX shell boundaries**.
 
 ---
 
-## 🧠 What is the relationship between skill and MCP?
+## 1. Two Layers
+
+| Layer | Role |
+|---|---|
+| skill | Decides "when to enter the Memory Palace workflow" |
+| MCP | Decides "actually calling tools like `read_memory / search_memory / update_memory`" |
+
+You need both for it to truly work.
 
 <p align="center">
-  <img src="../images/skill_vs_mcp.png" width="800" alt="Skill vs MCP Principle" />
+  <img src="../images/skill_vs_mcp.png" width="800" alt="Skill vs MCP" />
 </p>
 
-You can think of it as:
-
-- **skill** = The "driving rules" in the driver's head.
-- **MCP** = The actual car and steering wheel.
-
-Only skill, no MCP:
-
-- The model knows "it should use Memory Palace now."
-- But when it needs to read or write memory, there are no tools to call.
-
-Only MCP, no skill:
-
-- The tools exist.
-- But the model doesn't necessarily know when to use them, leading to missed or incorrect triggers.
-
-Therefore, what this repository does is essentially fill in both layers.
-
 ---
 
-## ✅ What you will usually see locally after running sync/install
+## 2. One Command for the Main Path
 
-The public repository only contains the canonical bundle by default. After executing the sync/install commands above, you will typically see these key entries in your local workspace:
-
-| File | Purpose |
-|---|---|
-| `docs/skills/memory-palace/` | The source of truth for the canonical skill (exists in public repo) |
-| `.claude/skills/memory-palace/SKILL.md` | repo-local skill mirror for Claude Code (locally generated) |
-| `.codex/skills/memory-palace/SKILL.md` | repo-local skill mirror for Codex (locally generated) |
-| `.opencode/skills/memory-palace/SKILL.md` | repo-local skill mirror for OpenCode (locally generated) |
-| `.gemini/skills/memory-palace/SKILL.md` | repo-local skill entry for Gemini (locally generated) |
-| `.gemini/settings.json` | Project-level MCP config for Gemini (generated after workspace install) |
-| `.gemini/policies/memory-palace-overrides.toml` | Gemini policy override for Memory Palace (generated after install to avoid deprecated `__` MCP tool syntax warnings) |
-| `.mcp.json` | Project-level MCP config for Claude Code (generated after workspace install) |
-
-If you follow the default `--scope user --with-mcp` path in this document, you will also usually see these home-directory entries:
-
-- `~/.claude/skills/memory-palace/`
-- `~/.codex/config.toml`
-- `~/.gemini/skills/memory-palace/SKILL.md`
-- `~/.gemini/settings.json`
-- `~/.gemini/policies/memory-palace-overrides.toml`
-- `~/.config/opencode/opencode.json`
-
-So:
-
-- The default recommendation is to run one unified `--scope user --with-mcp` install first.
-- For `Claude Code` and `Gemini CLI`, add workspace install only when you also want project-level entries in the current repo.
-- The **skill** for `Codex CLI` and `OpenCode` is already in place.
-- In the recent validation environment, after `--scope user --with-mcp` was installed, the user-scope MCP binding for `Codex` could be aligned to the current repo, but `mcp_bindings` / `Codex smoke` should still be treated as `PARTIAL`.
-- For `OpenCode`, it is recommended to manually confirm once with `mcp list`.
-
-If you are integrating an IDE host, do not keep reading with a hidden-mirror mental model. Jump directly to:
-
-- `IDE_HOSTS_EN.md`
-- `python scripts/render_ide_host_config.py --host <cursor|windsurf|vscode-host|antigravity>`
-
----
-
-## 🛠️ How to configure the four CLI clients
-
-## 1) `Claude Code`
-
-The more reliable default recommendation is still:
+On a new machine, prefer the unified user-scope install:
 
 ```bash
-python scripts/install_skill.py --targets claude --scope user --with-mcp --force
+python scripts/install_skill.py \
+  --targets claude,codex,gemini,opencode \
+  --scope user --with-mcp --force
 ```
 
-If you also want the **current repository** to get an extra project-level entry, add a workspace install afterwards.
+After that, your home directory typically contains:
 
-- `~/.claude/skills/memory-palace/`
-- a `mcpServers.memory-palace` block for the current repo inside `~/.claude.json`
+- `~/.claude/skills/memory-palace/` and an `mcpServers.memory-palace` block in `~/.claude.json` pointing at this repo
+- `~/.codex/config.toml`
+- `~/.gemini/skills/memory-palace/SKILL.md`, `~/.gemini/settings.json`, `~/.gemini/policies/memory-palace-overrides.toml`
+- `~/.config/opencode/opencode.json`
 
-If you also add workspace install, the local workspace will additionally contain:
+If you also want a project-level entry in the current repository, additionally run:
 
-- `.claude/skills/memory-palace/`
-- `.mcp.json`
+```bash
+python scripts/install_skill.py \
+  --targets claude,gemini \
+  --scope workspace --with-mcp --force
+```
 
-Then, when you start `Claude Code` in this repository, it can see both:
+The workspace will get `.claude/skills/memory-palace/`, `.mcp.json`, `.gemini/skills/memory-palace/`, `.gemini/settings.json`, `.gemini/policies/memory-palace-overrides.toml`.
 
-1. The `memory-palace` skill.
-2. The `memory-palace` MCP server.
+> The public repository only ships the canonical bundle (`docs/skills/memory-palace/`). `.claude / .codex / .gemini / .opencode` mirrors and `.mcp.json` are local artifacts generated after install.
 
-Recommended check:
+---
+
+## 3. Platform Branches
+
+The repo-local MCP launcher selects automatically by host:
+
+- Native Windows -> `python backend/mcp_wrapper.py`
+- macOS / Linux / `Git Bash` / `WSL` / MSYS / Cygwin -> `bash scripts/run_memory_palace_mcp_stdio.sh`
+
+Both `install_skill.py` and `render_ide_host_config.py` pick the right one automatically.
+
+Both wrappers reuse the `DATABASE_URL` from the current repository's `.env`. If `.env` points at `/app/...` or `/data/...` container paths, the wrapper refuses to start - use a host absolute path or go back to Docker `/sse`.
+
+---
+
+## 4. Per-CLI Boundaries
+
+| Client | repo-local skill | MCP main path |
+|---|---|---|
+| `Claude Code` | Auto-discovered after sync | `~/.claude.json` or `.mcp.json` |
+| `Gemini CLI` | Auto-discovered after sync | `~/.gemini/settings.json` or `.gemini/settings.json` |
+| `Codex CLI` | Auto-discovered after sync | `~/.codex/config.toml` (user-scope) |
+| `OpenCode` | Auto-discovered after sync | `~/.config/opencode/opencode.json` (user-scope) |
+
+For `Codex / OpenCode`, workspace scope does not write a stable MCP binding. User-scope is their primary path.
+
+### Client self-check
 
 ```bash
 claude mcp list
-```
-
-If you see `memory-palace` in the project, you're basically set.
-
-In this actual validation, `Claude Code` was already able to complete a real MCP tool call in non-interactive mode. If you get `TOOL_OK`, that path is working.
-
----
-
-## 2) `Gemini CLI`
-
-The more reliable default recommendation is still:
-
-```bash
-python scripts/install_skill.py --targets gemini --scope user --with-mcp --force
-```
-
-After that, your home directory will at least contain:
-
-- `~/.gemini/skills/memory-palace/SKILL.md`
-- `~/.gemini/settings.json`
-- `~/.gemini/policies/memory-palace-overrides.toml`
-
-If you also want the **current repository** to get an extra project-level entry, add a workspace install afterwards; then the workspace will be supplemented with:
-
-- `.gemini/skills/memory-palace/SKILL.md`
-- `.gemini/settings.json`
-- `.gemini/policies/memory-palace-overrides.toml`
-
-In the **current local workspace**, Gemini can then use the project-level entry; for cross-repo reuse, user-scope remains the more stable default.
-
-Recommended check:
-
-```bash
-gemini skills list --all
 gemini mcp list
+codex mcp list
+opencode mcp list
 ```
 
-If you see this prompt:
-
-- `Policy file warning in memory-palace-overrides.toml`
-- `The "__" syntax for MCP tools is strictly deprecated`
-
-rerun the Gemini install command from this repository first. The current installer rewrites `memory-palace-overrides.toml` to Gemini's supported `mcpName = "memory-palace"` policy format.
-
-If you see this prompt:
-
-- `Skill conflict detected`
-- `... overriding the same skill from ~/.gemini/skills/...`
-
-This is usually not a bad thing; it means the **skill in the current workspace is overriding the older version in the user directory.**
-
-If you see this prompt:
-
-- `memory-palace` is `Disconnected` in `gemini mcp list`
-- Or `MCP issues detected` appears in Gemini's answer
-
-Delete the old user-level MCP entry first, then re-add the project-level one:
-
-```bash
-# native Windows
-gemini mcp remove memory-palace
-gemini mcp add -s project memory-palace python <repo-root>\backend\mcp_wrapper.py
-```
-
-```bash
-# macOS / Linux / Git Bash / WSL
-gemini mcp remove memory-palace
-gemini mcp add -s project memory-palace /bin/zsh -lc 'cd <repo-root> && bash scripts/run_memory_palace_mcp_stdio.sh'
-```
-
-> Replace `<repo-root>` with your actual repository root directory.
->
-> This syntax reuses the `DATABASE_URL` in the current repo's `.env`. If you have already run Dashboard / HTTP API in the same repo, do not manually write a separate `backend/memory.db`, otherwise you may end up connecting the client and the dashboard to two different databases.
->
-> Do not copy the Docker `/app/data/...` path from `.env.docker` into local `.env` either, and treat `/data/...`-style container sqlite paths the same way. Repo-local `stdio` MCP now refuses that configuration on purpose; use a host absolute path or keep using Docker `/sse` instead.
+Seeing `memory-palace connected` / a project block for the current repo means it is wired.
 
 ---
 
-## 3) `Codex CLI`
+## 5. Manual Fallback: Add MCP Directly
 
-For `Codex`, consider these separately:
-
-- **skill**: After running `sync/install`, `.codex/skills/memory-palace/` will exist locally.
-- **MCP**: Preferred path is `python scripts/install_skill.py --targets codex --scope user --with-mcp --force`, which writes to the user directory `~/.codex/config.toml`; manual `codex mcp add` is only a fallback.
-
-In plain English:
-
-- In this repo, `Codex` knows there is a `memory-palace` skill.
-- But the first time you use it on your machine, you still need to write the MCP startup command into your user-scope config.
-
-On a new machine, do this first:
+Only use this when `install_skill.py` fails for a specific client:
 
 ```bash
-python scripts/install_skill.py --targets codex --scope user --with-mcp --force
-```
-
-Then check:
-
-```bash
-codex mcp list
-```
-
-If `python scripts/evaluate_memory_palace_skill.py` still reports:
-
-- `mcp_bindings` failed
-- or `Codex smoke` failed
-
-do not assume the skill itself is broken first. A more common cause is that `~/.codex/config.toml` still contains an old entry, or that `user-scope MCP` was never installed. First rerun:
-
-```bash
-python scripts/install_skill.py --targets codex --scope user --with-mcp --force
-```
-
-If the scripted check still fails, or you are explicitly doing manual troubleshooting, then use:
-
-```bash
-# native Windows
+# Codex - native Windows
 codex mcp add memory-palace -- python C:\ABS\PATH\TO\REPO\backend\mcp_wrapper.py
-```
 
-```bash
-# macOS / Linux / Git Bash / WSL
+# Codex - macOS / Linux / Git Bash / WSL
 codex mcp add memory-palace \
   -- /bin/zsh -lc 'cd /ABS/PATH/TO/REPO && bash scripts/run_memory_palace_mcp_stdio.sh'
 ```
 
-Note:
+```bash
+# Gemini - native Windows
+gemini mcp add -s project memory-palace python <repo-root>\backend\mcp_wrapper.py
 
-- Replace `/ABS/PATH/TO/REPO` with your actual repository path.
-- Whether you use the script or the manual fallback, the resulting config ends up in `~/.codex/config.toml`.
-- This is the current product behavior of `Codex CLI`, not a missing file in this repo.
-- This command also reuses the current repo `.env` for `DATABASE_URL`; if that `.env` still points to Docker `/app/data/...` or another `/data/...` container path, local `stdio` MCP will refuse to start.
-- If you are doing manual troubleshooting, keep the fallback command shape here as-is: use `python + backend/mcp_wrapper.py` on Windows, or `/bin/zsh -lc 'cd <repo-root> && bash scripts/run_memory_palace_mcp_stdio.sh'` on POSIX paths. Do not casually switch it to `python3`, and do not append extra `&& ...` fragments in the same shell command; the repository scripts no longer treat those rewrites as the same stable repo-local binding.
+# Gemini - macOS / Linux / Git Bash / WSL
+gemini mcp add -s project memory-palace \
+  /bin/zsh -lc 'cd <repo-root> && bash scripts/run_memory_palace_mcp_stdio.sh'
+```
+
+For OpenCode, add a `local / stdio` server in its own MCP management UI with the same command/args.
+
+> Replace `<repo-root>` / `/ABS/PATH/TO/REPO` with your real repo root.
+>
+> These fallback commands write into the client's user-scope config.
 
 ---
 
-## 4) `OpenCode`
+## 6. IDE Hosts
 
-After you execute `sync/install`, `OpenCode` will usually have:
+`Cursor / Windsurf / VSCode-host / Antigravity` use a different integration path:
 
-- `.opencode/skills/memory-palace/`
+- Rules entry: repo-root `AGENTS.md`
+- MCP entry: `python scripts/render_ide_host_config.py --host <cursor|windsurf|vscode-host|antigravity>`
 
-In the recent validation environment, this path was confirmed at least to the point where the repo-local skill was visible and `opencode mcp list` showed `memory-palace connected`.
-
-However, on a new machine, the safer default sequence is still to run:
-
-```bash
-python scripts/install_skill.py --targets opencode --scope user --with-mcp --force
-opencode mcp list
-```
-
-If you can already see `memory-palace`, you're set.
-
-If the scripted check still fails, or you are explicitly doing manual troubleshooting, add a new local stdio server in `OpenCode`'s own MCP management entry. That step is fallback-only. The core parameters are:
-
-```text
-# native Windows
-name: memory-palace
-type: local / stdio
-command: python
-args:
-  - <repo-root>\backend\mcp_wrapper.py
-```
-
-```text
-# macOS / Linux / Git Bash / WSL
-name: memory-palace
-type: local / stdio
-command: /bin/zsh
-args:
-  - -lc
-  - cd <repo-root> && bash scripts/run_memory_palace_mcp_stdio.sh
-```
-
-The UI entry for different versions of `OpenCode` may look different, but these are the essential items to fill in.
+Do not treat them as hidden-skill-mirror consumers. See `IDE_HOSTS_EN.md`.
 
 ---
 
-## 5) How to configure IDE hosts
-
-These hosts are now grouped together as **IDE Hosts**:
-
-- `Cursor`
-- `Windsurf`
-- `VSCode-host`
-- `Antigravity`
-
-The unified stance is simple:
-
-- **rules entry**: `AGENTS.md`
-- **MCP entry**: `python scripts/render_ide_host_config.py --host ...`
-- **host differences**: add a wrapper / workflow only when needed; do not assume these IDEs should directly consume hidden `SKILL.md` mirrors
-
-Recommended commands:
+## 7. Verification
 
 ```bash
-python scripts/render_ide_host_config.py --host cursor
-python scripts/render_ide_host_config.py --host windsurf
-python scripts/render_ide_host_config.py --host vscode-host
-python scripts/render_ide_host_config.py --host antigravity
+# Skill mirror drift check
+python scripts/sync_memory_palace_skill.py --check
+
+# Multi-client skill trigger smoke
+python scripts/evaluate_memory_palace_skill.py
+
+# Real MCP call e2e
+cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 ```
 
-Use `vscode-host` as the canonical flag so it matches the documented `VSCode-host` label. The legacy `--host vscode` spelling is still accepted as a compatibility alias.
+These three generate local reports under `docs/skills/` (`TRIGGER_SMOKE_REPORT.md` / `MCP_LIVE_E2E_REPORT.md`). They are gitignored by default and exist for local review. Check the content before forwarding - they may include local paths.
 
-On Windows the default output is already `python-wrapper`. If a host on macOS / Linux has `stdin/stdout` or CRLF quirks, switch to:
+For isolated report output, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH`; relative paths are redirected under the system temp directory's `memory-palace-reports/`, while absolute paths outside the repository give you a fixed location. Treat `PARTIAL` as a host boundary that needs targeted follow-up, especially for Codex/OpenCode user-scope MCP binding.
 
-```bash
-python scripts/render_ide_host_config.py --host antigravity --launcher python-wrapper
-```
+### Trigger self-check
 
-One-line memory:
-
-- CLI clients: default to hidden skill mirrors + `install_skill.py`
-- IDE hosts: default to `AGENTS.md` + `render_ide_host_config.py`
-
----
-
-## 🔍 How to tell if the trigger was successful
-
-The simplest positive prompt:
+Positive prompt:
 
 ```text
 Read from system://boot first, then help me check for recent memories regarding deployment preferences.
 ```
 
-If `memory-palace` is hit, the response or execution will usually show these signals:
+Expected: `read_memory("system://boot")` -> `search_memory(..., include_session=true)`.
 
-- It starts with `read_memory("system://boot")`.
-- It won't write blindly before checking the target.
-- It will mention `search_memory(..., include_session=true)` or an equivalent recall process.
-
-The simplest negative prompt:
+Negative prompt:
 
 ```text
 Rewrite the introductory paragraph of the README for me.
 ```
 
-Pure document tasks like this **should not** trigger the Memory Palace workflow.
+Should NOT trigger the Memory Palace workflow.
 
 ---
 
-## 🧪 Existing validation commands in the repository
+## 8. Common Misconceptions
 
-Check for drift in the skill mirror:
-
-```bash
-python scripts/sync_memory_palace_skill.py --check
-```
-
-Check the current multi-client smoke path:
-
-```bash
-python scripts/evaluate_memory_palace_skill.py
-```
-
-Check the actual MCP call chain:
-
-```bash
-cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
-```
-
-Both scripts will generate validation reports locally:
-
-- `docs/skills/TRIGGER_SMOKE_REPORT.md` (Summary of local smoke tests; please check for local paths or client config traces before sharing).
-- `docs/skills/MCP_LIVE_E2E_REPORT.md`
-
-It is recommended to treat these as review artifacts on your own machine rather than primary documentation; these files are excluded by `.gitignore` by default. `evaluate_memory_palace_skill.py` now returns a non-zero exit code whenever any check is `FAIL`; `SKIP` / `PARTIAL` / `MANUAL` do not fail the process by themselves, and the current default Gemini smoke model is `gemini-3-flash-preview`.
-If you need isolated output during parallel review or CI, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH` first. When you use relative paths, the scripts now redirect them under the system temp directory's `memory-palace-reports/` root; if you want a fully controlled destination, prefer absolute paths outside the repository.
-
-A note on the experience: `evaluate_memory_palace_skill.py` runs multiple CLIs serially; it often takes a few minutes to complete. If you see no new output for a while, don't immediately assume it's stuck. The current `codex` item now falls back to `PARTIAL` when `codex exec` reaches the smoke timeout without producing structured output, so one slow Codex host CLI should not stall the whole run.
-A note on side effects: `gemini_live` is now **explicitly opt-in**. The script only attempts that real-database `create/update/guard` round when you set `MEMORY_PALACE_ENABLE_GEMINI_LIVE=1`, and it may leave test memories like `notes://gemini_suite_*`. For regular smoke tests, keep the default or explicitly set `MEMORY_PALACE_SKIP_GEMINI_LIVE=1`.
-One more current smoke boundary: if the prompt already names a concrete URI,
-the answer is now expected to go straight to `read_memory(...)` for that URI.
-If a client still falls back to `search_memory(...)` first on that known-URI
-follow-up, the live/smoke result can land as `PARTIAL`.
-If the current machine simply does not have the `Antigravity` host runtime, treat the Antigravity item in `evaluate_memory_palace_skill.py` as "manual verification on the target host still pending" rather than a repository-mainline failure.
-If the report only shows `mcp_bindings` as failed, rerun the unified `user-scope` install first and then rerun smoke:
-
-```bash
-python scripts/install_skill.py --targets claude,codex,gemini,opencode --scope user --with-mcp --force
-python scripts/evaluate_memory_palace_skill.py
-```
-
-Maintain the same sharing awareness for `MCP_LIVE_E2E_REPORT.md`: it uses an isolated temporary database by default and won't touch your production database, but failures may still contain traces of local logs, stderr, or temporary directories. Check the content yourself before forwarding it to others.
+- **Skill file present means it works**: You also need MCP wired.
+- **Only MCP configured**: Tools are callable but the client may not auto-enter the workflow.
+- **Codex / OpenCode don't need MCP**: repo-local auto-discovery is not the same as MCP binding; user-scope registration is still required.
+- **Reading hidden paths directly**: Some clients block `.gemini/skills/` and similar. Always reference `docs/skills/memory-palace/...` for file paths.
 
 ---
 
-## 🙋 Common Misconceptions
+## 9. What to Read Next
 
-### Myth 1: Seeing the skill file means it's ready to use
-
-No.
-
-The skill only solves "whether it should trigger."
-To actually call tools, you still need the MCP server configuration.
-
-### Myth 2: If Gemini finds the skill, it will trigger stably
-
-Not necessarily.
-
-Gemini can be more conservative with hidden directories sometimes, which is why this installation chain supplements your local environment with:
-
-- `.gemini/skills/...`
-- `.gemini/settings.json`
-- `variants/gemini/SKILL.md`
-
-### Myth 3: If `.codex/skills/...` exists locally, no MCP config is needed
-
-Still not enough.
-
-`Codex` MCP primarily looks at the user-level config `~/.codex/config.toml`.
-
-### Myth 4: IDE hosts should start from hidden skill mirrors
-
-No.
-
-For `Cursor / Windsurf / VSCode-host / Antigravity`, the current primary path is:
-
-- repo-root `AGENTS.md`
-- `python scripts/render_ide_host_config.py --host ...`
-
-`Antigravity` only keeps one extra host-specific difference:
-
-- a workflow can still be projected into `.agent/workflows/...` or `~/.gemini/antigravity/global_workflows/...`
-- rule discovery should prefer `AGENTS.md`, while keeping `GEMINI.md` as a legacy fallback
-
-But that does not change the fact that it belongs to the IDE-host path.
-
----
-
-## 📚 What to read next
-
-If you've got it running, follow this order:
-
-1. `MEMORY_PALACE_SKILLS_EN.md` —— Design principles, Claude spec alignment, maintenance boundaries.
-2. `CLI_COMPATIBILITY_GUIDE_EN.md` —— Unified compatibility guidance for CLI clients and IDE hosts.
-3. `IDE_HOSTS_EN.md` —— The primary path for Cursor / Windsurf / VSCode-host / Antigravity.
-4. `docs/skills/memory-palace/SKILL.md` —— The actual skill body intended for the model.
-
-If you just want to verify if it's currently working, focus on these 3 commands:
-
-```bash
-python scripts/sync_memory_palace_skill.py --check
-python scripts/evaluate_memory_palace_skill.py
-cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
-```
+- `CLI_COMPATIBILITY_GUIDE_EN.md` - Full per-CLI options and boundaries
+- `IDE_HOSTS_EN.md` - Integration for Cursor / Windsurf / VSCode-host / Antigravity
+- `docs/skills/memory-palace/SKILL.md` - The actual skill body the model reads

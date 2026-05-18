@@ -14,8 +14,6 @@ This path is best for users who:
 - only want Dashboard / API / SSE running first
 - do not want to debug Node / Python / Dockerfile / buildx issues up front
 
-If you just want it to work first, start here.
-
 ---
 
 ## 2. Shortest Commands
@@ -42,9 +40,7 @@ docker compose -f docker-compose.ghcr.yml pull
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-> This uses **Profile B** by default.
->
-> Pull the latest official images before startup. If you use an old cache, private mirror, or manually retagged image, switch back to the latest official image first when troubleshooting.
+> This uses **Profile B** by default. Pull the latest official images before startup. If you use an old cache or private mirror, switch back to the latest official image first when troubleshooting.
 
 ---
 
@@ -64,13 +60,13 @@ curl -fsS http://127.0.0.1:18000/health
 
 If this check is still failing, the frontend may not start yet. The current compose path waits for the backend healthcheck to pass before it lets the frontend continue.
 
-If you also want to confirm that the first-run assistant is correctly staying in Docker guidance mode:
+Confirm that the first-run assistant is correctly staying in Docker guidance mode:
 
 ```bash
 curl -fsS http://127.0.0.1:3000/api/setup/status
 ```
 
-A normal result should include:
+A normal result includes:
 
 - `"running_in_docker": true`
 - `"apply_supported": false`
@@ -82,8 +78,6 @@ That means it is not pretending that container `.env` changes can be persisted.
 ## 4. The Most Common Misunderstanding
 
 ### 4.1 What This Path Solves
-
-It solves:
 
 - Dashboard
 - Backend API
@@ -102,8 +96,8 @@ In other words:
 - Docker starts the service side
 - client integration is still host-side configuration
 - if you later connect a client manually to `http://localhost:3000/sse`, `<YOUR_MCP_API_KEY>` normally means the `MCP_API_KEY` in the `.env.docker` file you just generated
-- do **not** assume `scripts/run_memory_palace_mcp_stdio.sh` will reuse container data, because that wrapper needs a host-side local `.env` plus `backend/.venv` and does not reuse `/app/data`
-- if you later switch back to a local `stdio` client, your local `.env` must contain a host-accessible absolute path; if `.env` is missing while `.env.docker` exists, or if `.env` / an explicit `DATABASE_URL` still points to `/app/...` or `/data/...`, the wrapper refuses to start and tells you to use a host path or Docker `/sse` instead
+- `scripts/run_memory_palace_mcp_stdio.sh` is not the entry point for the Docker path: that wrapper needs a host-side local `.env` plus `backend/.venv` and does not reuse `/app/data`
+- if you later switch back to a local `stdio` client, your local `.env` must contain a host-accessible absolute path
 
 If you also want to wire clients into this repository, continue with:
 
@@ -178,3 +172,4 @@ Continue with:
 - `docs/DEPLOYMENT_PROFILES_EN.md`
 - `docs/TROUBLESHOOTING_EN.md`
 - `docs/GHCR_ACCEPTANCE_CHECKLIST_EN.md`
+</content>

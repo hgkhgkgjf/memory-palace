@@ -2,88 +2,59 @@
 
 This directory describes the skills / MCP orchestration setup for Memory Palace.
 
-One boundary first:
+If you only start `Dashboard / API / SSE` through `docker compose` or GHCR images, this is not always your first stop - continue only if you also want `Claude / Codex / Gemini / OpenCode / IDE hosts` wired in. Docker runs the service side; it does not automatically modify local skill / MCP / IDE host configuration.
 
-- If you only started `Dashboard / API / SSE` through `docker compose` or GHCR images, this is not always your first stop.
-- Keep reading only when you also want to wire `Claude / Codex / Gemini / OpenCode / IDE hosts` into this repository.
-- Docker starts the service side; it does not automatically rewrite local skill / MCP / IDE host configuration on your machine.
-- If you want the AI to guide installation step by step, start with the standalone repo [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup); the current stance is **skills + MCP first, not MCP-only first**.
-- If you do not want the repo-local install path and only want to **connect a client manually to the Docker-exposed `/sse` endpoint**, start with:
-  - `docs/GHCR_QUICKSTART_EN.md`
-  - `6.2 SSE mode` and `6.3 client configuration examples` in `docs/GETTING_STARTED_EN.md`
+If you want AI to guide installation step by step, install the standalone [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup) repo, then say:
 
-If this is your first time looking here, it is recommended to read in this order:
+```text
+Use $memory-palace-setup to install and configure Memory Palace step by step.
+Prefer skills + MCP.
+```
 
-1. **Start with the shortest path**
-   - `memory-palace-setup` repo
-   - `SKILLS_QUICKSTART_EN.md`
-2. **Use the step-by-step path only when you need setup checks or troubleshooting**
-   - `GETTING_STARTED_EN.md`
-3. **Then read the full design**
-   - `MEMORY_PALACE_SKILLS_EN.md`
-4. **If you are integrating an IDE host**
-   - `IDE_HOSTS_EN.md`
+If you only want to manually connect a client to the Docker-exposed `/sse`, see:
+
+- `docs/GHCR_QUICKSTART_EN.md`
+- Section `6.2 SSE mode` and `6.3 client configuration examples` in `docs/GETTING_STARTED_EN.md`
 
 ---
 
-## What these files are each for
+## Navigation
 
-- If you only want to know “which command should I run now,” start with `SKILLS_QUICKSTART_EN.md`
-- If you want the AI to do the routing instead of reading the whole setup stack yourself, install `memory-palace-setup` first, then say: `Use $memory-palace-setup to install and configure Memory Palace step by step. Prefer skills + MCP.`
-- If you are already wiring it and need to check “was the skill discovered” or “is MCP really bound to this checkout,” then read `GETTING_STARTED_EN.md`
-- `GETTING_STARTED_EN.md`
-  - For people connecting it for the first time
-  - Mainly answers “how to wire it step by step, and how to verify each step”
-- `SKILLS_QUICKSTART_EN.md`
-  - For people who want the shortest path first
-  - Mainly answers “what to run first, which clients are wired in what way right now, and which boundaries matter up front”
-- `MEMORY_PALACE_SKILLS_EN.md`
-  - For people who want to see the full design
-  - Mainly explains the canonical bundle, variants, and workflow boundaries
-- `CLI_COMPATIBILITY_GUIDE_EN.md`
-  - For multi-CLI integration scenarios
-  - Mainly focuses on the differences among Claude / Gemini / Codex / OpenCode
-- `IDE_HOSTS_EN.md`
-  - For IDE-like hosts such as Cursor / Windsurf / VSCode-host / Antigravity
-  - Focuses on the `AGENTS.md + MCP snippet` projection path instead of hidden skill mirrors
+| File | Purpose |
+|---|---|
+| [`SKILLS_QUICKSTART_EN.md`](SKILLS_QUICKSTART_EN.md) | Fastest install path and trigger self-check |
+| [`CLI_COMPATIBILITY_GUIDE_EN.md`](CLI_COMPATIBILITY_GUIDE_EN.md) | Full options and boundaries for each CLI (Claude / Gemini / Codex / OpenCode) |
+| [`IDE_HOSTS_EN.md`](IDE_HOSTS_EN.md) | `AGENTS.md + MCP snippet` integration for Cursor / Windsurf / VSCode-host / Antigravity |
+| [`MEMORY_PALACE_SKILLS_EN.md`](MEMORY_PALACE_SKILLS_EN.md) | Skill system design, directory responsibilities, maintenance order |
+| [`GETTING_STARTED_EN.md`](GETTING_STARTED_EN.md) | Entry document (content merged into `SKILLS_QUICKSTART_EN.md`) |
+
+The Chinese versions drop the `_EN` suffix.
 
 ---
 
-## Local validation reports
+## Canonical Bundle
 
-- `TRIGGER_SMOKE_REPORT.md`
-  - Generated after running `python scripts/evaluate_memory_palace_skill.py`
-- `MCP_LIVE_E2E_REPORT.md`
-  - Generated after running `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
+The real canonical bundle is at:
 
-They are mainly used to help you re-check the connection results in the current environment, and they are not the primary entry documents.
-If you do not temporarily see these two files in a freshly cloned GitHub repository, that is normal; run the commands above first and then check again.
-If you plan to forward them to someone else, read through the contents yourself first; this kind of local report may include paths on your machine or traces of client configuration.
-If you do not want to overwrite the default files during parallel review or CI, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH` first. When you use relative paths, the scripts now redirect them under the system temp directory's `memory-palace-reports/` root; if you want a fully controlled destination, prefer absolute paths outside the repository.
+```text
+docs/skills/memory-palace/
+├── SKILL.md
+├── references/
+├── variants/
+└── agents/openai.yaml
+```
+
+Public docs explain how to use it. The canonical bundle defines what the skill actually is. `AGENTS.md` ships as a repo-local rule entry, allowing clients like Antigravity that support `AGENTS.md` to read repository constraints directly. Legacy setups can still fall back to `GEMINI.md`.
+
+`Cursor / Windsurf / VSCode-host / Antigravity` no longer use hidden skill mirrors as the default integration. They consume the repository through `AGENTS.md + python scripts/render_ide_host_config.py --host ...`.
 
 ---
 
-## Where is the canonical bundle
+## Local Validation Reports
 
-The real canonical bundle is here:
+- `TRIGGER_SMOKE_REPORT.md` - Generated by `python scripts/evaluate_memory_palace_skill.py`
+- `MCP_LIVE_E2E_REPORT.md` - Generated by `cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py`
 
-- `docs/skills/memory-palace/`
+These are local review artifacts, not primary entry docs. The public repository excludes them via `.gitignore`. Before forwarding, check the content for local paths or client config traces.
 
-What is inside:
-
-- `SKILL.md`
-- `references/`
-- `variants/`
-- `agents/openai.yaml`
-
-A one-sentence way to understand it:
-
-> The public documents are responsible for telling users how to use it, while the canonical bundle is responsible for defining what this skill actually is.
-
-One more repository-level note:
-
-> `Memory-Palace/AGENTS.md` is now shipped as a repo-local rule entry as well, so clients such as Antigravity that support `AGENTS.md` can read the repository constraints directly. Older setups can still fall back to the legacy `GEMINI.md` convention.
-
-One more unified repository stance:
-
-> IDE hosts such as `Cursor / Windsurf / VSCode-host / Antigravity` should no longer treat hidden skill mirrors as the default integration path. They should consume the repository through `AGENTS.md + python scripts/render_ide_host_config.py ...`, which projects the same skills + MCP capability surface into IDE hosts.
+For isolated output in parallel review or CI, set `MEMORY_PALACE_SKILL_REPORT_PATH` / `MEMORY_PALACE_MCP_E2E_REPORT_PATH`. Relative paths land under the system temp directory's `memory-palace-reports/`; absolute paths outside the repository give you full control.
