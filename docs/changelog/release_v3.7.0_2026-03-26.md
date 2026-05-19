@@ -50,4 +50,3 @@
 发布摘要建议：
 
 > `v3.7.0` 重新复验了主后端/前端链路，修紧了 `session_id` 与 `priority` 的严格校验，恢复了 repo-local skill sync 一致性。
-</content>

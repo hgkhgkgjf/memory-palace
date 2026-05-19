@@ -172,4 +172,3 @@ Continue with:
 - `docs/DEPLOYMENT_PROFILES_EN.md`
 - `docs/TROUBLESHOOTING_EN.md`
 - `docs/GHCR_ACCEPTANCE_CHECKLIST_EN.md`
-</content>

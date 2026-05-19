@@ -77,7 +77,7 @@ function Read-DatabaseUrlFromEnvFile {
     param([string]$Path)
 
     $databaseUrl = $null
-    Get-Content $Path | ForEach-Object {
+    [System.IO.File]::ReadAllLines($Path, [System.Text.UTF8Encoding]::new($false)) | ForEach-Object {
         if ($_ -match "^\s*([^#=]+)\s*=\s*(.*)\s*$") {
             $key = $matches[1].Trim()
             if ($key -ne 'DATABASE_URL') {

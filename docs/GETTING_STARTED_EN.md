@@ -289,12 +289,14 @@ Client configuration (pick the wrapper for your platform):
 {
   "mcpServers": {
     "memory-palace": {
-      "command": "python",
-      "args": ["/ABS/PATH/TO/REPO/backend/mcp_wrapper.py"]
+      "command": "C:\\ABS\\PATH\\TO\\REPO\\backend\\.venv\\Scripts\\python.exe",
+      "args": ["C:\\ABS\\PATH\\TO\\REPO\\backend\\mcp_wrapper.py"]
     }
   }
 }
 ```
+
+Use the venv's `python.exe` directly so the wrapper finds the right interpreter even when system `PATH` doesn't include it. Replace `C:\\ABS\\PATH\\TO\\REPO` with your real repository path; JSON requires the backslashes to be escaped (`\\`).
 
 Both wrappers rely on the local `backend/.venv` and the current repository's `.env`. If you haven't created `.venv` yet, go back to **Step 2**.
 
@@ -302,16 +304,17 @@ Both wrappers rely on the local `backend/.venv` and the current repository's `.e
 
 ```bash
 cd backend
-HOST=127.0.0.1 PORT=8010 python run_sse.py
+HOST=127.0.0.1 python run_sse.py
 ```
 
 ```powershell
 cd backend
-$env:HOST = "127.0.0.1"; $env:PORT = "8010"
+$env:HOST = "127.0.0.1"
+Remove-Item Env:PORT -ErrorAction SilentlyContinue
 python run_sse.py
 ```
 
-If 8000 is occupied, it falls back to 8010 automatically. SSE remains protected by `MCP_API_KEY`.
+When `PORT` is not set, an occupied 8000 falls back to 8010 automatically. Setting `PORT` pins the server to that port. SSE remains protected by `MCP_API_KEY`.
 
 Only set `HOST=0.0.0.0` when you really need remote clients; you are responsible for the API Key, firewall, and reverse proxy in that case.
 

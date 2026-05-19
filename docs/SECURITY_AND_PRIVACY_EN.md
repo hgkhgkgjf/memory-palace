@@ -65,6 +65,21 @@ Authorization: Bearer <MCP_API_KEY>
 
 > The backend uses `hmac.compare_digest` for constant-time comparison to prevent timing attacks.
 
+### Error Response Format
+
+Protected Dashboard APIs use FastAPI's standard response body. Business errors prefer a structured `detail` object:
+
+```json
+{
+  "detail": {
+    "error": "invalid_or_missing_api_key",
+    "reason": "invalid_or_missing_api_key"
+  }
+}
+```
+
+Clients should accept both legacy or framework-produced `detail: "..."` strings and the newer `detail.error` / `detail.reason` object fields. Use `detail.error` as the stable error code; use `detail.reason` for display or logging.
+
 ### SSE `/messages` Burst Rate Limit
 
 `/messages` is not an unlimited ingress path. The current implementation applies an in-process burst limit to a **stable client principal**:
@@ -260,4 +275,3 @@ The following security configurations can be directly verified in the project's 
 > - `<user-home>`: User home directory
 > - `/absolute/path/to/...`: macOS / Linux absolute path example
 > - `C:/absolute/path/to/...`: Windows absolute path example
-</content>

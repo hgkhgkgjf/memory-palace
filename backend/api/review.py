@@ -61,6 +61,12 @@ async def _run_write_lane(
     )
 
 
+def _error_detail(error: str, reason: str, **extra: Any) -> Dict[str, Any]:
+    detail: Dict[str, Any] = {"error": error, "reason": reason}
+    detail.update({key: value for key, value in extra.items() if value is not None})
+    return detail
+
+
 def _format_permanently_deleted_detail(
     memory_id: Any,
     *,
@@ -78,7 +84,14 @@ def _validate_session_id_or_400(session_id: str) -> str:
     try:
         return SnapshotManager._validate_session_id(session_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid session_id: {exc}.") from exc
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "invalid_session_id",
+                f"Invalid session_id: {exc}.",
+                session_id=session_id,
+            ),
+        ) from exc
 
 
 def _raise_review_internal_error(*, operation: str, error: str, exc: Exception) -> None:
@@ -177,9 +190,13 @@ def _raise_if_newer_review_snapshot_exists(
     uri = str(data.get("uri") or "").strip() or "unknown"
     raise HTTPException(
         status_code=409,
-        detail=(
+        detail=_error_detail(
+            "newer_review_snapshot_exists",
             f"Cannot rollback '{uri}': newer review snapshot exists in session "
-            f"'{conflict['session_id']}' at {conflict['snapshot_time']}."
+            f"'{conflict['session_id']}' at {conflict['snapshot_time']}.",
+            uri=uri,
+            conflict_session_id=conflict["session_id"],
+            conflict_snapshot_time=conflict["snapshot_time"],
         ),
     )
 
@@ -213,7 +230,11 @@ async def list_session_snapshots(session_id: str):
     if not snapshots:
         raise HTTPException(
             status_code=404,
-            detail=f"Session '{session_id}' not found or has no snapshots"
+            detail=_error_detail(
+                "session_snapshots_not_found",
+                f"Session '{session_id}' not found or has no snapshots",
+                session_id=session_id,
+            ),
         )
     
     return [SnapshotInfo(**s) for s in snapshots]
@@ -239,7 +260,12 @@ async def get_snapshot_detail(session_id: str, resource_id: str):
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+            detail=_error_detail(
+                "snapshot_not_found",
+                f"Snapshot for '{resource_id}' not found in session '{session_id}'",
+                resource_id=resource_id,
+                session_id=session_id,
+            ),
         )
     
     return SnapshotDetail(
@@ -324,9 +350,13 @@ async def _ensure_same_version_chain_or_409(
     if snapshot_tip is None or current_tip is None or snapshot_tip != current_tip:
         raise HTTPException(
             status_code=409,
-            detail=(
+            detail=_error_detail(
+                "version_chain_mismatch",
                 f"Cannot rollback '{uri}': snapshot memory_id={snapshot_memory_id} "
-                f"and current memory_id={current_memory_id} are not in the same version chain."
+                f"and current memory_id={current_memory_id} are not in the same version chain.",
+                uri=uri,
+                snapshot_memory_id=snapshot_memory_id,
+                current_memory_id=current_memory_id,
             ),
         )
 
@@ -376,7 +406,11 @@ def _restore_path_metadata_kwargs(client: Any, current: dict) -> Dict[str, Any]:
 
 
 def _map_restore_path_metadata_value_error(exc: ValueError, uri: str) -> HTTPException:
-    detail = f"Cannot rollback '{uri}': {exc}"
+    detail = _error_detail(
+        "rollback_metadata_failed",
+        f"Cannot rollback '{uri}': {exc}",
+        uri=uri,
+    )
     if "not found" in str(exc).lower():
         return HTTPException(status_code=404, detail=detail)
     return HTTPException(status_code=409, detail=detail)
@@ -659,7 +693,12 @@ async def get_resource_diff(session_id: str, resource_id: str):
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+            detail=_error_detail(
+                "snapshot_not_found",
+                f"Snapshot for '{resource_id}' not found in session '{session_id}'",
+                resource_id=resource_id,
+                session_id=session_id,
+            ),
         )
     
     resource_type = snapshot["resource_type"]
@@ -672,7 +711,12 @@ async def get_resource_diff(session_id: str, resource_id: str):
     if not handler:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown snapshot type: {resource_type}/{operation_type}"
+            detail=_error_detail(
+                "unknown_snapshot_type",
+                f"Unknown snapshot type: {resource_type}/{operation_type}",
+                resource_type=resource_type,
+                operation_type=operation_type,
+            ),
         )
     
     result = await handler(snapshot, resource_id)
@@ -708,7 +752,11 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             except (TypeError, ValueError):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid snapshot memory_id for '{uri}'.",
+                    detail=_error_detail(
+                        "invalid_snapshot_memory_id",
+                        f"Invalid snapshot memory_id for '{uri}'.",
+                        uri=uri,
+                    ),
                 )
         current_for_validation = await client.get_memory_by_path(
             path, domain, reinforce_access=False
@@ -721,10 +769,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             ):
                 raise HTTPException(
                     status_code=409,
-                    detail=(
+                    detail=_error_detail(
+                        "rollback_create_conflict",
                         f"Cannot rollback create for '{uri}': snapshot memory_id="
                         f"{snapshot_memory_id} does not match current memory_id="
-                        f"{current_memory_id}."
+                        f"{current_memory_id}.",
+                        uri=uri,
+                        snapshot_memory_id=snapshot_memory_id,
+                        current_memory_id=current_memory_id,
                     ),
                 )
 
@@ -814,7 +866,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
                 session_id=lane_session_id,
             )
         except (ValueError, PermissionError, RuntimeError) as e:
-            raise HTTPException(status_code=409, detail=f"Cannot delete '{uri}': {e}")
+            raise HTTPException(
+                status_code=409,
+                detail=_error_detail(
+                    "rollback_delete_failed",
+                    f"Cannot delete '{uri}': {e}",
+                    uri=uri,
+                ),
+            )
     
     elif operation_type == "create_alias":
         # Rollback of alias creation = remove the alias path only
@@ -830,9 +889,11 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             ):
                 raise HTTPException(
                     status_code=409,
-                    detail=(
+                    detail=_error_detail(
+                        "rollback_alias_conflict",
                         f"Cannot rollback alias '{uri}': "
-                        "it now points to a different memory."
+                        "it now points to a different memory.",
+                        uri=uri,
                     ),
                 )
 
@@ -843,9 +904,11 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
                 ):
                     raise HTTPException(
                         status_code=409,
-                        detail=(
+                        detail=_error_detail(
+                            "rollback_alias_conflict",
                             f"Cannot rollback alias '{uri}': "
-                            "it now points to a different memory."
+                            "it now points to a different memory.",
+                            uri=uri,
                         ),
                     )
 
@@ -873,7 +936,11 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             if existing_alias is not None:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"Cannot rollback alias '{uri}': {exc}",
+                    detail=_error_detail(
+                        "rollback_alias_failed",
+                        f"Cannot rollback alias '{uri}': {exc}",
+                        uri=uri,
+                    ),
                 ) from exc
             return {"deleted": True, "alias_removed": False, "no_change": True}
         return {"deleted": True, "alias_removed": True}
@@ -887,8 +954,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
         if not target_version:
             raise HTTPException(
                 status_code=410,
-                detail=_format_permanently_deleted_detail(
-                    memory_id,
+                detail=_error_detail(
+                    "memory_permanently_deleted",
+                    _format_permanently_deleted_detail(
+                        memory_id,
+                        action="restore",
+                        uri=uri,
+                    ),
+                    memory_id=memory_id,
                     action="restore",
                     uri=uri,
                 ),
@@ -911,7 +984,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             )
             return {"restored": True, "new_version": memory_id}
         except ValueError as e:
-            raise HTTPException(status_code=409, detail=f"Cannot restore '{uri}': {e}")
+            raise HTTPException(
+                status_code=409,
+                detail=_error_detail(
+                    "rollback_restore_failed",
+                    f"Cannot restore '{uri}': {e}",
+                    uri=uri,
+                ),
+            )
     
     elif operation_type == "modify_meta":
         # Rollback of metadata change = restore original priority/disclosure
@@ -919,7 +999,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
             path, domain, reinforce_access=False
         )
         if not current:
-            raise HTTPException(status_code=404, detail=f"'{uri}' no longer exists")
+            raise HTTPException(
+                status_code=404,
+                detail=_error_detail(
+                    "path_no_longer_exists",
+                    f"'{uri}' no longer exists",
+                    uri=uri,
+                ),
+            )
 
         async def _write_task_update_meta() -> Any:
             return await client.restore_path_metadata(
@@ -941,7 +1028,14 @@ async def _rollback_path(data: dict, *, lane_session_id: Optional[str] = None) -
         return {"metadata_restored": True}
     
     else:
-        raise HTTPException(status_code=400, detail=f"Unknown path operation: {operation_type}")
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "unknown_path_operation",
+                f"Unknown path operation: {operation_type}",
+                operation_type=operation_type,
+            ),
+        )
 
 
 async def _rollback_memory_content(
@@ -956,21 +1050,38 @@ async def _rollback_memory_content(
     try:
         memory_id = int(memory_id_raw)
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="Snapshot missing memory_id")
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "snapshot_missing_memory_id",
+                "Snapshot missing memory_id",
+            ),
+        )
     path = data.get("path")
     domain = data.get("domain", "core")
     uri = data.get("uri", f"{domain}://{path}")
     
     if memory_id <= 0:
-        raise HTTPException(status_code=400, detail="Snapshot missing memory_id")
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "snapshot_missing_memory_id",
+                "Snapshot missing memory_id",
+            ),
+        )
     
     # Verify the target memory still exists in DB (not permanently deleted)
     target_version = await client.get_memory_version(memory_id)
     if not target_version:
         raise HTTPException(
             status_code=410,
-            detail=_format_permanently_deleted_detail(
-                memory_id,
+            detail=_error_detail(
+                "memory_permanently_deleted",
+                _format_permanently_deleted_detail(
+                    memory_id,
+                    action="roll back",
+                ),
+                memory_id=memory_id,
                 action="roll back",
             ),
         )
@@ -998,14 +1109,22 @@ async def _rollback_memory_content(
     if not current:
         raise HTTPException(
             status_code=404,
-            detail=f"Path '{uri}' no longer exists and no alternative paths found. Cannot rollback content."
+            detail=_error_detail(
+                "rollback_content_path_missing",
+                f"Path '{uri}' no longer exists and no alternative paths found. Cannot rollback content.",
+                uri=uri,
+            ),
         )
 
     current_memory_id = current.get("id")
     if not isinstance(current_memory_id, int):
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot rollback '{uri}': current memory_id is invalid.",
+            detail=_error_detail(
+                "rollback_invalid_current_memory_id",
+                f"Cannot rollback '{uri}': current memory_id is invalid.",
+                uri=uri,
+            ),
         )
 
     if memory_id == current_memory_id:
@@ -1042,7 +1161,11 @@ async def _rollback_memory_content(
     except ValueError as exc:
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot rollback '{uri}': {exc}",
+            detail=_error_detail(
+                "rollback_failed",
+                f"Cannot rollback '{uri}': {exc}",
+                uri=uri,
+            ),
         ) from exc
     return {"new_version": result["restored_memory_id"]}
 
@@ -1062,18 +1185,35 @@ async def _rollback_legacy_modify(
     try:
         snapshot_memory_id = int(snapshot_memory_id_raw)
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="Snapshot missing memory_id")
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "snapshot_missing_memory_id",
+                "Snapshot missing memory_id",
+            ),
+        )
     
     if snapshot_memory_id <= 0:
-        raise HTTPException(status_code=400, detail="Snapshot missing memory_id")
+        raise HTTPException(
+            status_code=400,
+            detail=_error_detail(
+                "snapshot_missing_memory_id",
+                "Snapshot missing memory_id",
+            ),
+        )
     
     # Verify the target memory still exists in DB
     target_version = await client.get_memory_version(snapshot_memory_id)
     if not target_version:
         raise HTTPException(
             status_code=410,
-            detail=_format_permanently_deleted_detail(
-                snapshot_memory_id,
+            detail=_error_detail(
+                "memory_permanently_deleted",
+                _format_permanently_deleted_detail(
+                    snapshot_memory_id,
+                    action="roll back",
+                ),
+                memory_id=snapshot_memory_id,
                 action="roll back",
             ),
         )
@@ -1082,13 +1222,24 @@ async def _rollback_legacy_modify(
         path, domain, reinforce_access=False
     )
     if not current:
-        raise HTTPException(status_code=404, detail=f"'{uri}' no longer exists")
+        raise HTTPException(
+            status_code=404,
+            detail=_error_detail(
+                "path_no_longer_exists",
+                f"'{uri}' no longer exists",
+                uri=uri,
+            ),
+        )
 
     current_memory_id = current.get("id")
     if not isinstance(current_memory_id, int):
         raise HTTPException(
             status_code=409,
-            detail=f"Cannot rollback '{uri}': current memory_id is invalid.",
+            detail=_error_detail(
+                "rollback_invalid_current_memory_id",
+                f"Cannot rollback '{uri}': current memory_id is invalid.",
+                uri=uri,
+            ),
         )
 
     await _ensure_same_version_chain_or_409(
@@ -1139,7 +1290,11 @@ async def _rollback_legacy_modify(
         except ValueError as exc:
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot rollback '{uri}': {exc}",
+                detail=_error_detail(
+                    "rollback_failed",
+                    f"Cannot rollback '{uri}': {exc}",
+                    uri=uri,
+                ),
             ) from exc
         restored_id = result["restored_memory_id"]
     elif has_version_change:
@@ -1165,7 +1320,11 @@ async def _rollback_legacy_modify(
         except ValueError as exc:
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot rollback '{uri}': {exc}",
+                detail=_error_detail(
+                    "rollback_failed",
+                    f"Cannot rollback '{uri}': {exc}",
+                    uri=uri,
+                ),
             ) from exc
         restored_id = result["restored_memory_id"]
     
@@ -1221,7 +1380,12 @@ async def rollback_resource(session_id: str, resource_id: str, request: Rollback
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+            detail=_error_detail(
+                "snapshot_not_found",
+                f"Snapshot for '{resource_id}' not found in session '{session_id}'",
+                resource_id=resource_id,
+                session_id=session_id,
+            ),
         )
     
     resource_type = snapshot["resource_type"]
@@ -1262,9 +1426,23 @@ async def rollback_resource(session_id: str, resource_id: str, request: Rollback
                     lane_session_id=lane_session_id,
                 )
             else:
-                raise HTTPException(status_code=400, detail=f"Unknown memory operation: {operation_type}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=_error_detail(
+                        "unknown_memory_operation",
+                        f"Unknown memory operation: {operation_type}",
+                        operation_type=operation_type,
+                    ),
+                )
         else:
-            raise HTTPException(status_code=400, detail=f"Unknown resource type: {resource_type}")
+            raise HTTPException(
+                status_code=400,
+                detail=_error_detail(
+                    "unknown_resource_type",
+                    f"Unknown resource type: {resource_type}",
+                    resource_type=resource_type,
+                ),
+            )
         
         # Build response message
         message = _build_rollback_message(resource_id, operation_type, result)
@@ -1320,7 +1498,12 @@ async def delete_snapshot(session_id: str, resource_id: str):
     if not snapshot:
         raise HTTPException(
             status_code=404,
-            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+            detail=_error_detail(
+                "snapshot_not_found",
+                f"Snapshot for '{resource_id}' not found in session '{session_id}'",
+                resource_id=resource_id,
+                session_id=session_id,
+            ),
         )
 
     deleted = manager.delete_snapshot(session_id, resource_id)
@@ -1328,7 +1511,12 @@ async def delete_snapshot(session_id: str, resource_id: str):
     if not deleted:
         raise HTTPException(
             status_code=404,
-            detail=f"Snapshot for '{resource_id}' not found in session '{session_id}'"
+            detail=_error_detail(
+                "snapshot_not_found",
+                f"Snapshot for '{resource_id}' not found in session '{session_id}'",
+                resource_id=resource_id,
+                session_id=session_id,
+            ),
         )
     
     return {"message": f"Snapshot for '{resource_id}' deleted"}
@@ -1348,7 +1536,11 @@ async def clear_session(session_id: str):
     if count == 0:
         raise HTTPException(
             status_code=404,
-            detail=f"Session '{session_id}' not found or already empty"
+            detail=_error_detail(
+                "session_not_found",
+                f"Session '{session_id}' not found or already empty",
+                session_id=session_id,
+            ),
         )
     
     return {"message": f"Session '{session_id}' cleared, {count} snapshots deleted"}
@@ -1404,9 +1596,23 @@ async def permanently_delete_memory(memory_id: int):
         )
         return {"message": f"Memory {memory_id} permanently deleted"}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(
+            status_code=404,
+            detail=_error_detail(
+                "deprecated_memory_not_found",
+                str(e),
+                memory_id=memory_id,
+            ),
+        )
     except PermissionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(
+            status_code=409,
+            detail=_error_detail(
+                "deprecated_memory_delete_conflict",
+                str(e),
+                memory_id=memory_id,
+            ),
+        )
     except Exception as e:
         _raise_review_internal_error(
             operation="permanently_delete_memory",

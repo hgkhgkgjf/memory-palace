@@ -130,7 +130,7 @@ async def test_diff_memory_content_uses_english_deleted_placeholder(
 
 
 @pytest.mark.asyncio
-async def test_rollback_memory_content_returns_english_deleted_version_detail(
+async def test_rollback_memory_content_returns_structured_deleted_version_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _DeletedVersionClient:
@@ -152,10 +152,12 @@ async def test_rollback_memory_content_returns_english_deleted_version_detail(
         )
 
     assert exc_info.value.status_code == 410
-    assert (
-        exc_info.value.detail
-        == "Old version (memory_id=123) was permanently deleted. Cannot roll back."
-    )
+    assert exc_info.value.detail == {
+        "error": "memory_permanently_deleted",
+        "reason": "Old version (memory_id=123) was permanently deleted. Cannot roll back.",
+        "memory_id": 123,
+        "action": "roll back",
+    }
 
 
 @pytest.mark.asyncio
@@ -786,7 +788,7 @@ def test_review_module_keeps_deleted_messages_in_english() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rollback_memory_content_reports_deleted_version_in_english(
+async def test_rollback_memory_content_reports_structured_deleted_version_detail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _MissingVersionClient:
@@ -807,10 +809,12 @@ async def test_rollback_memory_content_reports_deleted_version_in_english(
         )
 
     assert exc_info.value.status_code == 410
-    assert (
-        exc_info.value.detail
-        == "Old version (memory_id=17) was permanently deleted. Cannot roll back."
-    )
+    assert exc_info.value.detail == {
+        "error": "memory_permanently_deleted",
+        "reason": "Old version (memory_id=17) was permanently deleted. Cannot roll back.",
+        "memory_id": 17,
+        "action": "roll back",
+    }
 
 
 @pytest.mark.asyncio

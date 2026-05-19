@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -356,12 +355,21 @@ class MigrationGate:
         wanted = list(versions or self._all_versions_from_disk())
         if take_backup and wanted:
             try:
-                report.backup_path = self._take_backup()
-                self._log(
-                    report,
-                    event="backup_taken",
-                    backup_path=str(report.backup_path),
-                )
+                backup_path = self._take_backup()
+                report.backup_path = backup_path
+                if backup_path is None:
+                    self._log(
+                        report,
+                        event="skip_backup",
+                        reason="database_file_missing",
+                        versions=wanted,
+                    )
+                else:
+                    self._log(
+                        report,
+                        event="backup_taken",
+                        backup_path=str(backup_path),
+                    )
             except Exception as exc:
                 report.aborted_at = "backup"
                 report.abort_reason = f"backup_failed: {type(exc).__name__}: {exc}"
@@ -467,14 +475,32 @@ class MigrationGate:
             )
             return report
 
+        if not self.database_file.exists():
+            self._log(
+                report,
+                event="skip_backup",
+                reason="database_file_missing",
+                versions=wanted,
+            )
+            return report
+
         if take_backup and wanted:
             try:
-                report.backup_path = self._take_backup()
-                self._log(
-                    report,
-                    event="backup_taken",
-                    backup_path=str(report.backup_path),
-                )
+                backup_path = self._take_backup()
+                report.backup_path = backup_path
+                if backup_path is None:
+                    self._log(
+                        report,
+                        event="skip_backup",
+                        reason="database_file_missing",
+                        versions=wanted,
+                    )
+                else:
+                    self._log(
+                        report,
+                        event="backup_taken",
+                        backup_path=str(backup_path),
+                    )
             except Exception as exc:
                 report.aborted_at = "backup"
                 report.abort_reason = f"backup_failed: {type(exc).__name__}: {exc}"
@@ -564,18 +590,39 @@ class MigrationGate:
         if not applied:
             self._log(report, event="no_pending")
 
-    def _take_backup(self) -> Path:
+    def _take_backup(self) -> Optional[Path]:
         assert self.database_file is not None
+        if not self.database_file.exists():
+            return None
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         target = self.backup_dir / f"{self.database_file.name}.{ts}.bak"
-        # shutil.copy2 is sufficient for SQLite without WAL writers
-        # running; the migration_gate is expected to be invoked while
-        # the application is quiesced.
-        if self.database_file.exists():
-            shutil.copy2(self.database_file, target)
-        else:
-            target.write_bytes(b"")
+        source_conn = sqlite3.connect(str(self.database_file))
+        try:
+            try:
+                checkpoint = source_conn.execute(
+                    "PRAGMA wal_checkpoint(TRUNCATE)"
+                ).fetchone()
+                if checkpoint and int(checkpoint[0] or 0):
+                    logger.warning(
+                        "WAL checkpoint was busy before backup (result=%s); "
+                        "backup will still be consistent via sqlite3.backup()",
+                        checkpoint,
+                    )
+            except sqlite3.Error as exc:
+                logger.warning("WAL checkpoint before backup failed: %s", exc)
+
+            dest_conn = sqlite3.connect(str(target))
+            try:
+                source_conn.backup(dest_conn, pages=256, sleep=0.05)
+            except Exception:
+                dest_conn.close()
+                target.unlink(missing_ok=True)
+                raise
+            else:
+                dest_conn.close()
+        finally:
+            source_conn.close()
         return target
 
     def _export_table(self, table_name: str, file_name: str) -> Path:

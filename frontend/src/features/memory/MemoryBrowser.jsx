@@ -462,6 +462,7 @@ export default function MemoryBrowser() {
                   value={composerTitle}
                   onChange={(e) => setComposerTitle(e.target.value)}
                   placeholder={t('memory.titlePlaceholder')}
+                  aria-label={t('memory.titlePlaceholder')}
                   className="palace-input bg-white/40 focus:bg-white/80"
                 />
                 <textarea
@@ -471,6 +472,7 @@ export default function MemoryBrowser() {
                     setConversationDirty(true);
                   }}
                   placeholder={t('memory.conversationPlaceholder')}
+                  aria-label={t('memory.conversationPlaceholder')}
                   className="palace-input h-48 resize-none bg-white/40 focus:bg-white/80 leading-relaxed"
                 />
                 <div className="grid grid-cols-2 gap-3">
@@ -481,12 +483,14 @@ export default function MemoryBrowser() {
                     min="0"
                     className="palace-input bg-white/40 focus:bg-white/80"
                     placeholder={t('memory.priorityPlaceholder')}
+                    aria-label={t('memory.priorityPlaceholder')}
                   />
                   <input
                     value={composerDisclosure}
                     onChange={(e) => setComposerDisclosure(e.target.value)}
                     className="palace-input bg-white/40 focus:bg-white/80"
                     placeholder={t('memory.disclosurePlaceholder')}
+                    aria-label={t('memory.disclosurePlaceholder')}
                   />
                 </div>
                 <button
@@ -514,6 +518,7 @@ export default function MemoryBrowser() {
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                     placeholder={t('memory.searchPlaceholder')}
+                    aria-label={t('memory.searchPlaceholder')}
                     className="palace-input pl-9 bg-white/40 focus:bg-white/80"
                   />
                 </div>
@@ -523,6 +528,7 @@ export default function MemoryBrowser() {
                   type="number"
                   min="0"
                   placeholder={t('memory.maxPriorityPlaceholder')}
+                  aria-label={t('memory.maxPriorityPlaceholder')}
                   className="palace-input bg-white/40 focus:bg-white/80"
                 />
               </div>
@@ -692,12 +698,14 @@ export default function MemoryBrowser() {
                         onChange={(e) => setEditPriority(Number(e.target.value) || 0)}
                         className="palace-input bg-white/60"
                         placeholder={t('memory.priorityPlaceholder')}
+                        aria-label={t('memory.priorityPlaceholder')}
                       />
                       <input
                         value={editDisclosure}
                         onChange={(e) => setEditDisclosure(e.target.value)}
                         className="palace-input bg-white/60"
                         placeholder={t('memory.disclosurePlaceholder')}
+                        aria-label={t('memory.disclosurePlaceholder')}
                       />
                     </motion.div>
                   )}
@@ -706,6 +714,7 @@ export default function MemoryBrowser() {
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
+                      aria-label={t('memory.currentNodeContent')}
                       className="palace-input h-72 resize-y bg-white/60 font-mono text-sm leading-relaxed"
                     />
                   ) : (

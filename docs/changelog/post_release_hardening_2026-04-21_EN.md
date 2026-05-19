@@ -49,4 +49,3 @@ The public MCP contract is tighter, percent-encoded memory URIs are handled more
 If you need a conservative one-liner for others:
 
 > This follow-up tightens the public MCP input contract, makes percent-encoded URI handling more predictable, fail-closes earlier on bad local SQLite files, removes the half-success window from vitality multi-delete, and re-verifies backend, frontend, and repo-local MCP.
-</content>

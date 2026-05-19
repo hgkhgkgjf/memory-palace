@@ -402,7 +402,10 @@ async def test_browse_update_node_surfaces_version_conflict_as_409(
         )
 
     assert exc_info.value.status_code == 409
-    assert exc_info.value.detail == "Memory version conflict"
+    assert exc_info.value.detail == {
+        "error": "memory_version_conflict",
+        "reason": "Memory version conflict",
+    }
 
 
 @pytest.mark.asyncio

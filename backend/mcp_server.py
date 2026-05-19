@@ -4715,11 +4715,11 @@ async def create_memory(
         )
         # Validate title if provided
         if title:
-            if not re.match(r"^[a-zA-Z0-9_-]+$", title):
+            if not re.match(r"^[\w-]+$", title, flags=re.UNICODE):
                 return _tool_response(
                     ok=False,
                     message=(
-                        "Error: Title must only contain alphanumeric characters, "
+                        "Error: Title must only contain Unicode letters, digits, "
                         "underscores, or hyphens (no spaces, slashes, or special characters)."
                     ),
                     created=False,

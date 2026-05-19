@@ -201,7 +201,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 cd frontend && npm install && npm run dev
 ```
 
-打开 <http://localhost:5173>。如果要立刻使用 Dashboard 或 `/browse` / `/review` / `/maintenance`，先在 `.env` 里加 `MCP_API_KEY=change-this`（或 `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` 用于本机回环调试）再启动后端。
+打开 <http://localhost:5173>。如果要立刻使用 Dashboard 或 `/browse` / `/review` / `/maintenance`，先在 `.env` 里加 `MCP_API_KEY=<your-mcp-api-key>`（或 `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` 用于本机回环调试）再启动后端。
 
 ### 默认访问地址
 
@@ -209,7 +209,7 @@ cd frontend && npm install && npm run dev
 |---|---|---|
 | 前端仪表盘 | <http://localhost:5173> | <http://127.0.0.1:3000> |
 | 后端 API | <http://127.0.0.1:8000> | <http://127.0.0.1:18000> |
-| SSE | <http://127.0.0.1:8010/sse> | <http://127.0.0.1:3000/sse> |
+| SSE | <http://127.0.0.1:8000/sse>（被占用时回退 `8010`） | <http://127.0.0.1:3000/sse> |
 
 ### 重要边界
 
@@ -295,7 +295,7 @@ Memory Palace 通过 MCP 协议暴露 **9 个标准化工具**：
 
 ```bash
 cd backend && ./.venv/bin/python mcp_server.py     # stdio（Windows: .\.venv\Scripts\python.exe）
-cd backend && HOST=127.0.0.1 PORT=8010 python run_sse.py   # SSE（回环示例）
+cd backend && HOST=127.0.0.1 python run_sse.py              # SSE（默认 8000；被占用时自动回退 8010）
 ```
 
 `stdio` 不经过 HTTP/SSE 鉴权中间层，但受保护的 HTTP/SSE 路由仍要 `MCP_API_KEY`。`HOST=0.0.0.0` 只在确实需要远程访问、并且自己的防火墙 / 反向代理 / 鉴权已经就位时才使用；远程 hostname / origin 也要补 `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`。
@@ -360,16 +360,16 @@ cd backend && python ../scripts/evaluate_memory_palace_mcp_e2e.py
 
 这是一份发布摘要，具体数字会随硬件、provider 和模型不同而变化。完整方法与复现：[EVALUATION.md](docs/EVALUATION.md)。同口径旧版 vs 当前版本对照：[release_summary_vs_old_project_2026-03-06.md](docs/changelog/release_summary_vs_old_project_2026-03-06.md)。
 
-A/B/C/D 真实运行 · `profile_abcd_real_metrics.json` · 每数据集 8 样本 · 10 个干扰文档 · Seed = 20260219
+A/B/C/D 真实运行 · `profile_abcd_real_metrics.json` · 每数据集 8 样本 · 200 个干扰文档 · Seed = 20260219
 
-| 档位 | 数据集 | HR@10 | MRR | NDCG@10 | p95（ms） |
-|---|---|---:|---:|---:|---:|
-| A | SQuAD v2 / NFCorpus | 0.000 / 0.250 | 0.000 / 0.250 | 0.000 / 0.250 | 1.78 / 1.74 |
-| B | SQuAD v2 / NFCorpus | 0.625 / 0.750 | 0.302 / 0.478 | 0.383 / 0.542 | 4.92 / 5.02 |
-| **C** | SQuAD v2 / NFCorpus | **1.000** / 0.750 | **1.000** / 0.567 | **1.000** / 0.611 | 665 / 454 |
-| **D** | SQuAD v2 / NFCorpus | **1.000** / 0.750 | **1.000** / 0.650 | **1.000** / 0.673 | 2078 / 2365 |
+| 档位 | Avg HR@10 | Avg MRR | Avg NDCG@10 | Avg Recall@10 | Avg p95（ms） |
+|---|---:|---:|---:|---:|---:|
+| A | 0.125 | 0.125 | 0.125 | 0.125 | 2.7 |
+| B | 0.188 | 0.156 | 0.164 | 0.188 | 14.7 |
+| **C** | **0.812** | **0.714** | **0.737** | **0.812** | 208.8 |
+| **D** | **0.875** | **0.776** | **0.799** | **0.875** | 3004.9 |
 
-C/D 在记录的运行中通过已配置的 embedding 和 reranker 模型在 SQuAD v2 上达到完美召回，额外延迟来自模型推理和网络。A/B 大样本门控（100 样本）和完整逐数据集表格在 [EVALUATION.md](docs/EVALUATION.md) 中。
+C/D 在 B 的基础上加上真实 embedding 和 reranker，额外延迟来自模型推理和网络。逐数据集明细、A/B 大样本门控（100 样本）和旧版对照都在 [EVALUATION.md](docs/EVALUATION.md) 中。
 
 <p align="center">
   <img src="docs/images/benchmark_comparison.png" width="900" alt="旧版 vs 当前版本检索质量与延迟对比图" />

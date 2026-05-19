@@ -201,7 +201,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 cd frontend && npm install && npm run dev
 ```
 
-Open <http://localhost:5173>. Add `MCP_API_KEY=change-this` (or `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` for loopback-only debugging) to `.env` before starting the backend if you want Dashboard / `/browse` / `/review` / `/maintenance` access.
+Open <http://localhost:5173>. Add `MCP_API_KEY=<your-mcp-api-key>` (or `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` for loopback-only debugging) to `.env` before starting the backend if you want Dashboard / `/browse` / `/review` / `/maintenance` access.
 
 ### Default Endpoints
 
@@ -209,7 +209,7 @@ Open <http://localhost:5173>. Add `MCP_API_KEY=change-this` (or `MCP_API_KEY_ALL
 |---|---|---|
 | Frontend Dashboard | <http://localhost:5173> | <http://127.0.0.1:3000> |
 | Backend API | <http://127.0.0.1:8000> | <http://127.0.0.1:18000> |
-| SSE | <http://127.0.0.1:8010/sse> | <http://127.0.0.1:3000/sse> |
+| SSE | <http://127.0.0.1:8000/sse> (or `8010` fallback) | <http://127.0.0.1:3000/sse> |
 
 ### Important Boundaries
 
@@ -295,7 +295,7 @@ Memory Palace exposes **9 standardized tools**:
 
 ```bash
 cd backend && ./.venv/bin/python mcp_server.py     # stdio (Windows: .\.venv\Scripts\python.exe)
-cd backend && HOST=127.0.0.1 PORT=8010 python run_sse.py   # SSE (loopback)
+cd backend && HOST=127.0.0.1 python run_sse.py              # SSE (default 8000; auto-fallback 8010)
 ```
 
 `stdio` bypasses the HTTP/SSE auth middleware. HTTP/SSE routes still require `MCP_API_KEY`. Use `HOST=0.0.0.0` only after your own firewall/proxy/auth is in place; remote hosts also need `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`.
@@ -360,16 +360,16 @@ User-scope install is the stable default on fresh machines — Codex and OpenCod
 
 Release summary; numbers depend on hardware, provider, and model choice. Full methodology and reproduction: [EVALUATION_EN.md](docs/EVALUATION_EN.md). Old-vs-current comparison: [release_summary_vs_old_project_2026-03-06_EN.md](docs/changelog/release_summary_vs_old_project_2026-03-06_EN.md).
 
-A/B/C/D real run · `profile_abcd_real_metrics.json` · 8 samples per dataset · 10 distractors · Seed = 20260219
+A/B/C/D real run · `profile_abcd_real_metrics.json` · 8 samples per dataset · 200 distractors · Seed = 20260219
 
-| Profile | Dataset | HR@10 | MRR | NDCG@10 | p95 (ms) |
-|---|---|---:|---:|---:|---:|
-| A | SQuAD v2 / NFCorpus | 0.000 / 0.250 | 0.000 / 0.250 | 0.000 / 0.250 | 1.78 / 1.74 |
-| B | SQuAD v2 / NFCorpus | 0.625 / 0.750 | 0.302 / 0.478 | 0.383 / 0.542 | 4.92 / 5.02 |
-| **C** | SQuAD v2 / NFCorpus | **1.000** / 0.750 | **1.000** / 0.567 | **1.000** / 0.611 | 665 / 454 |
-| **D** | SQuAD v2 / NFCorpus | **1.000** / 0.750 | **1.000** / 0.650 | **1.000** / 0.673 | 2078 / 2365 |
+| Profile | Avg HR@10 | Avg MRR | Avg NDCG@10 | Avg Recall@10 | Avg p95 (ms) |
+|---|---:|---:|---:|---:|---:|
+| A | 0.125 | 0.125 | 0.125 | 0.125 | 2.7 |
+| B | 0.188 | 0.156 | 0.164 | 0.188 | 14.7 |
+| **C** | **0.812** | **0.714** | **0.737** | **0.812** | 208.8 |
+| **D** | **0.875** | **0.776** | **0.799** | **0.875** | 3004.9 |
 
-C/D reach perfect SQuAD v2 recall in the recorded run with configured embedding and reranker models; added latency is model inference + network. A/B large-sample gate (100 samples) and the full per-dataset table are in [EVALUATION_EN.md](docs/EVALUATION_EN.md).
+C/D add real embedding and reranker on top of B; the extra latency is model inference plus network. Per-dataset breakdown, A/B large-sample gate (100 samples), and the old-vs-current comparison are in [EVALUATION_EN.md](docs/EVALUATION_EN.md).
 
 <p align="center">
   <img src="docs/images/benchmark_comparison.png" width="900" alt="Old vs Current benchmark comparison" />

@@ -291,7 +291,14 @@ def _detect_filesystem_type(probe_path: Optional[FilePath]) -> str:
                 command,
                 stderr=subprocess.DEVNULL,
                 text=True,
+                timeout=5,
             ).strip()
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                "Filesystem type probe timed out after 5 seconds: %s",
+                " ".join(command),
+            )
+            continue
         except Exception:
             continue
         if not output:
@@ -836,6 +843,10 @@ class SQLiteClient:
                 requested_mode == "wal"
                 and self._runtime_write_wal_network_filesystem_signal
             ):
+                logger.warning(
+                    "WAL mode disabled: network filesystem detected, "
+                    "falling back to DELETE journal mode"
+                )
                 requested_mode = "delete"
                 status = "fallback_delete"
                 error = (

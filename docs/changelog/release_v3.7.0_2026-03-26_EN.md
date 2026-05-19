@@ -50,4 +50,3 @@ This note records what was actually changed and re-verified in the current repos
 Conservative release summary:
 
 > `v3.7.0` re-verifies the main backend/frontend paths, repairs strict validation around `session_id` and `priority`, and restores repo-local skill sync consistency.
-</content>

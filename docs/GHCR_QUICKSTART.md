@@ -170,4 +170,3 @@ docker compose -f docker-compose.ghcr.yml down -v
 - `docs/DEPLOYMENT_PROFILES.md`
 - `docs/TROUBLESHOOTING.md`
 - `docs/GHCR_ACCEPTANCE_CHECKLIST.md`
-</content>

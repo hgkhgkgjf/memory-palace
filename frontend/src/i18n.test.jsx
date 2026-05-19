@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 
 vi.mock('./lib/api', () => ({
   getSetupStatus: vi.fn().mockResolvedValue({
@@ -44,6 +45,27 @@ vi.mock('./features/maintenance/MaintenancePage', () => ({
 vi.mock('./features/observability/ObservabilityPage', () => ({
   default: () => <div>observability-page</div>,
 }));
+
+const runLangDetectScript = ({
+  storedLocale = null,
+  languages = ['en-US'],
+  language = 'en-US',
+} = {}) => {
+  const script = readFileSync('public/lang-detect.js', 'utf8');
+  const documentLike = { documentElement: { lang: '' } };
+  const localStorageLike = {
+    getItem: vi.fn((key) => (key === 'memory-palace.locale' ? storedLocale : null)),
+  };
+  const navigatorLike = { languages, language };
+
+  Function('localStorage', 'navigator', 'document', script)(
+    localStorageLike,
+    navigatorLike,
+    documentLike,
+  );
+
+  return documentLike.documentElement.lang;
+};
 
 describe('i18n bootstrap', () => {
   beforeEach(() => {
@@ -95,6 +117,12 @@ describe('i18n bootstrap', () => {
     expect(primedLocale).toBe('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
     expect(document.title).toBe('Memory Palace 控制台');
+  });
+
+  it('normalizes stored Chinese locale aliases in the synchronous lang detect script', () => {
+    expect(runLangDetectScript({ storedLocale: 'zh' })).toBe('zh-CN');
+    expect(runLangDetectScript({ storedLocale: 'zh-TW' })).toBe('zh-CN');
+    expect(runLangDetectScript({ storedLocale: 'zh-HK' })).toBe('zh-CN');
   });
 
   it('treats null translations as missing values instead of returning null', async () => {

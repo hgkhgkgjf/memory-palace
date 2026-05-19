@@ -285,22 +285,26 @@ cd <project-root>/backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn main:app --host 127.0.0.1 --port 18000
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+> `8000` is the backend's local default. `18000` only applies to Docker, where it is the host-side mapping of the container's `8000`.
 
 ### Step 3: Start the Frontend
 
 ```bash
 cd <project-root>/frontend
 npm install
-MEMORY_PALACE_API_PROXY_TARGET=http://127.0.0.1:18000 npm run dev -- --host 127.0.0.1 --port 3000
+MEMORY_PALACE_API_PROXY_TARGET=http://127.0.0.1:8000 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
 To proxy same-origin SSE through Vite, add:
 
 ```bash
-MEMORY_PALACE_SSE_PROXY_TARGET=http://127.0.0.1:8010
+MEMORY_PALACE_SSE_PROXY_TARGET=http://127.0.0.1:8000
 ```
+
+Only point the SSE proxy to `http://127.0.0.1:8010` when you run `run_sse.py` separately on `8010`.
 
 ---
 
@@ -392,10 +396,10 @@ Setting `MCP_API_KEY_ALLOW_INSECURE_LOCAL=true` bypasses auth:
 ### SSE Startup Example
 
 ```bash
-HOST=127.0.0.1 PORT=8010 python run_sse.py
+HOST=127.0.0.1 python run_sse.py
 ```
 
-> `run_sse.py` tries `127.0.0.1:8000` first and falls back to `8010` if occupied. To serve other hosts, bind `0.0.0.0`, then add `MCP_API_KEY`, network isolation, a reverse proxy, and TLS. Remote hostnames / origins also need `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`.
+> When `PORT` is not set, `run_sse.py` tries `127.0.0.1:8000` first and falls back to `8010` if occupied. Setting `PORT` pins the server to that port. To serve other hosts, bind `0.0.0.0`, then add `MCP_API_KEY`, network isolation, a reverse proxy, and TLS. Remote hostnames / origins also need `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`.
 
 ---
 

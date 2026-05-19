@@ -400,4 +400,3 @@ No. Vitality only decays over time. However, each time a memory is accessed (thr
 ### Q: When do I need to manually "Rebuild Index"?
 
 When you notice that memories you know exist aren't showing up in search results. Under normal use, the index is maintained automatically.
-</content>

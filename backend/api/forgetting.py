@@ -18,6 +18,7 @@ not used.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 from typing import Any, Dict, List, Optional, Sequence
@@ -337,7 +338,9 @@ async def confirm_archive(payload: ArchiveConfirmRequest) -> Dict[str, Any]:
     selected_id_set = set(selected_ids)
 
     def _validate_consumed_review_token(token: str, memory_id: int) -> bool:
-        return str(token or "") == review_token and int(memory_id) in selected_id_set
+        return hmac.compare_digest(str(token or ""), review_token) and int(
+            memory_id
+        ) in selected_id_set
 
     engine = _engine(review_token_validator=_validate_consumed_review_token)
 
@@ -435,7 +438,7 @@ async def archive(payload: ArchiveRequest) -> Dict[str, Any]:
 
     def _validate_legacy_review_token(token: str, memory_id: int) -> bool:
         return (
-            str(token or "").strip() == expected_legacy_token
+            hmac.compare_digest(str(token or "").strip(), expected_legacy_token)
             and int(memory_id) == int(payload.memory_id)
         )
 

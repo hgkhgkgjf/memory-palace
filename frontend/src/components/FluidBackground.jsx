@@ -1,8 +1,44 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+const getPrefersReducedMotion = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+};
+
 const FluidBackground = ({ reducedEffects = false }) => {
-  if (reducedEffects) {
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(getPrefersReducedMotion);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+    const handleChange = (event) => {
+      setPrefersReducedMotion(event.matches);
+    };
+
+    setPrefersReducedMotion(mediaQuery.matches);
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    if (typeof mediaQuery.addListener === 'function') {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+
+    return undefined;
+  }, []);
+
+  const shouldReduce = reducedEffects || prefersReducedMotion;
+  if (shouldReduce) {
     return (
       <div
         className="fixed inset-0 -z-10 overflow-hidden bg-[#fdfbf7]"

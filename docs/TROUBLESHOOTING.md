@@ -135,15 +135,15 @@ unset MCP_API_KEY MCP_API_KEY_ALLOW_INSECURE_LOCAL
 
 2. 检查 SSE 进程：
    ```bash
-   curl -fsS http://127.0.0.1:8010/health
+   curl -fsS http://127.0.0.1:8000/health
    ```
-   返回 `{"status":"ok","service":"memory-palace-sse"}` 即正常。
+   返回 `{"status":"ok","service":"memory-palace-sse"}` 即正常。如果 `8000` 被占用，`run_sse.py` 会自动回退到 `8010`，换成那个端口试试。
 
-3. 换端口启动：
+3. 手动指定端口：
    ```bash
-   HOST=127.0.0.1 PORT=8010 python run_sse.py
+   HOST=127.0.0.1 PORT=9000 python run_sse.py
    ```
-   `run_sse.py` 优先尝试 `8000`，被占用时自动回退 `8010`。日志会打印最终 `/sse` 地址，按提示更新客户端配置。
+   日志会打印最终 `/sse` 地址，按提示更新客户端配置。
 
 4. 查找并释放占用端口：
    ```bash

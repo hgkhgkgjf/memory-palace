@@ -13,6 +13,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $script:PortProbeFallbackWarned = $false
 $script:FrontendPortLockDir = $null
@@ -422,8 +423,8 @@ function Rewrite-LoopbackApiBaseForDocker {
         return $ApiBase
     }
 
-    $host = ([string]$builder.Host).Trim().ToLowerInvariant()
-    if ($host -notin @('127.0.0.1', '0.0.0.0', 'localhost', '::1')) {
+    $hostName = ([string]$builder.Host).Trim().ToLowerInvariant()
+    if ($hostName -notin @('127.0.0.1', '0.0.0.0', 'localhost', '::1')) {
         return $ApiBase
     }
 

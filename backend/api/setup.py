@@ -182,7 +182,10 @@ def _normalize_optional_value(value: Optional[str]) -> Optional[str]:
     if "\n" in normalized or "\r" in normalized:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Configuration values cannot contain line breaks.",
+            detail={
+                "error": "config_value_invalid_line_break",
+                "reason": "Configuration values cannot contain line breaks.",
+            },
         )
     return normalized
 
@@ -857,7 +860,10 @@ async def save_setup_config(payload: SetupConfigRequest) -> Dict[str, Any]:
     if not updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No configuration changes were provided.",
+            detail={
+                "error": "no_config_changes",
+                "reason": "No configuration changes were provided.",
+            },
         )
 
     try:

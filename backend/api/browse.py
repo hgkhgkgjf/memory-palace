@@ -53,6 +53,12 @@ ENABLE_WRITE_LANE_QUEUE = _env_bool("RUNTIME_WRITE_LANE_QUEUE", True)
 _DASHBOARD_WRITE_SESSION_ID = "dashboard"
 
 
+def _error_detail(error: str, reason: str, **extra: Any) -> Dict[str, Any]:
+    detail: Dict[str, Any] = {"error": error, "reason": reason}
+    detail.update({key: value for key, value in extra.items() if value is not None})
+    return detail
+
+
 def _event_preview(text: str, max_chars: int = 220) -> str:
     compact = " ".join(str(text or "").strip().split())
     if len(compact) <= max_chars:
@@ -78,7 +84,12 @@ def _normalize_domain_or_422(domain: str) -> str:
     if normalized not in _VALID_DOMAINS:
         raise HTTPException(
             status_code=422,
-            detail=f"Unknown domain '{normalized}'. Valid domains: {', '.join(_VALID_DOMAINS)}",
+            detail=_error_detail(
+                "invalid_domain",
+                f"Unknown domain '{normalized}'. Valid domains: {', '.join(_VALID_DOMAINS)}",
+                domain=normalized,
+                valid_domains=_VALID_DOMAINS,
+            ),
         )
     return normalized
 
@@ -88,7 +99,12 @@ def _ensure_writable_domain_or_422(domain: str, *, operation: str) -> str:
     if normalized in _READ_ONLY_DOMAINS:
         raise HTTPException(
             status_code=422,
-            detail=f"{operation} does not allow writes to '{normalized}://'. system:// is read-only.",
+            detail=_error_detail(
+                "read_only_domain",
+                f"{operation} does not allow writes to '{normalized}://'. system:// is read-only.",
+                domain=normalized,
+                operation=operation,
+            ),
         )
     return normalized
 
@@ -187,9 +203,13 @@ def _validate_path_length_or_422(path: str, *, label: str) -> str:
     if len(normalized) > _BROWSE_PATH_MAX_CHARS:
         raise HTTPException(
             status_code=422,
-            detail=(
+            detail=_error_detail(
+                "path_too_long",
                 f"{label} is too long ({len(normalized)} chars). "
-                f"Max allowed path length is {_BROWSE_PATH_MAX_CHARS}."
+                f"Max allowed path length is {_BROWSE_PATH_MAX_CHARS}.",
+                label=label,
+                length=len(normalized),
+                max_length=_BROWSE_PATH_MAX_CHARS,
             ),
         )
     return normalized
@@ -377,9 +397,16 @@ async def get_node(
         memory = await client.get_memory_by_path(
             path, domain=domain, reinforce_access=False
         )
-        
+
         if not memory:
-            raise HTTPException(status_code=404, detail=f"Path not found: {domain}://{path}")
+            raise HTTPException(
+                status_code=404,
+                detail=_error_detail(
+                    "path_not_found",
+                    f"Path not found: {domain}://{path}",
+                    uri=_make_uri(domain, path),
+                ),
+            )
         
         # Get children across all aliases of this memory
         children_raw = await client.get_children(memory["id"])
@@ -462,10 +489,14 @@ async def create_node(
     elif parent_path and len(parent_path) >= (_BROWSE_PATH_MAX_CHARS - 1):
         raise HTTPException(
             status_code=422,
-            detail=(
+            detail=_error_detail(
+                "path_too_long",
                 f"resulting path is too long. "
                 f"Cannot create a child under a {len(parent_path)}-char parent path "
-                f"when max allowed path length is {_BROWSE_PATH_MAX_CHARS}."
+                f"when max allowed path length is {_BROWSE_PATH_MAX_CHARS}.",
+                label="resulting path",
+                length=len(parent_path) + 1,
+                max_length=_BROWSE_PATH_MAX_CHARS,
             ),
         )
 
@@ -524,7 +555,10 @@ async def create_node(
     try:
         result = await _run_write_lane("browse.create_node", _write_task)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(
+            status_code=422,
+            detail=_error_detail("create_node_failed", str(e)),
+        )
 
     if bool(result.get("success")) and bool(result.get("created")):
         created_uri = str(result.get("uri") or _make_uri(domain, result.get("path") or ""))
@@ -552,7 +586,14 @@ async def update_node(
         path, domain=domain, reinforce_access=False
     )
     if not memory:
-        raise HTTPException(status_code=404, detail=f"Path not found: {domain}://{path}")
+        raise HTTPException(
+            status_code=404,
+            detail=_error_detail(
+                "path_not_found",
+                f"Path not found: {domain}://{path}",
+                uri=_make_uri(domain, path),
+            ),
+        )
 
     async def _write_task():
         lane_memory = await client.get_memory_by_path(
@@ -560,7 +601,12 @@ async def update_node(
         )
         if not lane_memory:
             raise HTTPException(
-                status_code=404, detail=f"Path not found: {domain}://{path}"
+                status_code=404,
+                detail=_error_detail(
+                    "path_not_found",
+                    f"Path not found: {domain}://{path}",
+                    uri=_make_uri(domain, path),
+                ),
             )
 
         if body.content is not None:
@@ -639,8 +685,17 @@ async def update_node(
         result = await _run_write_lane("browse.update_node", _write_task)
     except ValueError as e:
         if str(e).startswith("Memory version conflict"):
-            raise HTTPException(status_code=409, detail="Memory version conflict")
-        raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(
+                status_code=409,
+                detail=_error_detail(
+                    "memory_version_conflict",
+                    "Memory version conflict",
+                ),
+            )
+        raise HTTPException(
+            status_code=422,
+            detail=_error_detail("update_node_failed", str(e)),
+        )
 
     if bool(result.get("success")) and bool(result.get("updated")):
         change_parts = []
@@ -685,8 +740,14 @@ async def delete_node(
     except ValueError as e:
         message = str(e)
         if "not found" in message:
-            raise HTTPException(status_code=404, detail=message)
-        raise HTTPException(status_code=409, detail=message)
+            raise HTTPException(
+                status_code=404,
+                detail=_error_detail("path_not_found", message, uri=full_uri),
+            )
+        raise HTTPException(
+            status_code=409,
+            detail=_error_detail("delete_node_failed", message, uri=full_uri),
+        )
 
     await _record_dashboard_flush_event(f"Dashboard deleted {full_uri}")
     return {"success": True, **result}

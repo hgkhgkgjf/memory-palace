@@ -29,10 +29,10 @@ These numbers come from 2 datasets (`SQuAD v2 Dev`, `BEIR NFCorpus`) × 8 querie
 
 | Profile | Avg HR@10 | Avg MRR | Avg NDCG@10 | Avg Recall@10 | Avg p95(ms) |
 |---|---:|---:|---:|---:|---:|
-| A | 0.125 | 0.125 | 0.125 | 0.125 | 10.7 |
-| B | 0.188 | 0.156 | 0.164 | 0.188 | 48.5 |
-| C | 0.812 | 0.714 | 0.737 | 0.812 | 279.2 |
-| D | 0.875 | 0.776 | 0.799 | 0.875 | 3087.0 |
+| A | 0.125 | 0.125 | 0.125 | 0.125 | 2.7 |
+| B | 0.188 | 0.156 | 0.164 | 0.188 | 14.7 |
+| C | 0.812 | 0.714 | 0.737 | 0.812 | 208.8 |
+| D | 0.875 | 0.776 | 0.799 | 0.875 | 3004.9 |
 
 Key points:
 
@@ -181,4 +181,3 @@ If you need deeper reproduction, the repository ships benchmark helpers and test
 - When comparing different results, first confirm that `profile`, dataset scope, sample size, and model configuration are consistent.
 - If `profile c/d` lacks usable external model services, you may see `embedding_request_failed` / `embedding_fallback_hash`; this means the external chain is not ready, not that the main workflow is unusable.
 - For external communication, prefer the summary tables and chart already organized on this page; do not mix temporary re-test results from different baselines.
-</content>

@@ -49,4 +49,3 @@
 如果你要对外写一句摘要：
 
 > 这轮 follow-up 收紧了公开 MCP 输入契约，让 percent-encoded URI 的行为更可预期，在本地 SQLite 完整性异常时更早 fail-close，补掉了 vitality 多选删除的半成功窗口，并重新复核了后端、前端和 repo-local MCP。
-</content>

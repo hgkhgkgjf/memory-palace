@@ -285,22 +285,26 @@ cd <project-root>/backend
 python -m venv .venv
 source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-uvicorn main:app --host 127.0.0.1 --port 18000
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+> `8000` 是后端本地默认端口；`18000` 仅在 Docker 部署里才出现，是容器 `8000` 在宿主机上的端口映射。
 
 ### 第三步：启动前端
 
 ```bash
 cd <project-root>/frontend
 npm install
-MEMORY_PALACE_API_PROXY_TARGET=http://127.0.0.1:18000 npm run dev -- --host 127.0.0.1 --port 3000
+MEMORY_PALACE_API_PROXY_TARGET=http://127.0.0.1:8000 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
 如需 Vite 同源代理 SSE，再加：
 
 ```bash
-MEMORY_PALACE_SSE_PROXY_TARGET=http://127.0.0.1:8010
+MEMORY_PALACE_SSE_PROXY_TARGET=http://127.0.0.1:8000
 ```
+
+只有把 `run_sse.py` 单独跑在 `8010` 时，才把 SSE 代理目标改成 `http://127.0.0.1:8010`。
 
 ---
 
@@ -392,10 +396,10 @@ Authorization: Bearer <你的 MCP_API_KEY>
 ### SSE 启动示例
 
 ```bash
-HOST=127.0.0.1 PORT=8010 python run_sse.py
+HOST=127.0.0.1 python run_sse.py
 ```
 
-> `run_sse.py` 优先尝试 `127.0.0.1:8000`，被占用时回退到 `8010`。要给其他机器访问改成 `0.0.0.0`，并自行补齐 `MCP_API_KEY`、网络隔离、反向代理与 TLS。远程 hostname / origin 还需要 `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`。
+> 不显式设置 `PORT` 时，`run_sse.py` 优先尝试 `127.0.0.1:8000`，被占用时回退到 `8010`。显式设置 `PORT` 会固定使用该端口。要给其他机器访问改成 `0.0.0.0`，并自行补齐 `MCP_API_KEY`、网络隔离、反向代理与 TLS。远程 hostname / origin 还需要 `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS`。
 
 ---
 

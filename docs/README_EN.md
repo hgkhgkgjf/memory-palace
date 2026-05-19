@@ -56,4 +56,3 @@
 | Document | Description |
 |---|---|
 | [EVALUATION_EN.md](EVALUATION_EN.md) | Public benchmark methodology, summary of key A/B/C/D metrics, and reproduction commands |
-</content>

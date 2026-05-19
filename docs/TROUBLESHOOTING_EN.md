@@ -135,15 +135,15 @@ Meaning of the `reason` field:
 
 2. Probe the SSE process:
    ```bash
-   curl -fsS http://127.0.0.1:8010/health
+   curl -fsS http://127.0.0.1:8000/health
    ```
-   `{"status":"ok","service":"memory-palace-sse"}` means it's up.
+   `{"status":"ok","service":"memory-palace-sse"}` means it's up. If `8000` is occupied, `run_sse.py` auto-falls back to `8010`; try that port instead.
 
-3. Change the port:
+3. Override the port:
    ```bash
-   HOST=127.0.0.1 PORT=8010 python run_sse.py
+   HOST=127.0.0.1 PORT=9000 python run_sse.py
    ```
-   `run_sse.py` tries `8000` first and falls back to `8010` if occupied. The log prints the final `/sse` address; update client config to match.
+   The log prints the final `/sse` address; update client config to match.
 
 4. Find and release the port:
    ```bash

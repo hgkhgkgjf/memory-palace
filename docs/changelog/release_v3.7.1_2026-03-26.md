@@ -57,4 +57,3 @@
 发布摘要建议：
 
 > `v3.7.1` 收紧了本地 delete-path 原子性，保住了 alias 自身的 rollback metadata，修稳了 Windows 运维脚本边界，并完成了原生 macOS / Windows 宿主上的主链路复验。
-</content>

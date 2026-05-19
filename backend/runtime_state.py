@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import inspect
 import math
 import os
@@ -1456,9 +1457,9 @@ class CleanupReviewCoordinator:
             record = self._records.get(review_id_value)
             if record is None:
                 return {"ok": False, "error": "review_not_found_or_expired"}
-            if record.token != token_value:
+            if not hmac.compare_digest(record.token, token_value):
                 return {"ok": False, "error": "invalid_review_token"}
-            if record.confirmation_phrase != phrase_value:
+            if not hmac.compare_digest(record.confirmation_phrase, phrase_value):
                 return {"ok": False, "error": "confirmation_phrase_mismatch"}
             self._records.pop(review_id_value, None)
 

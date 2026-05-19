@@ -57,4 +57,3 @@ This note records what was actually changed and re-verified in the current repos
 Conservative release summary:
 
 > `v3.7.1` tightens local delete-path atomicity, preserves alias-specific rollback metadata, hardens Windows operator script boundaries, and re-verifies the main backend/frontend paths on real macOS and Windows hosts.
-</content>
