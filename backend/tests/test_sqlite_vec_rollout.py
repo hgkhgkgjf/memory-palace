@@ -1,3 +1,5 @@
+import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -72,6 +74,11 @@ async def test_sqlite_vec_rollout_enabled_without_extension_falls_back_to_legacy
     monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
     monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
     monkeypatch.delenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", raising=False)
+    monkeypatch.setattr(
+        SQLiteClient,
+        "_auto_discover_sqlite_vec_extension_path",
+        staticmethod(lambda: None),
+    )
 
     client = SQLiteClient(_sqlite_url(tmp_path / "sqlite-vec-no-extension.db"))
     await client.init_db()
@@ -105,6 +112,58 @@ async def test_sqlite_vec_rollout_enabled_without_extension_falls_back_to_legacy
         search_payload["metadata"]["vector_engine_selected"] == "legacy"
     )
     assert search_payload["metadata"]["vector_engine_path"] == "legacy_python_scoring"
+
+
+@pytest.mark.asyncio
+async def test_sqlite_vec_rollout_auto_discovers_pip_extension_without_env_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    extension_path = _resolve_sqlite_vec_extension_path()
+    if not extension_path:
+        pytest.skip("sqlite-vec package not available in test environment")
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "hash")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_ENABLED", "true")
+    monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
+    monkeypatch.delenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", raising=False)
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "sqlite-vec-auto-discovery.db"))
+    await client.init_db()
+    status_payload = await client.get_index_status()
+    capabilities = status_payload["capabilities"]
+    if capabilities["sqlite_vec_readiness"] != "ready":
+        await client.close()
+        pytest.skip("sqlite-vec extension cannot be loaded in current SQLite runtime")
+
+    await client.create_memory(
+        parent_path="",
+        content="sqlite vec auto discovery native search sample",
+        priority=1,
+        title="sqlite_vec_auto_discovery_native",
+        domain="core",
+    )
+    search_payload = await client.search_advanced(
+        query="sqlite vec auto discovery native search",
+        mode="semantic",
+        max_results=5,
+        candidate_multiplier=2,
+        filters={},
+    )
+    await client.close()
+
+    assert capabilities["sqlite_vec_status"] != "skipped_no_extension_path"
+    assert capabilities["sqlite_vec_diag_code"] != "path_not_provided"
+    assert capabilities["vector_engine_effective"] == "vec"
+    assert capabilities["sqlite_vec_knn_ready"] is True
+    expected_path = SQLiteClient._resolve_sqlite_extension_file(extension_path)
+    assert expected_path is not None
+    assert Path(client._sqlite_vec_capability["extension_path"]).resolve(
+        strict=False
+    ) == expected_path.resolve(strict=False)
+    assert search_payload["results"]
+    assert search_payload["metadata"]["vector_engine_path"] == "vec_native_topk_sql"
+
 
 @pytest.mark.asyncio
 async def test_sqlite_vec_rollout_ready_keeps_vec_selection(
@@ -274,6 +333,11 @@ async def test_sqlite_vec_rollout_falls_back_when_vec_knn_not_ready(
     monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
     monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
     monkeypatch.delenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", raising=False)
+    monkeypatch.setattr(
+        SQLiteClient,
+        "_auto_discover_sqlite_vec_extension_path",
+        staticmethod(lambda: None),
+    )
 
     client = SQLiteClient(_sqlite_url(tmp_path / "sqlite-vec-native-fallback.db"))
     await client.init_db()
@@ -409,6 +473,203 @@ async def test_sqlite_vec_rollout_vec0_knn_path_with_real_extension(
     assert search_payload["metadata"]["vector_engine_path"] == "vec_native_topk_sql"
     assert search_payload["metadata"]["sqlite_vec_knn_ready"] is True
     assert "sqlite_vec_native_query_failed" not in search_payload.get("degrade_reasons", [])
+
+
+@pytest.mark.asyncio
+async def test_sqlite_vec_rollout_rrf_and_native_vec_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    sqlite_vec = pytest.importorskip("sqlite_vec")
+    extension_path = str(sqlite_vec.loadable_path())
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "hash")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_ENABLED", "true")
+    monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", extension_path)
+    monkeypatch.setenv("RRF_ENABLED", "true")
+    monkeypatch.setenv("RRF_K", "10")
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "sqlite-vec-rrf-native.db"))
+    await client.init_db()
+    status_payload = await client.get_index_status()
+    if status_payload["capabilities"]["sqlite_vec_readiness"] != "ready":
+        await client.close()
+        pytest.skip("sqlite-vec extension cannot be loaded in current SQLite runtime")
+
+    await client.create_memory(
+        parent_path="",
+        content="sqlite vec rrf native fusion alpha sample",
+        priority=1,
+        title="sqlite_vec_rrf_native_alpha",
+        domain="core",
+    )
+    await client.create_memory(
+        parent_path="",
+        content="sqlite vec rrf native fusion beta sample",
+        priority=1,
+        title="sqlite_vec_rrf_native_beta",
+        domain="core",
+    )
+    search_payload = await client.search_advanced(
+        query="sqlite vec rrf native fusion",
+        mode="hybrid",
+        max_results=5,
+        candidate_multiplier=2,
+        filters={},
+    )
+    await client.close()
+
+    metadata = search_payload["metadata"]
+    assert search_payload["results"]
+    assert metadata["vector_engine_selected"] == "vec"
+    assert metadata["vector_engine_path"] == "vec_native_topk_sql"
+    assert metadata["sqlite_vec_knn_ready"] is True
+    assert metadata["rrf_applied"] is True
+    assert metadata["rrf_k"] == 10
+    assert metadata["rrf_channels"] == ["fts5", "vector"]
+
+
+@pytest.mark.asyncio
+async def test_sqlite_vec_rollout_recreates_vec0_when_dimension_changes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sqlite_vec = pytest.importorskip("sqlite_vec")
+    extension_path = str(sqlite_vec.loadable_path())
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "hash")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "64")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_ENABLED", "true")
+    monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", extension_path)
+
+    client = SQLiteClient(_sqlite_url(tmp_path / "sqlite-vec-dim-switch.db"))
+    await client.init_db()
+    status_payload = await client.get_index_status()
+    if status_payload["capabilities"]["sqlite_vec_readiness"] != "ready":
+        await client.close()
+        pytest.skip("sqlite-vec extension cannot be loaded in current SQLite runtime")
+
+    await client.create_memory(
+        parent_path="",
+        content="sqlite vec dimension switch sample",
+        priority=1,
+        title="sqlite_vec_dimension_switch",
+        domain="core",
+    )
+
+    vector_1024 = json.dumps([0.0] * 1024, separators=(",", ":"))
+    client._embedding_dim = 1024
+    caplog.set_level(logging.WARNING, logger="db.sqlite_client")
+    async with client.engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE memory_chunks_vec SET vector = :vector, dim = 1024"),
+            {"vector": vector_1024},
+        )
+        ready = await conn.run_sync(client._setup_sqlite_vec_knn_infra)
+        schema_result = await conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE name = 'memory_chunks_vec0'")
+        )
+        count_result = await conn.execute(text("SELECT COUNT(*) FROM memory_chunks_vec0"))
+
+    await client.close()
+
+    assert ready is True
+    assert "float[1024]" in str(schema_result.scalar() or "")
+    assert int(count_result.scalar() or 0) >= 1
+    assert "dimension change: 64 -> 1024" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_sqlite_vec_rollout_rebuilds_vec0_across_restarted_dimension_switches(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    sqlite_vec = pytest.importorskip("sqlite_vec")
+    extension_path = str(sqlite_vec.loadable_path())
+    db_path = tmp_path / "sqlite-vec-dim-switch-restart.db"
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_BACKEND", "hash")
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "64")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_ENABLED", "true")
+    monkeypatch.setenv("RETRIEVAL_VECTOR_ENGINE", "vec")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_READ_RATIO", "100")
+    monkeypatch.setenv("RETRIEVAL_SQLITE_VEC_EXTENSION_PATH", extension_path)
+
+    client64 = SQLiteClient(_sqlite_url(db_path))
+    await client64.init_db()
+    status64 = await client64.get_index_status()
+    if status64["capabilities"]["sqlite_vec_readiness"] != "ready":
+        await client64.close()
+        pytest.skip("sqlite-vec extension cannot be loaded in current SQLite runtime")
+    await client64.create_memory(
+        parent_path="",
+        content="sqlite vec restart dimension alpha sixty four",
+        priority=1,
+        title="sqlite_vec_restart_dimension_alpha",
+        domain="core",
+    )
+    await client64.close()
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "1024")
+    client1024 = SQLiteClient(_sqlite_url(db_path))
+    await client1024.init_db()
+    await client1024.create_memory(
+        parent_path="",
+        content="sqlite vec restart dimension beta ten twenty four",
+        priority=1,
+        title="sqlite_vec_restart_dimension_beta",
+        domain="core",
+    )
+    search1024 = await client1024.search_advanced(
+        query="sqlite vec restart dimension beta ten twenty four",
+        mode="semantic",
+        max_results=5,
+        candidate_multiplier=2,
+        filters={},
+    )
+    async with client1024.session() as session:
+        schema1024_result = await session.execute(
+            text("SELECT sql FROM sqlite_master WHERE name = 'memory_chunks_vec0'")
+        )
+    await client1024.close()
+
+    assert "float[1024]" in str(schema1024_result.scalar() or "")
+    assert search1024["results"]
+    assert search1024["mode"] == "semantic"
+    assert search1024["metadata"]["indexed_vector_dim_status"] == (
+        "mixed_current_aligned"
+    )
+    assert search1024["metadata"]["vector_engine_path"] == "vec_native_topk_sql"
+    assert "vector_dim_mixed_requires_reindex" in search1024["degrade_reasons"]
+    assert "embedding_dim_mismatch:64!=1024" in search1024["degrade_reasons"]
+
+    monkeypatch.setenv("RETRIEVAL_EMBEDDING_DIM", "64")
+    client64_again = SQLiteClient(_sqlite_url(db_path))
+    await client64_again.init_db()
+    search64 = await client64_again.search_advanced(
+        query="sqlite vec restart dimension alpha sixty four",
+        mode="semantic",
+        max_results=5,
+        candidate_multiplier=2,
+        filters={},
+    )
+    async with client64_again.session() as session:
+        schema64_result = await session.execute(
+            text("SELECT sql FROM sqlite_master WHERE name = 'memory_chunks_vec0'")
+        )
+    await client64_again.close()
+
+    assert "float[64]" in str(schema64_result.scalar() or "")
+    assert search64["results"]
+    assert search64["mode"] == "semantic"
+    assert search64["metadata"]["indexed_vector_dim_status"] == "mixed_current_aligned"
+    assert search64["metadata"]["vector_engine_path"] == "vec_native_topk_sql"
+    assert "embedding_dim_mismatch:1024!=64" in search64["degrade_reasons"]
 
 
 @pytest.mark.asyncio

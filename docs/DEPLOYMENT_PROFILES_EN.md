@@ -39,8 +39,8 @@ Choose a profile (A / B / C / D) based on your hardware and use case, then deplo
 
 **Notes**:
 
-- A → B: upgrades from pure keyword to hybrid search (built-in 64-dim hash, no external deps).
-- B → C/D: real embedding + reranker for stronger semantic retrieval.
+- A → B: upgrades from pure keyword to hybrid search (built-in 64-dim hash, no external deps). B enables RRF fusion by default (`RRF_K=10`).
+- B → C/D: real embedding + reranker for stronger semantic retrieval. C/D also request the `sqlite-vec` native vector engine; it is auto-discovered from pip `sqlite-vec` and falls back to legacy if not installed.
 - C vs D: same algorithm path. Defaults differ on endpoint (local vs remote) and reranker weight (C `0.30`, D `0.35`).
 
 > **Before upgrading**: if your database already contains vectors written by a different embedding backend, run `index_status()` first. If dimensions don't match, run `rebuild_index(wait=true)` or validate against a fresh database. The system does not auto-migrate old vectors.
@@ -74,6 +74,10 @@ RETRIEVAL_EMBEDDING_DIM=64
 RETRIEVAL_RERANKER_ENABLED=false
 RUNTIME_INDEX_WORKER_ENABLED=true
 RUNTIME_INDEX_DEFER_ON_WRITE=true
+
+# RRF fusion (on by default for this profile)
+RRF_ENABLED=true
+RRF_K=10
 ```
 
 ### Profile C — Local / Private API
@@ -97,6 +101,16 @@ RETRIEVAL_RERANKER_API_BASE=http://127.0.0.1:PORT/v1
 RETRIEVAL_RERANKER_API_KEY=replace-with-your-key
 RETRIEVAL_RERANKER_MODEL=your-reranker-model-id
 RETRIEVAL_RERANKER_WEIGHT=0.30
+
+# RRF fusion (on by default for this profile)
+RRF_ENABLED=true
+RRF_K=10
+
+# sqlite-vec native vector engine (auto-discovered from pip install sqlite-vec)
+RETRIEVAL_SQLITE_VEC_ENABLED=true
+RETRIEVAL_SQLITE_VEC_EXTENSION_PATH=
+RETRIEVAL_VECTOR_ENGINE=vec
+RETRIEVAL_SQLITE_VEC_READ_RATIO=100
 ```
 
 Without a unified `router`, configure directly:

@@ -4,7 +4,10 @@ import hmac
 import hashlib
 import asyncio
 import errno
+import logging
 import socket
+import threading
+import time
 import uvicorn
 from collections import deque
 from contextlib import asynccontextmanager
@@ -40,6 +43,8 @@ from mcp.server.sse import SseServerTransport
 from mcp.shared.message import ServerMessageMetadata, SessionMessage
 from runtime_state import runtime_state
 from runtime_bootstrap import initialize_backend_runtime
+
+logger = logging.getLogger(__name__)
 
 _MCP_API_KEY_ENV = "MCP_API_KEY"
 _MCP_API_KEY_HEADER = "X-MCP-API-Key"
@@ -446,7 +451,7 @@ class MemoryPalaceSseServerTransport(SseServerTransport):
         )
         self._message_rate_limit_buckets: Dict[str, Deque[float]] = {}
         self._message_rate_limit_last_seen: Dict[str, float] = {}
-        self._message_rate_limit_guard = asyncio.Lock()
+        self._message_rate_limit_guard = threading.Lock()
         self._runtime_loop: Optional[asyncio.AbstractEventLoop] = None
         self._shutdown_streams_requested = False
 
@@ -459,8 +464,8 @@ class MemoryPalaceSseServerTransport(SseServerTransport):
         self, *, scope: Scope, session_id: UUID
     ) -> Optional[int]:
         key = self._session_rate_limit_key(scope, session_id)
-        now = asyncio.get_running_loop().time()
-        async with self._message_rate_limit_guard:
+        now = time.monotonic()
+        with self._message_rate_limit_guard:
             bucket = self._message_rate_limit_buckets.get(key)
             if bucket is None:
                 self._evict_oldest_rate_limit_key_if_needed()
@@ -502,7 +507,10 @@ class MemoryPalaceSseServerTransport(SseServerTransport):
     async def connect_sse(self, scope: Scope, receive: Receive, send: Send):
         if scope["type"] != "http":
             raise ValueError("connect_sse can only handle HTTP requests")
-        self._runtime_loop = asyncio.get_running_loop()
+        try:
+            self._runtime_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._runtime_loop = None
 
         request = Request(scope, receive)
         error_response = await self._security.validate_request(request, is_post=False)
@@ -616,8 +624,18 @@ class MemoryPalaceSseServerTransport(SseServerTransport):
                     await self._clear_message_rate_limit_state(
                         scope=scope, session_id=session_id
                     )
-                    await read_stream_writer.aclose()
-                    await write_stream_reader.aclose()
+                    try:
+                        await read_stream_writer.aclose()
+                    except ClosedResourceError:
+                        pass
+                    except Exception:
+                        logger.debug("SSE read stream writer close failed", exc_info=True)
+                    try:
+                        await write_stream_reader.aclose()
+                    except ClosedResourceError:
+                        pass
+                    except Exception:
+                        logger.debug("SSE write stream reader close failed", exc_info=True)
 
             tg.start_soon(response_wrapper, scope, receive, send)
             yield (read_stream, write_stream)
@@ -631,7 +649,7 @@ class MemoryPalaceSseServerTransport(SseServerTransport):
             except Exception:
                 continue
 
-        async with self._message_rate_limit_guard:
+        with self._message_rate_limit_guard:
             self._message_rate_limit_buckets.clear()
             self._message_rate_limit_last_seen.clear()
 

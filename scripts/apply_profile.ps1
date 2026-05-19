@@ -29,6 +29,9 @@ param(
     [switch]$ShowHelp
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $Platform = $Platform.ToLowerInvariant()
@@ -114,6 +117,7 @@ function Acquire-TargetFileLock {
     }
 
     $lockPath = "$TargetPath.lock"
+    $stream = $null
     try {
         $stream = New-TargetFileLockStream -LockPath $lockPath
     }

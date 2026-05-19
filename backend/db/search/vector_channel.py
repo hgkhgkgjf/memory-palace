@@ -99,14 +99,20 @@ class VectorChannel(BaseChannel):
             if not indexed_vector_dims:
                 self.last_degrade_reasons.append("vector_index_empty")
                 return []
+            expected_dim = int(self._client._embedding_dim)
             if len(indexed_vector_dims) > 1:
+                self._client._append_embedding_dim_mismatch_reasons(
+                    self.last_degrade_reasons,
+                    stored_dims=set(indexed_vector_dims),
+                    query_dim=expected_dim,
+                )
                 self.last_degrade_reasons.append(
                     "vector_dim_mixed_requires_reindex"
                 )
-                return []
+                if expected_dim not in indexed_vector_dims:
+                    return []
             stored_dim = int(indexed_vector_dims[0])
-            expected_dim = int(self._client._embedding_dim)
-            if stored_dim != expected_dim:
+            if len(indexed_vector_dims) == 1 and stored_dim != expected_dim:
                 self.last_degrade_reasons.append(
                     f"embedding_dim_mismatch:{stored_dim}!={expected_dim}"
                 )

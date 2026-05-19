@@ -982,6 +982,8 @@ class SQLiteClient:
 
         extension_input = str(self._sqlite_vec_extension_path or "").strip()
         if not extension_input:
+            extension_input = self._auto_discover_sqlite_vec_extension_path() or ""
+        if not extension_input:
             return
 
         resolved_extension = self._resolve_sqlite_extension_file(extension_input)
@@ -1392,23 +1394,20 @@ class SQLiteClient:
             return False
 
         vector_dim = max(16, int(self._embedding_dim))
-        try:
-            dim_rows = connection.execute(
-                text(
-                    "SELECT DISTINCT dim "
-                    "FROM memory_chunks_vec "
-                    "WHERE dim IS NOT NULL AND dim > 0 "
-                    "LIMIT 2"
-                )
-            ).fetchall()
-            if len(dim_rows) == 1 and dim_rows[0][0] is not None:
-                vector_dim = max(16, int(dim_rows[0][0]))
-        except Exception:
-            # Keep configured dim when probing existing vectors fails.
-            vector_dim = max(16, int(self._embedding_dim))
         self._sqlite_vec_knn_dim = vector_dim
         table_name = self._quote_sqlite_identifier(self._sqlite_vec_knn_table)
         try:
+            existing_dim = self._get_existing_vec0_dim(
+                connection, self._sqlite_vec_knn_table
+            )
+            if existing_dim is not None and existing_dim != vector_dim:
+                logger.warning(
+                    "Recreating sqlite-vec KNN table %s due to dimension change: %s -> %s",
+                    self._sqlite_vec_knn_table,
+                    existing_dim,
+                    vector_dim,
+                )
+                connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
             connection.execute(
                 text(
                     f"CREATE VIRTUAL TABLE IF NOT EXISTS {table_name} "
@@ -2115,6 +2114,45 @@ class SQLiteClient:
                 continue
         return None
 
+    @staticmethod
+    def _get_existing_vec0_dim(connection, table_name: str) -> Optional[int]:
+        """Parse the dimension of an existing vec0 table from sqlite_master."""
+        try:
+            row = connection.execute(
+                text(
+                    "SELECT sql FROM sqlite_master "
+                    "WHERE type = 'table' AND name = :tbl "
+                    "LIMIT 1"
+                ),
+                {"tbl": table_name},
+            ).fetchone()
+            if row is None or row[0] is None:
+                return None
+            match = re.search(
+                r"\bfloat\s*\[\s*(\d+)\s*\]",
+                str(row[0]),
+                re.IGNORECASE,
+            )
+            if match:
+                return int(match.group(1))
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _auto_discover_sqlite_vec_extension_path() -> Optional[str]:
+        """Try to find the sqlite-vec native extension via the pip package."""
+        try:
+            import sqlite_vec  # type: ignore[import-untyped]
+
+            loadable = getattr(sqlite_vec, "loadable_path", None)
+            if callable(loadable):
+                path = str(loadable()).strip()
+                return path or None
+        except Exception:
+            pass
+        return None
+
     def _probe_sqlite_vec_capability(self) -> Dict[str, Any]:
         capability: Dict[str, Any] = {
             "status": "disabled",
@@ -2131,6 +2169,8 @@ class SQLiteClient:
             return capability
 
         extension_input = str(self._sqlite_vec_extension_path or "").strip()
+        if not extension_input:
+            extension_input = self._auto_discover_sqlite_vec_extension_path() or ""
         if not extension_input:
             capability["status"] = "skipped_no_extension_path"
             capability["diag_code"] = "path_not_provided"
@@ -3789,9 +3829,14 @@ class SQLiteClient:
                 "JOIN memories m ON m.id = mc.memory_id "
                 "JOIN paths p ON p.memory_id = mc.memory_id "
                 f"WHERE {where_clause} "
+                "AND mcv.dim = :query_vector_dim "
                 "LIMIT :semantic_pool_limit"
             ),
-            {**where_params, "semantic_pool_limit": semantic_pool_limit},
+            {
+                **where_params,
+                "query_vector_dim": len(query_embedding),
+                "semantic_pool_limit": semantic_pool_limit,
+            },
         )
 
         semantic_scored: List[Tuple[float, Dict[str, Any]]] = []
@@ -6823,7 +6868,6 @@ class SQLiteClient:
                     vector_engine_metadata["indexed_vector_dim_status"] = "empty"
                 elif len(indexed_vector_dims) > 1:
                     vector_engine_metadata["indexed_vector_dim_status"] = "mixed"
-                    mode_value = "keyword"
                     self._append_embedding_dim_mismatch_reasons(
                         degrade_reasons,
                         stored_dims=set(indexed_vector_dims),
@@ -6832,6 +6876,12 @@ class SQLiteClient:
                     self._append_degrade_reason(
                         degrade_reasons, "vector_dim_mixed_requires_reindex"
                     )
+                    if int(self._embedding_dim) in indexed_vector_dims:
+                        vector_engine_metadata["indexed_vector_dim_status"] = (
+                            "mixed_current_aligned"
+                        )
+                    else:
+                        mode_value = "keyword"
                 elif indexed_vector_dims[0] != int(self._embedding_dim):
                     vector_engine_metadata["indexed_vector_dim_status"] = "mismatch"
                     mode_value = "keyword"

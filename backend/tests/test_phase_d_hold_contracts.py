@@ -112,7 +112,7 @@ def _load_env_pairs(file_path: Path) -> dict[str, str]:
 
 
 def test_phase_d_hold_default_flags_off_in_env_and_profiles() -> None:
-    expected_defaults = {
+    base_defaults = {
         "EXTERNAL_IMPORT_ENABLED": "false",
         "EXTERNAL_IMPORT_ALLOWED_ROOTS": "",
         "EXTERNAL_IMPORT_ALLOWED_EXTS": ".md,.txt,.json",
@@ -124,13 +124,21 @@ def test_phase_d_hold_default_flags_off_in_env_and_profiles() -> None:
         "EMBEDDING_PROVIDER_CHAIN_ENABLED": "false",
         "EMBEDDING_PROVIDER_FAIL_OPEN": "false",
         "EMBEDDING_PROVIDER_FALLBACK": "hash",
-        "RETRIEVAL_SQLITE_VEC_ENABLED": "false",
         "RETRIEVAL_SQLITE_VEC_EXTENSION_PATH": "",
-        "RETRIEVAL_VECTOR_ENGINE": "legacy",
-        "RETRIEVAL_SQLITE_VEC_READ_RATIO": "0",
+        "RUNTIME_AUTO_FLUSH_ENABLED": "true",
         "RUNTIME_WRITE_WAL_SYNCHRONOUS": "normal",
         "RUNTIME_WRITE_BUSY_TIMEOUT_MS": "5000",
         "RUNTIME_WRITE_WAL_AUTOCHECKPOINT": "1000",
+    }
+    vec_off = {
+        "RETRIEVAL_SQLITE_VEC_ENABLED": "false",
+        "RETRIEVAL_VECTOR_ENGINE": "legacy",
+        "RETRIEVAL_SQLITE_VEC_READ_RATIO": "0",
+    }
+    vec_on = {
+        "RETRIEVAL_SQLITE_VEC_ENABLED": "true",
+        "RETRIEVAL_VECTOR_ENGINE": "vec",
+        "RETRIEVAL_SQLITE_VEC_READ_RATIO": "100",
     }
 
     project_root = Path(__file__).resolve().parents[2]
@@ -156,6 +164,16 @@ def test_phase_d_hold_default_flags_off_in_env_and_profiles() -> None:
     assert contract_files, "expected env contracts to exist"
     for contract_file in contract_files:
         pairs = _load_env_pairs(contract_file)
+        fname = contract_file.name
+        is_cd = fname in ("profile-c.env", "profile-d.env")
+        expected_defaults = {**base_defaults, **(vec_on if is_cd else vec_off)}
+        if fname == ".env.example":
+            expected_defaults.update({"RRF_ENABLED": "false", "RRF_K": "60"})
+        elif fname == "profile-a.env":
+            assert "RRF_ENABLED" not in pairs, f"{contract_file} should keep RRF unset"
+            assert "RRF_K" not in pairs, f"{contract_file} should keep RRF unset"
+        else:
+            expected_defaults.update({"RRF_ENABLED": "true", "RRF_K": "10"})
         missing = [key for key in expected_defaults if key not in pairs]
         assert not missing, f"{contract_file} missing defaults: {missing}"
         for key, expected in expected_defaults.items():

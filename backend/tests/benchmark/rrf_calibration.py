@@ -612,8 +612,8 @@ async def run_calibration(database_path: Path) -> Dict[str, Any]:
                     "reason": reason,
                     "feature_flag_default": False,
                     "notes": (
-                        "RRF stays OFF by default (C5). Operators enable it via "
-                        "RRF_ENABLED=true after replicating this calibration."
+                        "Raw code defaults keep RRF off (C5). Shipped Profile B/C/D "
+                        "templates opt in via RRF_ENABLED=true and RRF_K=10."
                     ),
                 },
                 "adaptive_formula": _adaptive_formula(per_k_metrics),

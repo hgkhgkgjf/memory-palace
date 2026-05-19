@@ -97,7 +97,7 @@
     "optimal_k": 5,
     "reason": "composite=0.6*MRR+0.3*Recall+0.1*NDCG=0.9832; p95=2.563ms",
     "feature_flag_default": false,
-    "notes": "RRF stays OFF by default (C5). Operators enable it via RRF_ENABLED=true after replicating this calibration."
+    "notes": "Raw code defaults keep RRF off (C5). Shipped Profile B/C/D templates opt in via RRF_ENABLED=true and RRF_K=10."
   },
   "adaptive_formula": {
     "formula": "k = clamp(2 * max_channel_depth, 10, 60)",
