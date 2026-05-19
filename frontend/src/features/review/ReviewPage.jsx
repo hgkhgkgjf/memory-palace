@@ -73,12 +73,14 @@ function ReviewPage() {
   const diffRequestRef = useRef(0);
   const snapshotsRequestRef = useRef(0);
   const mutationInFlightRef = useRef(false);
+  const mountedRef = useRef(false);
   const diffError = useMemo(() => {
     if (!diffErrorState) return null;
     return extractApiError(diffErrorState.error, t(diffErrorState.fallbackKey));
   }, [diffErrorState, t]);
 
   const beginMutation = () => {
+    if (!mountedRef.current) return false;
     if (mutationInFlightRef.current) return false;
     mutationInFlightRef.current = true;
     setMutationInFlight(true);
@@ -87,19 +89,36 @@ function ReviewPage() {
 
   const endMutation = () => {
     mutationInFlightRef.current = false;
-    setMutationInFlight(false);
+    if (mountedRef.current) {
+      setMutationInFlight(false);
+    }
   };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      sessionsRequestRef.current += 1;
+      snapshotsRequestRef.current += 1;
+      diffRequestRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
 
+  const isActiveSession = useCallback((sessionId) => (
+    mountedRef.current && currentSessionIdRef.current === sessionId
+  ), []);
+
   const loadSessions = useCallback(async () => {
+    if (!mountedRef.current) return;
     const requestId = ++sessionsRequestRef.current;
     try {
       const rawList = await getSessions();
       const list = normalizeSessionList(rawList);
-      if (requestId !== sessionsRequestRef.current) return;
+      if (!mountedRef.current || requestId !== sessionsRequestRef.current) return;
       setDiffErrorState(null);
       setSessions(list);
       // Logic to auto-select or maintain selection
@@ -118,18 +137,23 @@ function ReviewPage() {
       setSelectedSnapshot(null);
       setCurrentSessionId(list[0].session_id);
     } catch (err) {
-      if (requestId !== sessionsRequestRef.current) return;
+      if (!mountedRef.current || requestId !== sessionsRequestRef.current) return;
       setDiffErrorState({ error: err, fallbackKey: 'review.errors.loadSessions' });
     }
   }, []);
 
   const loadSnapshots = useCallback(async (sessionId) => {
+    if (!mountedRef.current) return;
     const requestId = ++snapshotsRequestRef.current;
     setLoading(true);
     setDiffErrorState(null);
     try {
       const list = await getSnapshots(sessionId);
-      if (requestId !== snapshotsRequestRef.current) return;
+      if (
+        !mountedRef.current
+        || requestId !== snapshotsRequestRef.current
+        || currentSessionIdRef.current !== sessionId
+      ) return;
       setSnapshots(list);
       if (list.length > 0) setSelectedSnapshot(list[0]);
       else {
@@ -137,7 +161,11 @@ function ReviewPage() {
         setDiffData(null);
       }
     } catch (err) {
-      if (requestId !== snapshotsRequestRef.current) return;
+      if (
+        !mountedRef.current
+        || requestId !== snapshotsRequestRef.current
+        || currentSessionIdRef.current !== sessionId
+      ) return;
       if (err.response?.status === 404) {
         setSnapshots([]);
         setSelectedSnapshot(null);
@@ -150,20 +178,29 @@ function ReviewPage() {
       setDiffData(null);
       setDiffErrorState({ error: err, fallbackKey: 'review.errors.loadSnapshots' });
     } finally {
-      if (requestId !== snapshotsRequestRef.current) return;
+      if (!mountedRef.current || requestId !== snapshotsRequestRef.current) return;
       setLoading(false);
     }
   }, []);
 
   const loadDiff = useCallback(async (sessionId, resourceId) => {
+    if (!mountedRef.current) return;
     const requestId = ++diffRequestRef.current;
     setDiffErrorState(null);
     setDiffData(null);
     try {
       const data = await getDiff(sessionId, resourceId);
-      if (requestId === diffRequestRef.current) setDiffData(data);
+      if (
+        mountedRef.current
+        && requestId === diffRequestRef.current
+        && currentSessionIdRef.current === sessionId
+      ) setDiffData(data);
     } catch (err) {
-      if (requestId === diffRequestRef.current) {
+      if (
+        mountedRef.current
+        && requestId === diffRequestRef.current
+        && currentSessionIdRef.current === sessionId
+      ) {
         setDiffErrorState({ error: err, fallbackKey: 'review.errors.retrieveFragment' });
         setDiffData(null);
       }
@@ -184,7 +221,11 @@ function ReviewPage() {
   }, [loadSessions]);
 
   useEffect(() => {
-    if (!currentSessionId) return undefined;
+    if (!currentSessionId) {
+      snapshotsRequestRef.current += 1;
+      setLoading(false);
+      return undefined;
+    }
     let cancelled = false;
     setSelectedSnapshot(null);
     const run = async () => {
@@ -194,11 +235,15 @@ function ReviewPage() {
     void run();
     return () => {
       cancelled = true;
+      snapshotsRequestRef.current += 1;
     };
   }, [currentSessionId, loadSnapshots]);
 
   useEffect(() => {
-    if (!(currentSessionId && selectedSnapshot)) return undefined;
+    if (!(currentSessionId && selectedSnapshot)) {
+      diffRequestRef.current += 1;
+      return undefined;
+    }
     let cancelled = false;
     const run = async () => {
       if (cancelled) return;
@@ -207,6 +252,7 @@ function ReviewPage() {
     void run();
     return () => {
       cancelled = true;
+      diffRequestRef.current += 1;
     };
   }, [currentSessionId, loadDiff, selectedSnapshot]);
 
@@ -228,18 +274,22 @@ function ReviewPage() {
       return;
     }
     try {
-      const rollbackResult = await rollbackResource(currentSessionId, selectedSnapshot.resource_id);
+      const sessionId = currentSessionId;
+      const resourceId = selectedSnapshot.resource_id;
+      const rollbackResult = await rollbackResource(sessionId, resourceId);
+      if (!isActiveSession(sessionId)) return;
       if (!rollbackResult?.success) {
         throw new Error(rollbackResult?.message || t('review.errors.rollback'));
       }
       // Rollback and snapshot cleanup are split calls; surface partial success explicitly.
       let cleanupError = null;
       try {
-        await approveSnapshot(currentSessionId, selectedSnapshot.resource_id);
+        await approveSnapshot(sessionId, resourceId);
       } catch (err) {
         cleanupError = err;
       }
-      await loadSnapshots(currentSessionId);
+      if (!isActiveSession(sessionId)) return;
+      await loadSnapshots(sessionId);
       await loadSessions();
       if (cleanupError) {
         const message = t('review.alerts.rollbackCleanupFailed', {
@@ -250,6 +300,7 @@ function ReviewPage() {
         }
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       const message = t('review.alerts.rejectionFailed', {
         detail: extractApiError(err, err?.message || t('review.errors.rollback')),
       });
@@ -266,10 +317,14 @@ function ReviewPage() {
     if (!beginMutation()) return;
     setActionMessage(null);
     try {
-      await approveSnapshot(currentSessionId, selectedSnapshot.resource_id);
-      await loadSnapshots(currentSessionId);
+      const sessionId = currentSessionId;
+      const resourceId = selectedSnapshot.resource_id;
+      await approveSnapshot(sessionId, resourceId);
+      if (!isActiveSession(sessionId)) return;
+      await loadSnapshots(sessionId);
       await loadSessions();
     } catch (err) {
+      if (!mountedRef.current) return;
       const message = t('review.alerts.integrationFailed', {
         detail: extractApiError(err, err?.message || t('review.errors.approve')),
       });
@@ -296,9 +351,12 @@ function ReviewPage() {
       return;
     }
     try {
-      await clearSession(currentSessionId);
+      const sessionId = currentSessionId;
+      await clearSession(sessionId);
+      if (!isActiveSession(sessionId)) return;
       await loadSessions();
     } catch (err) {
+      if (!mountedRef.current) return;
       const message = t('review.alerts.massIntegrationFailed', {
         detail: extractApiError(err, err?.message || t('review.errors.clearSession')),
       });
@@ -431,9 +489,11 @@ function ReviewPage() {
               <select 
                 id="review-session-select"
                 name="review_session_id"
-                className="w-full cursor-pointer appearance-none rounded-md border border-[color:var(--palace-line)] bg-white/90 px-3 py-2 text-xs text-[color:var(--palace-ink)] outline-none transition-all hover:border-[color:var(--palace-accent)] focus:border-[color:var(--palace-accent)] focus:ring-1 focus:ring-[color:var(--palace-accent)]/40"
+                disabled={mutationInFlight}
+                className="w-full cursor-pointer appearance-none rounded-md border border-[color:var(--palace-line)] bg-white/90 px-3 py-2 text-xs text-[color:var(--palace-ink)] outline-none transition-all hover:border-[color:var(--palace-accent)] focus:border-[color:var(--palace-accent)] focus:ring-1 focus:ring-[color:var(--palace-accent)]/40 disabled:cursor-not-allowed disabled:opacity-60"
                 value={currentSessionId || ''}
                 onChange={(e) => {
+                  if (mutationInFlight) return;
                   setSelectedSnapshot(null);
                   setCurrentSessionId(e.target.value);
                 }}
@@ -462,7 +522,11 @@ function ReviewPage() {
                 <SnapshotList 
                     snapshots={snapshots} 
                     selectedId={selectedSnapshot?.resource_id} 
-                    onSelect={setSelectedSnapshot} 
+                    onSelect={(snapshot) => {
+                      if (!mutationInFlight) {
+                        setSelectedSnapshot(snapshot);
+                      }
+                    }}
                 />
             )}
         </div>

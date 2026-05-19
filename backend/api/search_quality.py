@@ -29,8 +29,8 @@ async def get_search_quality_metrics() -> Dict[str, Any]:
     client = get_sqlite_client()
     try:
         index_status = await client.get_index_status()
-    except Exception as exc:
-        index_status = {"degraded": True, "reason": str(exc)}
+    except Exception:
+        index_status = {"degraded": True, "reason": "internal_error"}
 
     rrf_config = getattr(client, "_rrf_config", None)
     rrf_payload = {

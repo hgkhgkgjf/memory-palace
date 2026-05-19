@@ -4,6 +4,7 @@ import hmac
 import importlib
 import inspect
 import json
+import logging
 import math
 import os
 import re
@@ -49,6 +50,7 @@ _FORWARDED_HEADER_NAMES = {
     "true-client-ip",
     "cf-connecting-ip",
 }
+logger = logging.getLogger(__name__)
 
 
 class _VitalityCleanupAtomicDeleteError(RuntimeError):
@@ -56,7 +58,7 @@ class _VitalityCleanupAtomicDeleteError(RuntimeError):
         self.memory_id = int(memory_id)
         self.reason = str(reason or "error")
         self.original = exc
-        super().__init__(str(exc) or type(exc).__name__)
+        super().__init__(self.reason)
 
 
 def _get_configured_mcp_api_key() -> str:
@@ -350,6 +352,18 @@ def _safe_non_negative_int(value: Any) -> int:
         return max(0, int(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _internal_error_code(_exc: BaseException) -> str:
+    return "internal_error"
+
+
+def _rollback_skip_reason(exc: BaseException, fallback: str) -> str:
+    if isinstance(exc, PermissionError):
+        return "active_paths"
+    if isinstance(exc, ValueError):
+        return str(fallback or "operation_skipped")
+    return _internal_error_code(exc)
 
 
 async def _run_write_lane(
@@ -1805,15 +1819,16 @@ async def _rollback_import_created_memories(
                     {
                         "memory_id": memory_id,
                         "uri": item_uri or f"{item_domain}://{item_path}",
-                        "reason": str(exc) or "path_not_found",
+                        "reason": _rollback_skip_reason(exc, "path_not_found"),
                     }
                 )
             except Exception as exc:
+                logger.exception("maintenance.import.rollback.remove_path failed")
                 errors.append(
                     {
                         "memory_id": memory_id,
                         "uri": item_uri or f"{item_domain}://{item_path}",
-                        "error": str(exc) or type(exc).__name__,
+                        "error": _internal_error_code(exc),
                     }
                 )
 
@@ -1835,14 +1850,15 @@ async def _rollback_import_created_memories(
                 {
                     "memory_id": memory_id,
                     "uri": item_uri or None,
-                    "reason": str(exc) or type(exc).__name__,
+                    "reason": _rollback_skip_reason(exc, "memory_missing"),
                 }
             )
         except Exception as exc:
+            logger.exception("maintenance.import.rollback.delete_memory failed")
             errors.append(
                 {
                     "memory_id": memory_id,
-                    "error": str(exc) or type(exc).__name__,
+                    "error": _internal_error_code(exc),
                 }
             )
 
@@ -1943,7 +1959,8 @@ async def _best_effort_cleanup_learn_namespace(
             )
             removed_paths.append(uri)
         except Exception as exc:
-            skipped.append({"uri": uri, "reason": str(exc) or type(exc).__name__})
+            logger.exception("maintenance.learn.rollback.remove_path failed")
+            skipped.append({"uri": uri, "reason": _rollback_skip_reason(exc, "path_not_found")})
             continue
 
         removed_memory_id = 0
@@ -1963,11 +1980,12 @@ async def _best_effort_cleanup_learn_namespace(
             )
             deleted_memory_ids.append(target_memory_id)
         except Exception as exc:
+            logger.exception("maintenance.learn.rollback.delete_memory failed")
             skipped.append(
                 {
                     "uri": uri,
                     "memory_id": target_memory_id,
-                    "reason": str(exc) or type(exc).__name__,
+                    "reason": _rollback_skip_reason(exc, "memory_cleanup_failed"),
                 }
             )
 
@@ -3092,7 +3110,7 @@ async def execute_external_import(payload: ImportExecuteRequest):
             job["rollback"] = rollback_summary
             job["failure"] = {
                 "reason": "create_memory_failed",
-                "detail": str(exc) or type(exc).__name__,
+                "detail": _internal_error_code(exc),
                 "updated_at": _utc_iso_now(),
             }
             await _update_import_job(job_id, job)
@@ -3675,22 +3693,27 @@ async def trigger_reflection_workflow(payload: ReflectionWorkflowRequest):
             rollback_handler=_reflection_workflow_rollback_handler,
         )
     except ValueError as exc:
+        missing_job_id = str(exc) == "reflection workflow rollback requires job_id"
         raise HTTPException(
             status_code=422,
             detail={
                 "error": (
                     "reflection_workflow_invalid_request"
-                    if str(exc) == "reflection workflow rollback requires job_id"
+                    if missing_job_id
                     else "reflection_workflow_invalid_mode"
                 ),
                 "reason": (
                     "job_id_required"
-                    if str(exc) == "reflection workflow rollback requires job_id"
+                    if missing_job_id
                     else "unsupported_reflection_mode"
                 ),
                 "allowed_modes": ["prepare", "execute", "rollback"],
                 "mode": normalized_mode_lower or normalized_mode,
-                "message": str(exc),
+                "message": (
+                    "reflection_workflow_rollback_requires_job_id"
+                    if missing_job_id
+                    else "unsupported_reflection_mode"
+                ),
             },
         ) from exc
     except RuntimeError as exc:
@@ -4139,9 +4162,10 @@ async def confirm_vitality_cleanup(payload: VitalityCleanupConfirmRequest):
             if exc.reason in {"stale_state", "chain_referenced", "active_paths", "memory_missing"}:
                 skipped.append({"memory_id": exc.memory_id, "reason": exc.reason})
             else:
-                errors.append({"memory_id": exc.memory_id, "error": str(exc)})
+                errors.append({"memory_id": exc.memory_id, "error": exc.reason})
         except Exception as exc:
-            errors.append({"memory_id": 0, "error": str(exc)})
+            logger.exception("maintenance.vitality.cleanup.confirm failed")
+            errors.append({"memory_id": 0, "error": _internal_error_code(exc)})
 
     status = "executed" if not errors else "partially_failed"
     return {
@@ -4452,7 +4476,10 @@ async def run_observability_search(payload: SearchConsoleRequest):
     try:
         filters = _normalize_search_filters(raw_filters or {})
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_search_filters", "reason": type(exc).__name__},
+        )
 
     try:
         normalized_scope_hint = _normalize_scope_hint(scope_hint_raw)
@@ -4461,7 +4488,10 @@ async def run_observability_search(payload: SearchConsoleRequest):
             scope_hint=normalized_scope_hint,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(
+            status_code=422,
+            detail={"error": "invalid_search_scope", "reason": type(exc).__name__},
+        )
 
     client = get_sqlite_client()
     await runtime_state.ensure_started(get_sqlite_client)

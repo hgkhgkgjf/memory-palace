@@ -313,6 +313,8 @@ frontend/src/
 - Backend：`MEMORY_PALACE_BACKEND_PORT`（默认 `18000`，回退 `NOCTURNE_BACKEND_PORT`）
 - Frontend：`MEMORY_PALACE_FRONTEND_PORT`（默认 `3000`，回退 `NOCTURNE_FRONTEND_PORT`）
 
+`docker-compose.yml` 和 `docker-compose.ghcr.yml` 默认把宿主端口绑定到 `127.0.0.1`，外部机器无法直接访问。如果需要远程访问，在 `.env.docker` 里改端口变量为 `0.0.0.0:<port>` 格式，同时确保防火墙和 `MCP_API_KEY` 已就位。
+
 > 把 SSE 监听地址改成 `0.0.0.0` 只表示远程客户端可以连，**不表示**可以跳过 `MCP_API_KEY`、反向代理、防火墙或 TLS 等安全控制。
 
 ### 相关文件

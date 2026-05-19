@@ -1167,7 +1167,8 @@ async def test_vitality_cleanup_confirm_collects_unexpected_delete_errors(
     assert confirm_result["deleted_count"] == 0
     assert confirm_result["error_count"] == 1
     assert confirm_result["errors"][0]["memory_id"] == created["id"]
-    assert "delete_boom" in confirm_result["errors"][0]["error"]
+    assert confirm_result["errors"][0]["error"] == "error"
+    assert "delete_boom" not in str(confirm_result)
 
 
 @pytest.mark.asyncio
@@ -1282,7 +1283,8 @@ async def test_vitality_cleanup_confirm_does_not_partially_delete_when_second_de
     assert confirm_result["deleted_count"] == 0
     assert confirm_result["error_count"] == 1
     assert confirm_result["errors"][0]["memory_id"] == second["id"]
-    assert "delete_boom_second" in confirm_result["errors"][0]["error"]
+    assert confirm_result["errors"][0]["error"] == "error"
+    assert "delete_boom_second" not in str(confirm_result)
 
 
 @pytest.mark.asyncio
@@ -1498,7 +1500,7 @@ async def test_vitality_cleanup_confirm_rejects_non_atomic_multi_delete_fallback
     assert confirm_result["deleted_count"] == 0
     assert confirm_result["error_count"] == 1
     assert confirm_result["errors"][0]["memory_id"] == 0
-    assert "atomic_batch_delete_unavailable" in confirm_result["errors"][0]["error"]
+    assert confirm_result["errors"][0]["error"] == "atomic_batch_delete_unavailable"
 
 
 @pytest.mark.asyncio

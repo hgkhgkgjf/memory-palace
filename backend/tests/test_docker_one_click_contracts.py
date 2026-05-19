@@ -411,8 +411,9 @@ def test_shell_port_probe_falls_back_to_python_socket_bind() -> None:
     )
 
     assert 'socket.socket(socket.AF_INET, socket.SOCK_STREAM)' in shell_text
-    assert 'sock.bind(("0.0.0.0", port))' in shell_text
-    assert 'sock.bind(("127.0.0.1", port))' not in shell_text
+    assert 'sock.bind(("127.0.0.1", port))' in shell_text
+    assert 'sock.bind(("0.0.0.0", port))' not in shell_text
+    assert "docker-compose.yml publishes admin ports on loopback only" in shell_text
     assert (
         "neither lsof/nc nor a usable python socket probe is available; "
         "fail-closed port probing is enabled."

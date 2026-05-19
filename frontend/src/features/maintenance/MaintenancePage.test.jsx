@@ -5,6 +5,16 @@ import * as api from '../../lib/api';
 import i18n, { LOCALE_STORAGE_KEY } from '../../i18n';
 import MaintenancePage from './MaintenancePage';
 
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
 vi.mock('../../lib/api', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -464,6 +474,65 @@ describe('MaintenancePage', () => {
     });
     expect(screen.getByText(i18n.t('maintenance.vitality.reviewId', { value: 'review-1' }))).toBeInTheDocument();
     expect(screen.getByText('timeout exceeded')).toBeInTheDocument();
+    expect(api.queryVitalityCleanupCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh maintenance data after vitality confirm resolves post-unmount', async () => {
+    const user = userEvent.setup();
+    const confirmDeferred = createDeferred();
+    api.queryVitalityCleanupCandidates.mockResolvedValue({
+      status: 'ok',
+      items: [
+        {
+          memory_id: 101,
+          vitality_score: 0.12,
+          inactive_days: 30,
+          access_count: 0,
+          can_delete: true,
+          uri: 'core://agent/legacy',
+          content_snippet: 'legacy candidate',
+          state_hash: 'hash-101',
+        },
+      ],
+    });
+    api.prepareVitalityCleanup.mockResolvedValue({
+      review: {
+        review_id: 'review-1',
+        token: 'token-1',
+        confirmation_phrase: 'CONFIRM DELETE',
+        action: 'delete',
+        reviewer: 'maintenance_dashboard',
+      },
+    });
+    api.confirmVitalityCleanup.mockImplementation(() => confirmDeferred.promise);
+    window.prompt.mockReturnValue('CONFIRM DELETE');
+
+    const { unmount } = render(<MaintenancePage />);
+    await screen.findByText(/legacy candidate/i);
+    await waitFor(() => expect(api.listOrphanMemories).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.queryVitalityCleanupCandidates).toHaveBeenCalledTimes(1));
+
+    const selectAllButtons = screen.getAllByRole('button', { name: i18n.t('maintenance.selectAll') });
+    await user.click(selectAllButtons[selectAllButtons.length - 1]);
+    await user.click(screen.getByRole('button', { name: i18n.t('maintenance.vitality.prepareDelete', { count: 1 }) }));
+    await screen.findByText(i18n.t('maintenance.vitality.reviewId', { value: 'review-1' }));
+
+    await user.click(screen.getByRole('button', {
+      name: i18n.t('maintenance.vitality.confirmAction', {
+        action: i18n.t('maintenance.vitality.actionLabels.delete'),
+      }),
+    }));
+    await waitFor(() => expect(api.confirmVitalityCleanup).toHaveBeenCalledTimes(1));
+
+    unmount();
+
+    await act(async () => {
+      confirmDeferred.resolve({ status: 'executed' });
+      await confirmDeferred.promise;
+      await Promise.resolve();
+    });
+
+    expect(api.listOrphanMemories).toHaveBeenCalledTimes(1);
     expect(api.queryVitalityCleanupCandidates).toHaveBeenCalledTimes(1);
   });
 

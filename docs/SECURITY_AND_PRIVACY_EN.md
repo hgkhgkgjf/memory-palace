@@ -167,7 +167,7 @@ The Dashboard first-run setup assistant is not a generic "edit server config fro
 - the first local `.env` save requires a non-empty Dashboard key; leaving it blank is rejected by the backend
 - when the current process is running inside Docker, the assistant explicitly returns `setup_apply_unsupported` and stays in guidance mode instead of pretending it persisted container env / proxy changes
 - existing secrets are never echoed back into the UI; the frontend only receives masked "configured vs missing" summaries
-- error responses from MCP tools and the Dashboard API are sanitized: internal memory IDs, database paths, and similar internals are not included in client-facing error messages
+- error responses from MCP tools and the Dashboard API are sanitized: internal memory IDs, database paths, Python exception traces, and similar internals are not included in client-facing error messages. 500-class errors return `"internal_error"`; 400-class errors return the exception type name or a stable business error code (e.g. `orphan_not_found`, `orphan_delete_blocked`). Raw exceptions are only written to server-side logs
 - only the Dashboard `MCP_API_KEY` is stored in the current browser session's `sessionStorage`; embedding / reranker / LLM provider keys are not stored in the browser
 - Observability `/sse` subscriptions follow the same browser-side Dashboard auth path
 - when you switch profiles or turn optional providers back off, the assistant clears hidden stale router / API fields before saving

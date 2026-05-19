@@ -43,7 +43,10 @@ async def test_observability_search_rejects_bool_and_float_max_priority_filters(
         await maintenance_api.run_observability_search(payload)
 
     assert exc_info.value.status_code == 422
-    assert str(exc_info.value.detail) == "filters.max_priority must be an integer"
+    assert exc_info.value.detail == {
+        "error": "invalid_search_filters",
+        "reason": "ValueError",
+    }
 
 
 def test_observability_search_request_rejects_overlong_query() -> None:

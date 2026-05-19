@@ -89,7 +89,7 @@ Four intent classes — `factual`, `exploratory`, `temporal`, `causal` — route
 
 Four engines work together to keep the memory store healthy over time:
 
-- **Forgetting Engine**: vitality scores decay with a configurable half-life (30 days default). Memories below threshold become archive candidates. Actual archival requires a review token — no silent deletion.
+- **Forgetting Engine**: runtime vitality scores decay with `VITALITY_DECAY_HALF_LIFE_DAYS` (30 days in `.env.example`). Memories below threshold become archive candidates. Actual archival requires a review token — no silent deletion.
 - **Layering Engine**: organizes memories into L0 (raw) → L1 (linked clusters) → L2 (topic summaries) with full derivation provenance. Read-only; summaries are draft-only until explicitly approved.
 - **Compression Engine**: previews cascade tiers (mild/aggressive/emergency) at different budget utilization levels. Never writes — only shows what *would* compress.
 - **Procedural Engine**: extracts step-by-step procedures from conversation memories, making implicit workflows explicit and searchable.

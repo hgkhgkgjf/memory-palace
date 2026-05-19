@@ -313,6 +313,8 @@ Port environment variables:
 - Backend: `MEMORY_PALACE_BACKEND_PORT` (default `18000`, falls back to `NOCTURNE_BACKEND_PORT`)
 - Frontend: `MEMORY_PALACE_FRONTEND_PORT` (default `3000`, falls back to `NOCTURNE_FRONTEND_PORT`)
 
+`docker-compose.yml` and `docker-compose.ghcr.yml` bind host ports to `127.0.0.1` by default, so external machines cannot reach the services directly. For remote access, change the port variables in `.env.docker` to the `0.0.0.0:<port>` form, and make sure your firewall and `MCP_API_KEY` are in place.
+
 > Changing the SSE listening address to `0.0.0.0` only means remote clients can connect; it does **not** mean `MCP_API_KEY`, reverse proxies, firewalls, or TLS can be bypassed.
 
 ### Related Files

@@ -843,7 +843,10 @@ async def test_observability_search_rejects_non_integer_max_priority_filter(
         await maintenance_api.run_observability_search(payload)
 
     assert exc_info.value.status_code == 422
-    assert "filters.max_priority must be an integer" in str(exc_info.value.detail)
+    assert exc_info.value.detail == {
+        "error": "invalid_search_filters",
+        "reason": "ValueError",
+    }
 
 
 @pytest.mark.asyncio

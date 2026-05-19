@@ -190,6 +190,7 @@ export default function MaintenancePage() {
   const detailRequestSeqRef = useRef(0);
   const vitalityRequestSeqRef = useRef(0);
   const vitalityPrepareSeqRef = useRef(0);
+  const mountedRef = useRef(false);
   const translateRef = useRef(t);
   const vitalityFiltersRef = useRef({
     threshold: vitalityThreshold,
@@ -235,10 +236,13 @@ export default function MaintenancePage() {
 
   const invalidatePreparedReview = useCallback(() => {
     vitalityPrepareSeqRef.current += 1;
-    setVitalityPreparedReview(null);
+    if (mountedRef.current) {
+      setVitalityPreparedReview(null);
+    }
   }, []);
 
   const loadOrphans = useCallback(async () => {
+    if (!mountedRef.current) return;
     const requestSeq = orphanRequestSeqRef.current + 1;
     orphanRequestSeqRef.current = requestSeq;
     setLoading(true);
@@ -246,13 +250,13 @@ export default function MaintenancePage() {
     setSelectedIds(new Set());
     try {
       const data = await listOrphanMemories();
-      if (requestSeq !== orphanRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== orphanRequestSeqRef.current) return;
       setOrphans(Array.isArray(data) ? data : []);
     } catch (err) {
-      if (requestSeq !== orphanRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== orphanRequestSeqRef.current) return;
       setErrorState({ error: err, fallbackKey: 'maintenance.errors.loadOrphans' });
     } finally {
-      if (requestSeq !== orphanRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== orphanRequestSeqRef.current) return;
       setLoading(false);
     }
   }, []);
@@ -269,6 +273,7 @@ export default function MaintenancePage() {
      * }} [options]
      */
     async (options = {}) => {
+      if (!mountedRef.current) return;
       const {
         forceDecay = false,
         thresholdValue,
@@ -320,6 +325,7 @@ export default function MaintenancePage() {
         }
         if (forceDecay) {
           await triggerVitalityDecay({ force: true, reason: 'maintenance.manual_refresh' });
+          if (!mountedRef.current || requestSeq !== vitalityRequestSeqRef.current) return;
         }
         /** @type {{ threshold: number, inactive_days: number, limit: number, domain?: string, path_prefix?: string }} */
         const payload = {
@@ -334,7 +340,7 @@ export default function MaintenancePage() {
           payload.path_prefix = pathPrefixRaw;
         }
         const res = await queryVitalityCleanupCandidates(payload);
-        if (requestSeq !== vitalityRequestSeqRef.current) return;
+        if (!mountedRef.current || requestSeq !== vitalityRequestSeqRef.current) return;
         setVitalityCandidates(Array.isArray(res.items) ? res.items : []);
         setVitalityQueryMeta({
           status: res?.status || 'ok',
@@ -342,19 +348,30 @@ export default function MaintenancePage() {
         });
         setVitalitySelectedIds(new Set());
       } catch (err) {
-        if (requestSeq !== vitalityRequestSeqRef.current) return;
+        if (!mountedRef.current || requestSeq !== vitalityRequestSeqRef.current) return;
         setVitalityQueryMeta(null);
         setVitalityErrorState({
           error: err,
           fallbackKey: 'maintenance.errors.loadVitalityCandidates',
         });
       } finally {
-        if (requestSeq !== vitalityRequestSeqRef.current) return;
+        if (!mountedRef.current || requestSeq !== vitalityRequestSeqRef.current) return;
         setVitalityLoading(false);
       }
     },
     [invalidatePreparedReview]
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      orphanRequestSeqRef.current += 1;
+      detailRequestSeqRef.current += 1;
+      vitalityRequestSeqRef.current += 1;
+      vitalityPrepareSeqRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -462,8 +479,12 @@ export default function MaintenancePage() {
         if (!ok) failed.push(id);
       });
     } finally {
-      setBatchDeleting(false);
+      if (mountedRef.current) {
+        setBatchDeleting(false);
+      }
     }
+
+    if (!mountedRef.current) return;
 
     const failedSet = new Set(failed);
     setOrphans(prev => prev.filter(item => !toDelete.includes(item.id) || failedSet.has(item.id)));
@@ -540,18 +561,18 @@ export default function MaintenancePage() {
       ) {
         throw new Error(t('maintenance.errors.invalidReviewPayload'));
       }
-      if (prepareSeq !== vitalityPrepareSeqRef.current) return;
+      if (!mountedRef.current || prepareSeq !== vitalityPrepareSeqRef.current) return;
       setVitalityPreparedReview({ ...review, action: review.action || normalizedAction });
       setVitalityLastResult(null);
     } catch (err) {
-      if (prepareSeq !== vitalityPrepareSeqRef.current) return;
+      if (!mountedRef.current || prepareSeq !== vitalityPrepareSeqRef.current) return;
       setVitalityPreparedReview(null);
       setVitalityErrorState({
         error: err,
         fallbackKey: 'maintenance.errors.prepareCleanup',
       });
     } finally {
-      if (prepareSeq !== vitalityPrepareSeqRef.current) return;
+      if (!mountedRef.current || prepareSeq !== vitalityPrepareSeqRef.current) return;
       setVitalityProcessing(false);
     }
   };
@@ -599,10 +620,12 @@ export default function MaintenancePage() {
         token: vitalityPreparedReview.token,
         confirmation_phrase: typed,
       });
+      if (!mountedRef.current) return;
       setVitalityLastResult(payload);
       invalidatePreparedReview();
       await Promise.all([loadOrphans(), loadVitalityCandidates()]);
     } catch (err) {
+      if (!mountedRef.current) return;
       const detailCode = extractApiErrorCode(err);
       setVitalityErrorState({
         error: err,
@@ -613,7 +636,9 @@ export default function MaintenancePage() {
         await loadVitalityCandidates();
       }
     } finally {
-      setVitalityProcessing(false);
+      if (mountedRef.current) {
+        setVitalityProcessing(false);
+      }
     }
   };
 
@@ -637,10 +662,10 @@ export default function MaintenancePage() {
     setDetailLoading(id);
     try {
       const data = await getOrphanMemoryDetail(id);
-      if (requestSeq !== detailRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== detailRequestSeqRef.current) return;
       setDetailData(prev => ({ ...prev, [id]: data }));
     } catch (err) {
-      if (requestSeq !== detailRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== detailRequestSeqRef.current) return;
       setDetailData(prev => ({
         ...prev,
         [id]: {
@@ -648,7 +673,7 @@ export default function MaintenancePage() {
         },
       }));
     } finally {
-      if (requestSeq !== detailRequestSeqRef.current) return;
+      if (!mountedRef.current || requestSeq !== detailRequestSeqRef.current) return;
       setDetailLoading(null);
     }
   };

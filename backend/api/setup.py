@@ -1,6 +1,7 @@
 import errno
 import hmac
 import json
+import logging
 import os
 import tempfile
 import time
@@ -35,6 +36,7 @@ _RESTART_TARGETS_LOCAL = ["backend", "sse"]
 _RESTART_TARGETS_DOCKER = ["backend", "sse", "frontend"]
 _REMOTE_EMBEDDING_BACKENDS = {"api", "router", "openai"}
 _PRE_DOTENV_ENV_KEYS_MARKER = "MEMORY_PALACE_PRE_DOTENV_ENV_KEYS"
+logger = logging.getLogger(__name__)
 _SETUP_MANAGED_ENV_KEYS = {
     "MCP_API_KEY",
     "MCP_API_KEY_ALLOW_INSECURE_LOCAL",
@@ -542,7 +544,7 @@ def _normalize_setup_api_base_field(
                 "error": "setup_validation_failed",
                 "reason": "invalid_api_base_url",
                 "field": field,
-                "message": str(exc),
+                "message": "invalid_api_base_url",
             },
         ) from exc
 
@@ -869,11 +871,12 @@ async def save_setup_config(payload: SetupConfigRequest) -> Dict[str, Any]:
     try:
         _write_env_file(target_env_path, updates)
     except OSError as exc:
+        logger.exception("setup.config write failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error": "setup_write_failed",
-                "message": str(exc),
+                "reason": "internal_error",
             },
         ) from exc
 

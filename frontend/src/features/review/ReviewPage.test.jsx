@@ -101,6 +101,58 @@ describe('ReviewPage', () => {
     await waitFor(() => expect(integrateButton).not.toBeDisabled());
   });
 
+  it('does not reload review data after integrate resolves post-unmount', async () => {
+    const user = userEvent.setup();
+    const approveDeferred = createDeferred();
+    api.approveSnapshot.mockImplementation(() => approveDeferred.promise);
+
+    const { unmount } = render(<ReviewPage />);
+
+    const integrateButton = await screen.findByRole('button', { name: i18n.t('review.integrate') });
+    await waitFor(() => expect(api.getSessions).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.getSnapshots).toHaveBeenCalledTimes(1));
+
+    await user.click(integrateButton);
+    unmount();
+
+    await act(async () => {
+      approveDeferred.resolve({});
+      await approveDeferred.promise;
+      await Promise.resolve();
+    });
+
+    expect(api.getSnapshots).toHaveBeenCalledTimes(1);
+    expect(api.getSessions).toHaveBeenCalledTimes(1);
+    expect(window.alert).not.toHaveBeenCalled();
+  });
+
+  it('locks session switching while integrate mutation is in flight', async () => {
+    const user = userEvent.setup();
+    const approveDeferred = createDeferred();
+    api.getSessions.mockResolvedValue([
+      { session_id: 'session-a' },
+      { session_id: 'session-b' },
+    ]);
+    api.approveSnapshot.mockImplementation(() => approveDeferred.promise);
+
+    render(<ReviewPage />);
+
+    const integrateButton = await screen.findByRole('button', { name: i18n.t('review.integrate') });
+    const sessionSelect = screen.getByRole('combobox', { name: i18n.t('review.targetSession') });
+
+    expect(sessionSelect).not.toBeDisabled();
+    await user.click(integrateButton);
+    expect(sessionSelect).toBeDisabled();
+
+    await act(async () => {
+      approveDeferred.resolve({});
+      await approveDeferred.promise;
+    });
+
+    await waitFor(() => expect(sessionSelect).not.toBeDisabled());
+    expect(api.getSnapshots).toHaveBeenLastCalledWith('session-a');
+  });
+
   it('prevents duplicate reject submissions on double click', async () => {
     const user = userEvent.setup();
     const rollbackDeferred = createDeferred();

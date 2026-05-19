@@ -439,7 +439,7 @@ def test_reflection_invalid_mode_returns_422(monkeypatch: pytest.MonkeyPatch) ->
 
     async def _service(**kwargs):
         _ = kwargs
-        raise ValueError("unsupported reflection workflow mode")
+        raise ValueError("raw reflection secret")
 
     monkeypatch.setattr(maintenance_api, "_REFLECTION_WORKFLOW_SERVICE", _service)
 
@@ -460,6 +460,8 @@ def test_reflection_invalid_mode_returns_422(monkeypatch: pytest.MonkeyPatch) ->
     assert detail["error"] == "reflection_workflow_invalid_mode"
     assert detail["reason"] == "unsupported_reflection_mode"
     assert detail["allowed_modes"] == ["prepare", "execute", "rollback"]
+    assert detail["message"] == "unsupported_reflection_mode"
+    assert "raw reflection secret" not in response.text
 
 
 def test_reflection_prepare_requires_session_id(monkeypatch: pytest.MonkeyPatch) -> None:

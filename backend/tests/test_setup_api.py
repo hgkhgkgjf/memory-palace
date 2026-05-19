@@ -873,6 +873,57 @@ def test_setup_config_accepts_openai_backend_and_persists_embedding_dim(
     assert "RETRIEVAL_EMBEDDING_DIM=3072" in written
 
 
+def test_setup_config_write_failure_does_not_leak_raw_os_error(
+    monkeypatch, tmp_path: Path
+) -> None:
+    env_example = tmp_path / ".env.example"
+    env_example.write_text(
+        "\n".join(
+            [
+                "MCP_API_KEY=",
+                "MCP_API_KEY_ALLOW_INSECURE_LOCAL=false",
+                "RETRIEVAL_EMBEDDING_BACKEND=hash",
+                "RETRIEVAL_EMBEDDING_DIM=64",
+                "RETRIEVAL_RERANKER_ENABLED=false",
+                "WRITE_GUARD_LLM_ENABLED=false",
+                "INTENT_LLM_ENABLED=false",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    target_env = tmp_path / ".env"
+
+    def _raise_write_failure(*args, **kwargs):
+        _ = args, kwargs
+        raise OSError(errno.EACCES, "secret path /tmp/private")
+
+    monkeypatch.delenv("MCP_API_KEY", raising=False)
+    monkeypatch.delenv("MCP_API_KEY_ALLOW_INSECURE_LOCAL", raising=False)
+    monkeypatch.delenv("MEMORY_PALACE_RUNNING_IN_DOCKER", raising=False)
+    monkeypatch.setattr(setup_api, "_ENV_EXAMPLE_PATH", env_example)
+    monkeypatch.setattr(setup_api, "_write_env_file", _raise_write_failure)
+    monkeypatch.setenv("MEMORY_PALACE_SETUP_ENV_FILE", str(target_env))
+
+    with _build_client() as client:
+        response = client.post(
+            "/setup/config",
+            json={
+                "dashboard_api_key": "write-secret",
+                "allow_insecure_local": False,
+                "embedding_backend": "hash",
+            },
+        )
+
+    assert response.status_code == 500
+    assert "secret path" not in response.text
+    assert "/tmp/private" not in response.text
+    assert response.json()["detail"] == {
+        "error": "setup_write_failed",
+        "reason": "internal_error",
+    }
+
+
 def test_setup_config_rejects_openai_backend_without_embedding_dim_when_no_remote_dim_exists(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -147,6 +147,32 @@ class _ImportRaceClientStub(_ImportClientStub):
         )
 
 
+class _ImportRollbackFailureClientStub(_ImportClientStub):
+    async def remove_path(self, path: str, domain: str = "core"):
+        _ = path, domain
+        raise RuntimeError("raw_remove_secret")
+
+    async def permanently_delete_memory(
+        self,
+        memory_id: int,
+        *,
+        require_orphan: bool = False,
+    ):
+        _ = memory_id, require_orphan
+        raise RuntimeError("raw_delete_secret")
+
+
+class _LearnNamespaceDeleteFailureClientStub(_ImportClientStub):
+    async def permanently_delete_memory(
+        self,
+        memory_id: int,
+        *,
+        require_orphan: bool = False,
+    ):
+        _ = memory_id, require_orphan
+        raise RuntimeError("raw_delete_secret")
+
+
 def _build_client() -> TestClient:
     app = FastAPI()
     app.include_router(maintenance_api.router)
@@ -285,6 +311,152 @@ def test_external_import_execute_and_rollback_restores_snapshot(
         "maintenance.import.rollback.delete_memory",
     ]
     assert all(item["session_id"] == "session-1" for item in write_lane_calls)
+
+
+def test_external_import_rollback_does_not_leak_raw_exception_text(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    client_stub = _ImportRollbackFailureClientStub()
+
+    async def _run_write_lane_stub(*, session_id, operation, task):
+        _ = session_id, operation
+        return await task()
+
+    monkeypatch.setattr(maintenance_api, "get_sqlite_client", lambda: client_stub)
+    monkeypatch.setattr(maintenance_api, "ENABLE_WRITE_LANE_QUEUE", True)
+    monkeypatch.setattr(
+        maintenance_api.runtime_state.write_lanes,
+        "run_write",
+        _run_write_lane_stub,
+    )
+    monkeypatch.setenv("MCP_API_KEY", "import-secret")
+    monkeypatch.setenv("EXTERNAL_IMPORT_ENABLED", "true")
+    monkeypatch.setenv("EXTERNAL_IMPORT_ALLOWED_ROOTS", str(tmp_path))
+    headers = {"X-MCP-API-Key": "import-secret"}
+
+    file_path = tmp_path / "memo.md"
+    file_path.write_text("Import content v1", encoding="utf-8")
+
+    with _build_client() as client:
+        prepare = client.post(
+            "/maintenance/import/prepare",
+            headers=headers,
+            json=_prepare_payload(file_path),
+        )
+        assert prepare.status_code == 200
+        job_id = prepare.json().get("job_id")
+
+        execute = client.post(
+            "/maintenance/import/execute",
+            headers=headers,
+            json={"job_id": job_id},
+        )
+        assert execute.status_code == 200
+
+        rollback = client.post(
+            f"/maintenance/import/jobs/{job_id}/rollback",
+            headers=headers,
+            json={"reason": "manual_rollback"},
+        )
+
+    assert rollback.status_code == 200
+    assert "raw_remove_secret" not in rollback.text
+    assert "raw_delete_secret" not in rollback.text
+    rollback_summary = rollback.json().get("rollback") or {}
+    assert rollback_summary.get("error_count") == 2
+    rollback_errors = rollback_summary.get("errors")
+    assert rollback_errors[0]["memory_id"] == 1
+    assert rollback_errors[0]["uri"].startswith("notes://memo")
+    assert rollback_errors[0]["error"] == "internal_error"
+    assert rollback_errors[1] == {"memory_id": 1, "error": "internal_error"}
+
+
+@pytest.mark.asyncio
+async def test_explicit_learn_namespace_cleanup_does_not_leak_raw_exception_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client_stub = _ImportRollbackFailureClientStub()
+
+    async def _run_write_lane_stub(*, session_id, operation, task):
+        _ = session_id, operation
+        return await task()
+
+    monkeypatch.setattr(maintenance_api, "ENABLE_WRITE_LANE_QUEUE", True)
+    monkeypatch.setattr(
+        maintenance_api.runtime_state.write_lanes,
+        "run_write",
+        _run_write_lane_stub,
+    )
+
+    result = await maintenance_api._best_effort_cleanup_learn_namespace(
+        client=client_stub,
+        created_namespace_memories=[
+            {
+                "memory_id": 1,
+                "domain": "notes",
+                "path": "corrections/failed-session",
+                "uri": "notes://corrections/failed-session",
+            }
+        ],
+        session_id="failed-session",
+        job_id="learn-failed-ns-1",
+    )
+
+    assert "raw_remove_secret" not in str(result)
+    assert result["skipped"] == [
+        {
+            "uri": "notes://corrections/failed-session",
+            "reason": "internal_error",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_explicit_learn_namespace_delete_failure_does_not_leak_raw_exception_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client_stub = _LearnNamespaceDeleteFailureClientStub()
+    client_stub.memories[1] = {
+        "content": "ns-session",
+        "domain": "notes",
+        "path": "corrections/failed-session",
+    }
+    client_stub.paths[("notes", "corrections/failed-session")] = 1
+
+    async def _run_write_lane_stub(*, session_id, operation, task):
+        _ = session_id, operation
+        return await task()
+
+    monkeypatch.setattr(maintenance_api, "ENABLE_WRITE_LANE_QUEUE", True)
+    monkeypatch.setattr(
+        maintenance_api.runtime_state.write_lanes,
+        "run_write",
+        _run_write_lane_stub,
+    )
+
+    result = await maintenance_api._best_effort_cleanup_learn_namespace(
+        client=client_stub,
+        created_namespace_memories=[
+            {
+                "memory_id": 1,
+                "domain": "notes",
+                "path": "corrections/failed-session",
+                "uri": "notes://corrections/failed-session",
+            }
+        ],
+        session_id="failed-session",
+        job_id="learn-failed-ns-1",
+    )
+
+    assert "raw_delete_secret" not in str(result)
+    assert result["removed_paths"] == ["notes://corrections/failed-session"]
+    assert result["skipped"] == [
+        {
+            "uri": "notes://corrections/failed-session",
+            "memory_id": 1,
+            "reason": "internal_error",
+        }
+    ]
 
 
 def test_external_import_execute_rechecks_write_guard_inside_write_lane(

@@ -135,14 +135,6 @@ release_path_lock() {
 
 port_in_use() {
   local port="$1"
-  if command -v lsof >/dev/null 2>&1; then
-    lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
-    return $?
-  fi
-  if command -v nc >/dev/null 2>&1; then
-    nc -z 127.0.0.1 "${port}" >/dev/null 2>&1
-    return $?
-  fi
   if command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
     local python_candidate=""
     local probe_status=0
@@ -159,9 +151,9 @@ import sys
 port = int(sys.argv[1])
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
-    # docker compose publishes host ports without a loopback-only host IP, so
-    # probe the wildcard bind instead of only 127.0.0.1.
-    sock.bind(("0.0.0.0", port))
+    # docker-compose.yml publishes admin ports on loopback only. Probe the same
+    # address so a service bound only to another host IP does not block setup.
+    sock.bind(("127.0.0.1", port))
 except OSError as exc:
     if exc.errno == errno.EADDRINUSE:
         raise SystemExit(0)
@@ -180,6 +172,14 @@ PY
       0) return 0 ;;
       1) return 1 ;;
     esac
+  fi
+  if command -v nc >/dev/null 2>&1; then
+    nc -z 127.0.0.1 "${port}" >/dev/null 2>&1
+    return $?
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP@127.0.0.1:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
   fi
   if [[ "${port_probe_fallback_warned}" -eq 0 ]]; then
     echo "[port-probe] neither lsof/nc nor a usable python socket probe is available; fail-closed port probing is enabled." >&2
