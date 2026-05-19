@@ -132,7 +132,7 @@ create_memory(
     parent_uri: str,              # 必填
     content: str,                 # 必填
     priority: int,                # 必填（数字越小优先级越高）
-    title: Optional[str] = None,  # 路径名（仅 a-z/0-9/_/-）
+    title: Optional[str] = None,  # 路径名（Unicode 字母、数字、下划线、连字符）
     disclosure: str = ""          # 触发条件描述
 )
 ```
@@ -142,7 +142,7 @@ create_memory(
 1. 创建前自动 Write Guard 检查
 2. Guard 判定 `NOOP` / `UPDATE` / `DELETE` 时拒绝创建，返回 `guard_target_uri` / `guard_target_id` 作为建议
 3. Write Guard 临时异常导致 fail-closed 时，响应会带 `retryable=true` 和 `retry_hint`
-4. `title` 只允许字母、数字、下划线、连字符
+4. `title` 只允许 Unicode 字母、数字、下划线、连字符
 5. `content` 超过 `100000` 字符会被直接拒绝
 
 **示例**：

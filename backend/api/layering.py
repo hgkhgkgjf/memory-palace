@@ -123,7 +123,7 @@ async def list_summaries(
             status_code=500,
             detail={
                 "error": "list_summaries_failed",
-                "reason": str(exc),
+                "reason": "internal_error",
             },
         )
     return {
@@ -171,14 +171,15 @@ async def generate_summary(payload: SummaryGenerateRequest) -> Dict[str, Any]:
             derivation_method=payload.derivation_method,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.warning("layering.generate_summary rejected invalid request", exc_info=True)
+        raise HTTPException(status_code=400, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("layering.generate_summary failed")
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "generate_summary_failed",
-                "reason": str(exc),
+                "reason": "internal_error",
             },
         )
     return {

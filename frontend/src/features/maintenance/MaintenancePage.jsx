@@ -357,8 +357,20 @@ export default function MaintenancePage() {
   );
 
   useEffect(() => {
-    void loadOrphans();
-    void loadVitalityCandidates();
+    let cancelled = false;
+    const safeLoadOrphans = async () => {
+      if (cancelled) return;
+      await loadOrphans();
+    };
+    const safeLoadVitality = async () => {
+      if (cancelled) return;
+      await loadVitalityCandidates();
+    };
+    void safeLoadOrphans();
+    void safeLoadVitality();
+    return () => {
+      cancelled = true;
+    };
   }, [loadOrphans, loadVitalityCandidates]);
 
   /**

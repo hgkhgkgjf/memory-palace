@@ -196,7 +196,7 @@ async def simulate(
         logger.exception("forgetting.simulate failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "simulate_failed", "reason": str(exc)},
+            detail={"error": "simulate_failed", "reason": "internal_error"},
         )
     return {
         "count": len(simulations),
@@ -233,12 +233,13 @@ async def candidates(
             threshold=threshold, days_forward=days, limit=limit
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.warning("forgetting.candidates rejected invalid request", exc_info=True)
+        raise HTTPException(status_code=400, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("forgetting.candidates failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "candidates_failed", "reason": str(exc)},
+            detail={"error": "candidates_failed", "reason": "internal_error"},
         )
     return {
         "count": len(results),
@@ -266,12 +267,13 @@ async def prepare_archive(payload: ArchivePrepareRequest) -> Dict[str, Any]:
             days=payload.days,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.warning("forgetting.archive.prepare rejected invalid request", exc_info=True)
+        raise HTTPException(status_code=400, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("forgetting.archive.prepare failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "archive_prepare_failed", "reason": str(exc)},
+            detail={"error": "archive_prepare_failed", "reason": "internal_error"},
         )
 
     missing_ids = [memory_id for memory_id in selected if memory_id not in candidates_by_id]
@@ -352,12 +354,19 @@ async def confirm_archive(payload: ArchiveConfirmRequest) -> Dict[str, Any]:
             days=days,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        logger.warning(
+            "forgetting.archive.confirm rejected invalid recheck request",
+            exc_info=True,
+        )
+        raise HTTPException(status_code=400, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("forgetting.archive.confirm recheck failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "archive_confirm_recheck_failed", "reason": str(exc)},
+            detail={
+                "error": "archive_confirm_recheck_failed",
+                "reason": "internal_error",
+            },
         )
     stale_ids: List[int] = []
     for item in selections:
@@ -392,14 +401,16 @@ async def confirm_archive(payload: ArchiveConfirmRequest) -> Dict[str, Any]:
             )
             archives.append(result.to_api())
     except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc))
+        logger.warning("forgetting.archive.confirm blocked by permission", exc_info=True)
+        raise HTTPException(status_code=403, detail=type(exc).__name__)
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        logger.warning("forgetting.archive.confirm rejected archive state", exc_info=True)
+        raise HTTPException(status_code=409, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("forgetting.archive.confirm failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "archive_confirm_failed", "reason": str(exc)},
+            detail={"error": "archive_confirm_failed", "reason": "internal_error"},
         )
 
     return {
@@ -451,14 +462,16 @@ async def archive(payload: ArchiveRequest) -> Dict[str, Any]:
             archive_reason=payload.archive_reason,
         )
     except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc))
+        logger.warning("forgetting.archive blocked by permission", exc_info=True)
+        raise HTTPException(status_code=403, detail=type(exc).__name__)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        logger.warning("forgetting.archive could not find archive target", exc_info=True)
+        raise HTTPException(status_code=404, detail=type(exc).__name__)
     except Exception as exc:
         logger.exception("forgetting.archive failed")
         raise HTTPException(
             status_code=500,
-            detail={"error": "archive_failed", "reason": str(exc)},
+            detail={"error": "archive_failed", "reason": "internal_error"},
         )
     return {
         "archive": result.to_api(),

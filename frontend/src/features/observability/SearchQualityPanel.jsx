@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import {
@@ -210,15 +210,19 @@ export default function SearchQualityPanel() {
   const [error, setError] = useState(/** @type {string | null} */ (null));
   const [isMock, setIsMock] = useState(false);
 
+  const cancelledRef = useRef(false);
+
   const loadMetrics = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getSearchQualityMetrics();
+      if (cancelledRef.current) return;
       const usedMock = !data || data.is_mock === true;
       setMetrics(usedMock ? createMockQualityMetrics() : data);
       setIsMock(usedMock);
     } catch (err) {
+      if (cancelledRef.current) return;
       // Endpoint may not yet be implemented - fall back to mock data for development.
       const statusCode = err?.response?.status;
       if (statusCode === 404 || statusCode === 501 || err?.code === 'ERR_NETWORK') {
@@ -231,12 +235,16 @@ export default function SearchQualityPanel() {
         setError(t('observability.searchQuality.errors.loadMetrics'));
       }
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   }, [t]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     void loadMetrics();
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [loadMetrics]);
 
   const modesByKey = useMemo(() => {

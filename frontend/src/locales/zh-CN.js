@@ -1,6 +1,7 @@
 const zhCN = {
   common: {
     appName: 'Memory Palace',
+    skipToContent: '跳到主要内容',
     language: {
       chinese: '中文',
       english: 'English',
@@ -274,6 +275,18 @@ const zhCN = {
       l0Count: 'L0 访问日志：{{count}}',
       l1Count: 'L1 原子记忆：{{count}}',
       storageUsage: '存储用量：{{value}}',
+      mock: {
+        summary1Title: '发布回滚合并归纳（Q1）',
+        summary1Body: '从 8 条原子记忆中整合的发布回滚运行手册，涵盖发布门禁、流量切换与事后行动。',
+        summary2Title: '检索延迟调查（FTS5 与向量对比）',
+        summary2Body: '基于 5 条原子记忆，对预发数据集上的 FTS5 关键词检索与向量召回进行的综合对比。',
+        summary3Title: '遗忘策略阈值',
+        summary3Body: '关于活力衰减阈值校准的 3 份草稿——在上线前提交人工审查。',
+        detailTitle: '#{{id}} 的模拟摘要详情',
+        detailBody: '当层级详情接口尚未就绪时显示的模拟详情内容。',
+        atomicTitle: '原子记忆 #{{id}}',
+        atomicContent: '原子模拟记忆内容 #{{id}}。',
+      },
       layers: {
         L0: 'L0 访问日志',
         L1: 'L1 原子记忆',
@@ -490,6 +503,13 @@ const zhCN = {
         archive: '归档',
         keep: '保留',
         review: '审查',
+      },
+      mock: {
+        candidate1Title: '发布回滚运行手册',
+        candidate2Title: '衰减模型综述',
+        candidate3Title: '2026-01-17 会议复盘',
+        candidate4Title: '遗留 Bash 辅助脚本',
+        candidate5Title: '旧草稿（Q4 头脑风暴）',
       },
       errors: {
         loadCandidates: '加载遗忘候选失败',

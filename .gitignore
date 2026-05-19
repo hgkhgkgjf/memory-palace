@@ -111,6 +111,12 @@ frontend/.vite/
 frontend/design-system/
 *.tsbuildinfo
 
+# Benchmark datasets (fetched on demand by prepare_public_datasets.py)
+backend/tests/datasets/raw/*
+backend/tests/datasets/processed/*
+!backend/tests/datasets/raw/.gitkeep
+!backend/tests/datasets/processed/.gitkeep
+
 # Generated benchmark outputs (keep local, do not track)
 backend/tests/benchmark/artifacts/
 backend/tests/benchmark/benchmark_results_*.md

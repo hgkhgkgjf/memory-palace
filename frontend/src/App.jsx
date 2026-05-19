@@ -253,6 +253,12 @@ function Layout({ authState, authRevision, onOpenSetup, onClearApiKey }) {
       className="relative flex h-screen flex-col overflow-hidden text-[color:var(--palace-ink)]"
       data-browser-performance={reducedVisualMode ? 'lite' : 'default'}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-2 focus:bg-white focus:text-amber-700 focus:rounded"
+      >
+        {t('common.skipToContent')}
+      </a>
       <FluidBackground reducedEffects={reducedVisualMode} />
 
       {/* Floating Header */}
@@ -292,7 +298,7 @@ function Layout({ authState, authRevision, onOpenSetup, onClearApiKey }) {
       </div>
 
       {/* Main Area */}
-      <div className="relative z-10 flex-1 min-h-0 overflow-hidden px-6 pb-6 pt-2">
+      <main id="main-content" className="relative z-10 flex-1 min-h-0 overflow-hidden px-6 pb-6 pt-2">
         <div className="h-full w-full max-w-7xl mx-auto">
           <RootErrorBoundary resetKeys={[location.pathname, routesKey]}>
             <React.Suspense
@@ -316,7 +322,7 @@ function Layout({ authState, authRevision, onOpenSetup, onClearApiKey }) {
             </React.Suspense>
           </RootErrorBoundary>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -132,7 +132,7 @@ create_memory(
     parent_uri: str,              # Required
     content: str,                 # Required
     priority: int,                # Required (lower = higher priority)
-    title: Optional[str] = None,  # Path name (a-z/0-9/_/- only)
+    title: Optional[str] = None,  # Path name (Unicode letters, digits, underscore, hyphen)
     disclosure: str = ""          # Trigger condition
 )
 ```
@@ -142,7 +142,7 @@ create_memory(
 1. Write Guard runs automatically before creation
 2. If Guard returns `NOOP` / `UPDATE` / `DELETE`, creation is blocked; `guard_target_uri` / `guard_target_id` are returned as suggestions
 3. If Write Guard fail-closes from a transient error, the response includes `retryable=true` and `retry_hint`
-4. `title` allows only letters, digits, underscores, hyphens
+4. `title` allows only Unicode letters, digits, underscore, hyphen
 5. `content` longer than `100000` chars is rejected
 
 **Example**:

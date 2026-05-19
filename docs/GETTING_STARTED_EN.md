@@ -96,7 +96,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 On a successful start you should see:
 
 ```
-Memory API starting...
+Memory API starting.
 SQLite database initialized.
 INFO:     Uvicorn running on http://127.0.0.1:8000
 ```
@@ -320,7 +320,7 @@ Only set `HOST=0.0.0.0` when you really need remote clients; you are responsible
 
 In a Docker deployment, SSE is mounted inside the backend process and exposed at `http://127.0.0.1:3000/sse` via the frontend proxy.
 
-Client configuration:
+Client configuration (8010 is the fallback port when 8000 is occupied):
 
 ```json
 {

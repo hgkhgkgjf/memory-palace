@@ -98,7 +98,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 正常启动会显示：
 
 ```
-Memory API starting...
+Memory API starting.
 SQLite database initialized.
 INFO:     Uvicorn running on http://127.0.0.1:8000
 ```
@@ -322,7 +322,7 @@ python run_sse.py
 
 Docker 部署下 SSE 直接挂在 backend 进程内，通过前端代理暴露在 `http://127.0.0.1:3000/sse`。
 
-客户端配置：
+客户端配置（8010 为 8000 被占用时的回退端口）：
 
 ```json
 {

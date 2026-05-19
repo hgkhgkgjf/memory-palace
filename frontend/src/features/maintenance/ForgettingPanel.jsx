@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import {
@@ -61,14 +61,18 @@ const createMockSimulation = (days) => ({
   is_mock: true,
 });
 
-/** @returns {ForgettingCandidate[]} */
-const createMockCandidates = (threshold) => {
+/**
+ * @param {number} threshold
+ * @param {(key: string, options?: object) => string} t
+ * @returns {ForgettingCandidate[]}
+ */
+const createMockCandidates = (threshold, t) => {
   const sources = [
-    { id: 1001, uri: 'core://agent/stale_notes/release-rollback', title: 'Release rollback runbook' },
-    { id: 1002, uri: 'core://research/ml_papers/decay-models', title: 'Decay model survey' },
-    { id: 1003, uri: 'core://meeting/2026-01-17', title: 'Meeting 2026-01-17 retros' },
-    { id: 1004, uri: 'core://snippets/legacy-shell', title: 'Legacy bash helpers' },
-    { id: 1005, uri: 'core://misc/old-draft', title: 'Old draft (Q4 brainstorm)' },
+    { id: 1001, uri: 'core://agent/stale_notes/release-rollback', title: t('maintenance.forgetting.mock.candidate1Title') },
+    { id: 1002, uri: 'core://research/ml_papers/decay-models', title: t('maintenance.forgetting.mock.candidate2Title') },
+    { id: 1003, uri: 'core://meeting/2026-01-17', title: t('maintenance.forgetting.mock.candidate3Title') },
+    { id: 1004, uri: 'core://snippets/legacy-shell', title: t('maintenance.forgetting.mock.candidate4Title') },
+    { id: 1005, uri: 'core://misc/old-draft', title: t('maintenance.forgetting.mock.candidate5Title') },
   ];
   return sources.map((s, idx) => {
     const current = Math.max(0.05, threshold - 0.05 - idx * 0.04);
@@ -341,6 +345,8 @@ export default function ForgettingPanel({ onInspectMemory }) {
     return statusCode === 404 || statusCode === 501 || err?.code === 'ERR_NETWORK';
   };
 
+  const cancelledRef = useRef(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -350,6 +356,7 @@ export default function ForgettingPanel({ onInspectMemory }) {
         simulateForgettingDecay({ days }),
         getForgettingCandidates({ threshold }),
       ]);
+      if (cancelledRef.current) return;
       let mock = false;
       let simulationLookup = new Map();
       if (simRes.status === 'fulfilled' && simRes.value) {
@@ -378,10 +385,10 @@ export default function ForgettingPanel({ onInspectMemory }) {
         );
         if (candRes.value.is_mock) mock = true;
       } else if (candRes.status === 'rejected' && isUnsupportedError(candRes.reason)) {
-        setCandidates(createMockCandidates(threshold));
+        setCandidates(createMockCandidates(threshold, t));
         mock = true;
       } else if (candRes.status === 'rejected') {
-        setCandidates(createMockCandidates(threshold));
+        setCandidates(createMockCandidates(threshold, t));
         mock = true;
         setError(t('maintenance.forgetting.errors.loadCandidates'));
       } else if (candRes.status === 'fulfilled') {
@@ -392,12 +399,16 @@ export default function ForgettingPanel({ onInspectMemory }) {
       setIsMock(mock);
       setSelectedIds(new Set());
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   }, [days, threshold, t]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     void loadData();
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [loadData]);
 
   const toggleSelect = useCallback((id) => {

@@ -172,20 +172,42 @@ function ReviewPage() {
 
   // --- Data Loading Logic (Keep existing logic, refine UI) ---
   useEffect(() => {
-    loadSessions();
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled) return;
+      await loadSessions();
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [loadSessions]);
 
   useEffect(() => {
-    if (currentSessionId) {
-      setSelectedSnapshot(null);
-      loadSnapshots(currentSessionId);
-    }
+    if (!currentSessionId) return undefined;
+    let cancelled = false;
+    setSelectedSnapshot(null);
+    const run = async () => {
+      if (cancelled) return;
+      await loadSnapshots(currentSessionId);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [currentSessionId, loadSnapshots]);
 
   useEffect(() => {
-    if (currentSessionId && selectedSnapshot) {
-      loadDiff(currentSessionId, selectedSnapshot.resource_id);
-    }
+    if (!(currentSessionId && selectedSnapshot)) return undefined;
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled) return;
+      await loadDiff(currentSessionId, selectedSnapshot.resource_id);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [currentSessionId, loadDiff, selectedSnapshot]);
 
   // --- Handlers ---

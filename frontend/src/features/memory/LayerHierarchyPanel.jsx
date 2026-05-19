@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import {
@@ -58,8 +58,11 @@ const PANEL_CLASS =
  * }} L2DetailPayload
  */
 
-/** @returns {LayeringPayload} */
-const createMockSummaryPayload = () => ({
+/**
+ * @param {(key: string, options?: object) => string} t
+ * @returns {LayeringPayload}
+ */
+const createMockSummaryPayload = (t) => ({
   timestamp: new Date().toISOString(),
   is_mock: true,
   layer_stats: [
@@ -70,8 +73,8 @@ const createMockSummaryPayload = () => ({
   summaries: [
     {
       id: 'l2-001',
-      title: 'Release rollback consolidations (Q1)',
-      summary: 'Consolidated release rollback runbooks from 8 atomic notes covering deploy gates, traffic shifting, and post-mortem actions.',
+      title: t('memory.layerHierarchy.mock.summary1Title'),
+      summary: t('memory.layerHierarchy.mock.summary1Body'),
       confidence: 0.86,
       review_state: 'approved',
       created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
@@ -81,8 +84,8 @@ const createMockSummaryPayload = () => ({
     },
     {
       id: 'l2-002',
-      title: 'Search latency investigation (FTS5 vs vector)',
-      summary: 'Synthesis of 5 atomic memories comparing FTS5 keyword retrieval against vector recall over the staging dataset.',
+      title: t('memory.layerHierarchy.mock.summary2Title'),
+      summary: t('memory.layerHierarchy.mock.summary2Body'),
       confidence: 0.74,
       review_state: 'pending',
       created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
@@ -92,8 +95,8 @@ const createMockSummaryPayload = () => ({
     },
     {
       id: 'l2-003',
-      title: 'Forgetting policy thresholds',
-      summary: 'Three drafts on calibrating vitality decay thresholds — surfaced for human review before rollout.',
+      title: t('memory.layerHierarchy.mock.summary3Title'),
+      summary: t('memory.layerHierarchy.mock.summary3Body'),
       confidence: 0.62,
       review_state: 'flagged',
       created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
@@ -104,20 +107,20 @@ const createMockSummaryPayload = () => ({
   ],
 });
 
-const createMockDetailPayload = (id) => ({
+const createMockDetailPayload = (id, t) => ({
   is_mock: true,
   summary: {
     id,
-    title: `Mock summary detail for ${id}`,
-    summary: 'Mock detail content shown when the layering detail endpoint is not yet available.',
+    title: t('memory.layerHierarchy.mock.detailTitle', { id }),
+    summary: t('memory.layerHierarchy.mock.detailBody'),
     confidence: 0.72,
     review_state: 'pending',
     source_memory_ids: [9001, 9002, 9003],
   },
   source_memories: [
-    { id: 9001, uri: 'core://notes/alpha', title: 'Atomic memory #9001', content: 'Atomic mock memory content #9001.', priority: 5 },
-    { id: 9002, uri: 'core://notes/beta', title: 'Atomic memory #9002', content: 'Atomic mock memory content #9002.', priority: 3 },
-    { id: 9003, uri: 'core://notes/gamma', title: 'Atomic memory #9003', content: 'Atomic mock memory content #9003.', priority: 7 },
+    { id: 9001, uri: 'core://notes/alpha', title: t('memory.layerHierarchy.mock.atomicTitle', { id: 9001 }), content: t('memory.layerHierarchy.mock.atomicContent', { id: 9001 }), priority: 5 },
+    { id: 9002, uri: 'core://notes/beta', title: t('memory.layerHierarchy.mock.atomicTitle', { id: 9002 }), content: t('memory.layerHierarchy.mock.atomicContent', { id: 9002 }), priority: 3 },
+    { id: 9003, uri: 'core://notes/gamma', title: t('memory.layerHierarchy.mock.atomicTitle', { id: 9003 }), content: t('memory.layerHierarchy.mock.atomicContent', { id: 9003 }), priority: 7 },
   ],
 });
 
@@ -321,31 +324,39 @@ export default function LayerHierarchyPanel() {
   const [detailLoadingId, setDetailLoadingId] = useState(/** @type {string | number | null} */ (null));
   const [expandedL1Ids, setExpandedL1Ids] = useState(/** @type {Set<string>} */ (new Set()));
 
+  const cancelledRef = useRef(false);
+
   const loadPayload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getLayeringSummaries();
+      if (cancelledRef.current) return;
       const usedMock = !data || data.is_mock === true;
-      setPayload(usedMock ? createMockSummaryPayload() : data);
+      setPayload(usedMock ? createMockSummaryPayload(t) : data);
       setIsMock(usedMock);
     } catch (err) {
+      if (cancelledRef.current) return;
       if (isUnsupportedError(err)) {
-        setPayload(createMockSummaryPayload());
+        setPayload(createMockSummaryPayload(t));
         setIsMock(true);
         setError(null);
       } else {
-        setPayload(createMockSummaryPayload());
+        setPayload(createMockSummaryPayload(t));
         setIsMock(true);
         setError(t('memory.layerHierarchy.errors.loadSummaries'));
       }
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   }, [t]);
 
   useEffect(() => {
+    cancelledRef.current = false;
     void loadPayload();
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [loadPayload]);
 
   const handleToggleSummary = useCallback(
@@ -361,20 +372,22 @@ export default function LayerHierarchyPanel() {
       setDetailLoadingId(id);
       try {
         const detail = await getLayeringSummaryDetail(id);
+        if (cancelledRef.current) return;
         if (detail && !detail.is_mock) {
           setSummaryDetail((prev) => ({ ...prev, [key]: detail }));
         } else {
-          setSummaryDetail((prev) => ({ ...prev, [key]: detail || createMockDetailPayload(id) }));
+          setSummaryDetail((prev) => ({ ...prev, [key]: detail || createMockDetailPayload(id, t) }));
         }
       } catch (err) {
+        if (cancelledRef.current) return;
         if (isUnsupportedError(err)) {
-          setSummaryDetail((prev) => ({ ...prev, [key]: createMockDetailPayload(id) }));
+          setSummaryDetail((prev) => ({ ...prev, [key]: createMockDetailPayload(id, t) }));
         } else {
-          setSummaryDetail((prev) => ({ ...prev, [key]: createMockDetailPayload(id) }));
+          setSummaryDetail((prev) => ({ ...prev, [key]: createMockDetailPayload(id, t) }));
           setError(t('memory.layerHierarchy.errors.loadDetail', { id }));
         }
       } finally {
-        setDetailLoadingId(null);
+        if (!cancelledRef.current) setDetailLoadingId(null);
       }
     },
     [expandedSummaryId, summaryDetail, t]

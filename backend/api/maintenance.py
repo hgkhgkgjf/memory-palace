@@ -3783,10 +3783,32 @@ async def delete_orphan(memory_id: int):
             session_id=f"maintenance.orphan:{memory_id}",
         )
         return result
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as exc:
+        logger.warning(
+            "maintenance.delete_orphan target missing or not orphan: memory_id=%s",
+            memory_id,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "orphan_not_found",
+                "reason": "The specified memory does not exist or is not an orphan.",
+            },
+        )
+    except PermissionError as exc:
+        logger.warning(
+            "maintenance.delete_orphan blocked protected memory: memory_id=%s",
+            memory_id,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "orphan_delete_blocked",
+                "reason": "The memory is protected and cannot be deleted.",
+            },
+        )
 
 
 @router.post("/vitality/decay")
@@ -4319,7 +4341,8 @@ async def rebuild_index(reason: str = "api", wait: bool = False, timeout_seconds
                 "result": result,
             }
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
+            logger.exception("maintenance.rebuild_index sync execution failed")
+            raise HTTPException(status_code=500, detail="internal_error")
 
     enqueue_result = await runtime_state.index_worker.enqueue_rebuild(
         reason=reason or "api"
@@ -4362,9 +4385,15 @@ async def reindex_memory(
                 "result": result,
             }
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+            logger.warning(
+                "maintenance.reindex_memory rejected invalid memory id: memory_id=%s",
+                memory_id,
+                exc_info=True,
+            )
+            raise HTTPException(status_code=400, detail=type(exc).__name__)
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
+            logger.exception("maintenance.reindex_memory sync execution failed")
+            raise HTTPException(status_code=500, detail="internal_error")
 
     enqueue_result = await runtime_state.index_worker.enqueue_reindex_memory(
         memory_id=memory_id,
@@ -4625,11 +4654,13 @@ async def run_observability_search(payload: SearchConsoleRequest):
             raise HTTPException(status_code=500, detail="No compatible sqlite_client search API found.")
         backend_payload = raw_result
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        logger.warning("maintenance.observability.search rejected invalid request", exc_info=True)
+        raise HTTPException(status_code=422, detail=type(exc).__name__)
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("maintenance.observability.search failed")
+        raise HTTPException(status_code=500, detail="internal_error")
     latency_ms = (time.perf_counter() - started) * 1000.0
 
     global_results, backend_metadata = _extract_search_payload_shared(backend_payload)
@@ -4806,9 +4837,10 @@ async def get_observability_summary():
         index_status = await client.get_index_status()
         index_status.setdefault("degraded", False)
     except Exception as exc:
+        logger.exception("maintenance.observability.index_status failed")
         index_status = {
             "degraded": True,
-            "reason": str(exc),
+            "reason": "internal_error",
             "source": "maintenance.observability.index_status",
         }
 
@@ -4821,9 +4853,10 @@ async def get_observability_summary():
             else:
                 gist_stats = {"degraded": True, "reason": "invalid_gist_stats_payload"}
         except Exception as exc:
+            logger.exception("maintenance.observability.gist_stats failed")
             gist_stats = {
                 "degraded": True,
-                "reason": str(exc),
+                "reason": "internal_error",
                 "source": "maintenance.observability.gist_stats",
             }
     else:
@@ -4845,9 +4878,10 @@ async def get_observability_summary():
                     "reason": "invalid_vitality_stats_payload",
                 }
         except Exception as exc:
+            logger.exception("maintenance.observability.vitality_stats failed")
             vitality_stats = {
                 "degraded": True,
-                "reason": str(exc),
+                "reason": "internal_error",
                 "source": "maintenance.observability.vitality_stats",
             }
     else:
@@ -4866,9 +4900,10 @@ async def get_observability_summary():
     try:
         sm_lite_stats = await _build_sm_lite_stats()
     except Exception as exc:
+        logger.exception("maintenance.observability.sm_lite_stats failed")
         sm_lite_stats = {
             "degraded": True,
-            "reason": str(exc),
+            "reason": "internal_error",
             "storage": "runtime_ephemeral",
             "promotion_path": "compact_context + auto_flush",
             "session_cache": {},

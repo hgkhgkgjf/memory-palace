@@ -147,7 +147,7 @@ How it works:
 
 1. The frontend reads `window.__MEMORY_PALACE_RUNTIME__`
 2. The axios request interceptor determines if the request needs authentication
-3. Authentication headers are injected automatically for `/maintenance/*`, `/review/*`, `/browse/*`, `/setup/*`, `/layering/*`, `/forgetting/*`, and `/search/quality-metrics`
+3. Authentication headers are injected automatically for `/maintenance/*`, `/review/*`, `/browse/*`, `/setup/*`, `/api/layering/*`, `/api/forgetting/*`, and `/search/quality-metrics`
 4. Observability reuses the same auth path for `/sse`: without a browser-side Dashboard key it stays on native `EventSource`; with a key it switches to fetch-based SSE so the same header/bearer auth can be sent without putting the key in the URL; each reconnect re-resolves the current browser auth while still carrying `Last-Event-ID`, and terminal `4xx` auth failures stop retrying
 
 > Compatibility: the old field name `window.__MCP_RUNTIME_CONFIG__` is still supported.

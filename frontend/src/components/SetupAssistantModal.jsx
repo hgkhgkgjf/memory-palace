@@ -1041,7 +1041,7 @@ export default function SetupAssistantModal({
                       onChange={(event) => updateField('dashboard_api_key', event.target.value)}
                       placeholder={t('setup.dashboard.apiKeyPlaceholder')}
                       type="password"
-                      inputProps={{ 'data-autofocus': 'true' }}
+                      inputProps={{ 'data-autofocus': 'true', autoComplete: 'off' }}
                     />
                     <SetupToggle
                       label={t('setup.dashboard.insecureLocalLabel')}
@@ -1119,6 +1119,7 @@ export default function SetupAssistantModal({
                         onChange={(event) => updateField('embedding_api_key', event.target.value)}
                         placeholder={t('setup.retrieval.embeddingApiKeyPlaceholder')}
                         type="password"
+                        inputProps={{ autoComplete: 'off' }}
                       />
                     </div>
                   ) : null}
@@ -1153,6 +1154,7 @@ export default function SetupAssistantModal({
                         onChange={(event) => updateField('router_api_key', event.target.value)}
                         placeholder={t('setup.retrieval.routerApiKeyPlaceholder')}
                         type="password"
+                        inputProps={{ autoComplete: 'off' }}
                       />
                       <SetupInput
                         label={t('setup.retrieval.routerEmbeddingModelLabel')}
@@ -1197,6 +1199,7 @@ export default function SetupAssistantModal({
                         onChange={(event) => updateField('reranker_api_key', event.target.value)}
                         placeholder={t('setup.retrieval.rerankerApiKeyPlaceholder')}
                         type="password"
+                        inputProps={{ autoComplete: 'off' }}
                       />
                     </div>
                   ) : null}
@@ -1245,6 +1248,7 @@ export default function SetupAssistantModal({
                         onChange={(event) => updateField('write_guard_llm_api_key', event.target.value)}
                         placeholder={t('setup.llm.writeGuardApiKeyPlaceholder')}
                         type="password"
+                        inputProps={{ autoComplete: 'off' }}
                       />
                     </div>
                   ) : null}
@@ -1277,6 +1281,7 @@ export default function SetupAssistantModal({
                         onChange={(event) => updateField('intent_llm_api_key', event.target.value)}
                         placeholder={t('setup.llm.intentApiKeyPlaceholder')}
                         type="password"
+                        inputProps={{ autoComplete: 'off' }}
                       />
                       {showRouterFields ? (
                         <SetupInput

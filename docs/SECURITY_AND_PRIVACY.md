@@ -147,7 +147,7 @@ Authorization: Bearer <MCP_API_KEY>
 
 1. 前端读取 `window.__MEMORY_PALACE_RUNTIME__`
 2. axios 请求拦截器判断请求是否需要鉴权
-3. 对 `/maintenance/*`、`/review/*`、`/browse/*`、`/setup/*`、`/layering/*`、`/forgetting/*` 以及 `/search/quality-metrics` 自动注入鉴权头
+3. 对 `/maintenance/*`、`/review/*`、`/browse/*`、`/setup/*`、`/api/layering/*`、`/api/forgetting/*` 以及 `/search/quality-metrics` 自动注入鉴权头
 4. Observability 订阅 `/sse` 时也会复用这套鉴权：没有浏览器侧 Dashboard key 时走原生 `EventSource`；有 key 时切到可带 header/bearer 的 fetch-based SSE，不会把 key 拼到 URL 里；重连会重新读取当前浏览器鉴权并继续带上 `Last-Event-ID`；明确的 `4xx` 鉴权失败则停止重试
 
 > 兼容性：也支持旧字段名 `window.__MCP_RUNTIME_CONFIG__`。

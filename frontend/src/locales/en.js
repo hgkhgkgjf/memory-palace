@@ -1,6 +1,7 @@
 const en = {
   common: {
     appName: 'Memory Palace',
+    skipToContent: 'Skip to main content',
     language: {
       chinese: '中文',
       english: 'English',
@@ -276,6 +277,18 @@ const en = {
       l0Count: 'L0 access logs: {{count}}',
       l1Count: 'L1 atomic memories: {{count}}',
       storageUsage: 'Storage usage: {{value}}',
+      mock: {
+        summary1Title: 'Release rollback consolidations (Q1)',
+        summary1Body: 'Consolidated release rollback runbooks from 8 atomic notes covering deploy gates, traffic shifting, and post-mortem actions.',
+        summary2Title: 'Search latency investigation (FTS5 vs vector)',
+        summary2Body: 'Synthesis of 5 atomic memories comparing FTS5 keyword retrieval against vector recall over the staging dataset.',
+        summary3Title: 'Forgetting policy thresholds',
+        summary3Body: 'Three drafts on calibrating vitality decay thresholds — surfaced for human review before rollout.',
+        detailTitle: 'Mock summary detail for {{id}}',
+        detailBody: 'Mock detail content shown when the layering detail endpoint is not yet available.',
+        atomicTitle: 'Atomic memory #{{id}}',
+        atomicContent: 'Atomic mock memory content #{{id}}.',
+      },
       layers: {
         L0: 'L0 Access Logs',
         L1: 'L1 Atomic Memories',
@@ -492,6 +505,13 @@ const en = {
         archive: 'Archive',
         keep: 'Keep',
         review: 'Review',
+      },
+      mock: {
+        candidate1Title: 'Release rollback runbook',
+        candidate2Title: 'Decay model survey',
+        candidate3Title: 'Meeting 2026-01-17 retros',
+        candidate4Title: 'Legacy bash helpers',
+        candidate5Title: 'Old draft (Q4 brainstorm)',
       },
       errors: {
         loadCandidates: 'Failed to load forgetting candidates',
