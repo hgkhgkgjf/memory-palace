@@ -129,7 +129,12 @@ _LONG_GIST_SUMMARY = (
 
 
 def _spawn_compact_context_worker(
-    *, backend_dir: Path, script_path: Path, db_path: Path, hold_seconds: float
+    *,
+    backend_dir: Path,
+    script_path: Path,
+    db_path: Path,
+    hold_seconds: float,
+    marker_path: Optional[Path] = None,
 ) -> subprocess.Popen[str]:
     env = dict(os.environ)
     env["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
@@ -140,8 +145,11 @@ def _spawn_compact_context_worker(
         if existing_pythonpath
         else str(backend_dir)
     )
+    args = [sys.executable, str(script_path), str(hold_seconds)]
+    if marker_path is not None:
+        args.append(str(marker_path))
     return subprocess.Popen(
-        [sys.executable, str(script_path), str(hold_seconds)],
+        args,
         cwd=str(backend_dir),
         env=env,
         stdout=subprocess.PIPE,
@@ -161,6 +169,22 @@ def _read_process_json_output(process: subprocess.Popen[str], *, timeout: float)
     lines = [line.strip() for line in output.splitlines() if line.strip()]
     assert lines, "worker process produced no output"
     return json.loads(lines[-1])
+
+
+def _wait_for_process_marker(
+    process: subprocess.Popen[str], marker_path: Path, *, timeout: float
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if marker_path.exists():
+            return
+        if process.poll() is not None:
+            output, _ = process.communicate(timeout=5)
+            raise AssertionError(
+                f"worker process exited before writing marker: {output}"
+            )
+        time.sleep(0.05)
+    raise AssertionError(f"worker process did not write marker: {marker_path}")
 
 
 @pytest.mark.asyncio
@@ -273,11 +297,15 @@ def test_compact_context_cross_process_lock_blocks_duplicate_flush(tmp_path: Pat
             """
             import asyncio
             import json
+            from pathlib import Path
             import sys
 
             import mcp_server
 
             HOLD_SECONDS = float(sys.argv[1])
+            MARKER_PATH = (
+                Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
+            )
 
 
             class _FakeFlushTracker:
@@ -288,6 +316,8 @@ def test_compact_context_cross_process_lock_blocks_duplicate_flush(tmp_path: Pat
                 async def build_summary(self, *, session_id=None, limit=12):
                     _ = session_id, limit
                     if HOLD_SECONDS > 0:
+                        if MARKER_PATH is not None:
+                            MARKER_PATH.write_text("lock-held", encoding="utf-8")
                         await asyncio.sleep(HOLD_SECONDS)
                     return "Session compaction notes:\\n- process lock integration test"
 
@@ -353,14 +383,16 @@ def test_compact_context_cross_process_lock_blocks_duplicate_flush(tmp_path: Pat
     )
 
     db_path = tmp_path / "compact-process-lock.db"
+    lock_marker_path = tmp_path / "first-worker-lock-held"
     first = _spawn_compact_context_worker(
         backend_dir=backend_dir,
         script_path=worker_script,
         db_path=db_path,
-        hold_seconds=2.0,
+        hold_seconds=3.0,
+        marker_path=lock_marker_path,
     )
     try:
-        time.sleep(0.2)
+        _wait_for_process_marker(first, lock_marker_path, timeout=5)
         second = _spawn_compact_context_worker(
             backend_dir=backend_dir,
             script_path=worker_script,
