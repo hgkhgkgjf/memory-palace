@@ -53,6 +53,7 @@ def test_repo_local_stdio_command_uses_python_wrapper_on_windows(
     monkeypatch.setattr(harness, "BACKEND_ROOT", backend_root)
     monkeypatch.setattr(harness.os, "name", "nt")
     monkeypatch.setattr(harness.sys, "executable", r"C:\Python313\python.exe")
+    _set_windows_posix_shell_env(monkeypatch, {})
 
     command, args = harness._repo_local_stdio_command()
 
@@ -72,6 +73,7 @@ def test_repo_local_stdio_command_fails_closed_without_backend_venv_on_windows(
     monkeypatch.setattr(harness, "BACKEND_ROOT", backend_root)
     monkeypatch.setattr(harness.os, "name", "nt")
     monkeypatch.setattr(harness.sys, "executable", r"C:\Python313\python.exe")
+    _set_windows_posix_shell_env(monkeypatch, {})
 
     with pytest.raises(SystemExit, match="Missing backend virtualenv python"):
         harness._repo_local_stdio_command()
