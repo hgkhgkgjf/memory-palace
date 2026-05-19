@@ -20,7 +20,7 @@
 |---|---|
 | [`memory-palace-setup`](https://github.com/AGI-is-going-to-arrive/memory-palace-setup) | 给 AI 看的独立安装向导 skill。装好后直接说：`使用 $memory-palace-setup 帮我一步步安装配置 Memory Palace，优先走 skills + MCP。` |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | 5 分钟跑通本地开发、GHCR 拉镜像和 Docker，附 MCP 客户端配置示例 |
-| [DASHBOARD_GUIDE_CN.md](DASHBOARD_GUIDE_CN.md) | 按页面解释 Dashboard 每个按钮、字段和典型操作流程 |
+| [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) | 按页面解释 Dashboard 每个按钮、字段和典型操作流程 |
 | [skills/GETTING_STARTED.md](skills/GETTING_STARTED.md) | 第一次把 CLI 客户端的 skill + MCP 真正接到当前仓库 |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | 启动失败、端口冲突、鉴权失败、搜索降级等常见问题排查 |
 | [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) | API Key 安全配置、隐私保护、分享前自检 |

@@ -404,7 +404,17 @@ Docker 前端 `nginx.conf.template` 对 `/index.html` 返回 `Cache-Control: no-
 
 ---
 
-## 15. 获取帮助
+## 15. Dashboard 编辑时返回 409 / Memory version conflict
+
+如果在 Dashboard 记忆页点「保存」时看到 `409` 或 `Memory version conflict`，说明你正在编辑的记忆在你打开后被其它会话（MCP tool、另一个浏览器标签页等）修改了。
+
+处理方式：刷新页面重新加载最新内容，然后再编辑。
+
+这和 Review 页面的 `409` 含义一样——都是防止覆盖更新的记忆版本。
+
+---
+
+## 16. 获取帮助
 
 如果上述步骤无法解决：
 

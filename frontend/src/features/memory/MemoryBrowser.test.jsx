@@ -68,7 +68,10 @@ const makeNodePayload = (path, content, children = []) => ({
 
 const renderMemoryBrowser = (entry) =>
   render(
-    <MemoryRouter initialEntries={[entry]}>
+    <MemoryRouter
+      initialEntries={[entry]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/memory" element={<MemoryBrowser />} />
       </Routes>
@@ -157,7 +160,10 @@ describe('MemoryBrowser', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/memory?domain=core&path=path-a']}>
+      <MemoryRouter
+        initialEntries={['/memory?domain=core&path=path-a']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <Routes>
           <Route path="/memory" element={<RaceHarness />} />
         </Routes>

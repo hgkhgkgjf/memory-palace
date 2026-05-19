@@ -145,6 +145,30 @@ class _SnapshotFailureAliasClient:
         raise ValueError("alias not found")
 
 
+class _UpdateConflictClient:
+    async def get_memory_by_path(self, path: str, domain: str, *_args, **_kwargs):
+        if (domain, path) == ("core", "agent/conflict"):
+            return {
+                "id": 41,
+                "content": "original",
+                "priority": 1,
+                "disclosure": None,
+            }
+        return None
+
+    async def get_memory_by_id(self, memory_id: int):
+        return {"id": memory_id, "paths": ["core://agent/conflict"]}
+
+    async def write_guard(self, **_kwargs):
+        return {"action": "ADD", "method": "stub", "reason": "allow"}
+
+    async def update_memory(self, **_kwargs):
+        raise ValueError(
+            "Memory version conflict for 'core://agent/conflict': "
+            "expected memory id 41, current memory id 42"
+        )
+
+
 @pytest.mark.asyncio
 async def test_read_memory_partial_validation_errors_return_json() -> None:
     raw = await mcp_server.read_memory("core://agent/index", chunk_id=-1)
@@ -410,6 +434,33 @@ async def test_update_memory_rejects_overlong_append_before_db_write(monkeypatch
     assert payload["ok"] is False
     assert payload["updated"] is False
     assert "at most 100000 characters" in payload["message"]
+
+
+@pytest.mark.asyncio
+async def test_update_memory_conflict_hides_current_memory_id(monkeypatch) -> None:
+    async def _run_write_inline(_operation: str, task):
+        return await task()
+
+    async def _never_defer():
+        return False
+
+    async def _noop_async(*_args, **_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(mcp_server, "get_sqlite_client", lambda: _UpdateConflictClient())
+    monkeypatch.setattr(mcp_server, "_run_write_lane", _run_write_inline)
+    monkeypatch.setattr(mcp_server, "_should_defer_index_on_write", _never_defer)
+    monkeypatch.setattr(mcp_server, "_snapshot_memory_content", _noop_async)
+
+    raw = await mcp_server.update_memory(
+        uri="core://agent/conflict",
+        append="\nupdated",
+    )
+    payload = json.loads(raw)
+
+    assert payload["ok"] is False
+    assert payload["updated"] is False
+    assert payload["message"] == "Error: Memory version conflict"
 
 
 @pytest.mark.asyncio

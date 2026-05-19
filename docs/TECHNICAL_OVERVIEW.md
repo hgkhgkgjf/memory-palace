@@ -93,6 +93,7 @@ backend/
 - 单次 `content` 限制：`BROWSE_CONTENT_MAX_CHARS`（默认 1 MiB）
 - 路径长度限制：`BROWSE_PATH_MAX_CHARS`（默认 512）
 - write lane 塞满时返回结构化 `503`（`write_lane_timeout`）
+- 并发写入同一路径导致版本冲突时返回 `409`（`Memory version conflict`）
 
 ### `/review`
 

@@ -93,6 +93,7 @@ backend/
 - Per-write `content` limit: `BROWSE_CONTENT_MAX_CHARS` (default 1 MiB)
 - Path length limit: `BROWSE_PATH_MAX_CHARS` (default 512)
 - When the write lane is saturated, returns structured `503` (`write_lane_timeout`)
+- Concurrent writes to the same path return `409` (`Memory version conflict`)
 
 ### `/review`
 

@@ -189,6 +189,8 @@ update_memory(
 >
 > Any of `old_string` / `new_string` / `append` longer than `100000` chars is rejected.
 >
+> If the memory was modified by another session between your read and write, the server returns a `Memory version conflict` error. Re-read with `read_memory` and retry.
+>
 > If `guard_action=UPDATE` returns a valid `guard_target_id`, the update still proceeds **in place on the current URI**. The `guard_target_uri` is a hint, not an automatic redirect.
 
 **Examples**:

@@ -625,6 +625,7 @@ async def update_node(
             content=body.content,
             priority=body.priority,
             disclosure=body.disclosure,
+            expected_memory_id=lane_memory.get("id"),
         )
         return {
             "success": True,
@@ -637,6 +638,8 @@ async def update_node(
     try:
         result = await _run_write_lane("browse.update_node", _write_task)
     except ValueError as e:
+        if str(e).startswith("Memory version conflict"):
+            raise HTTPException(status_code=409, detail="Memory version conflict")
         raise HTTPException(status_code=422, detail=str(e))
 
     if bool(result.get("success")) and bool(result.get("updated")):

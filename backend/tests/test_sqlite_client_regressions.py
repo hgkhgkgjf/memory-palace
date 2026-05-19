@@ -1,6 +1,7 @@
+import inspect
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import time
 
 import pytest
 from sqlalchemy import text
@@ -452,6 +453,131 @@ async def test_permanently_delete_memory_rejects_referenced_orphan_chain_tail(
     await client.close()
 
     assert still_exists is not None
+
+
+@pytest.mark.asyncio
+async def test_update_memory_rejects_stale_expected_memory_id(tmp_path: Path) -> None:
+    client = SQLiteClient(_sqlite_url(tmp_path / "update-memory-cas.db"))
+    await client.init_db()
+
+    await client.create_memory(
+        parent_path="",
+        content="version-1",
+        priority=1,
+        title="cas-target",
+        domain="core",
+    )
+    initial = await client.get_memory_by_path(
+        "cas-target",
+        domain="core",
+        reinforce_access=False,
+    )
+    assert initial is not None
+    stale_id = int(initial["id"])
+
+    await client.update_memory(
+        path="cas-target",
+        content="version-2",
+        domain="core",
+        expected_memory_id=stale_id,
+    )
+
+    with pytest.raises(ValueError, match="Memory version conflict"):
+        await client.update_memory(
+            path="cas-target",
+            content="version-3",
+            domain="core",
+            expected_memory_id=stale_id,
+        )
+
+    current = await client.get_memory_by_path(
+        "cas-target",
+        domain="core",
+        reinforce_access=False,
+    )
+    assert current is not None
+    assert current["content"] == "version-2"
+
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_update_memory_allows_legacy_call_without_expected_memory_id(
+    tmp_path: Path,
+) -> None:
+    client = SQLiteClient(_sqlite_url(tmp_path / "update-memory-cas-none.db"))
+    await client.init_db()
+
+    await client.create_memory(
+        parent_path="",
+        content="version-1",
+        priority=1,
+        title="cas-none-target",
+        domain="core",
+    )
+    await client.update_memory(
+        path="cas-none-target",
+        content="version-2",
+        domain="core",
+    )
+
+    updated = await client.update_memory(
+        path="cas-none-target",
+        content="version-3",
+        domain="core",
+        expected_memory_id=None,
+    )
+    current = await client.get_memory_by_path(
+        "cas-none-target",
+        domain="core",
+        reinforce_access=False,
+    )
+
+    await client.close()
+
+    assert int(updated["new_memory_id"]) == int(current["id"])
+    assert current["content"] == "version-3"
+
+
+@pytest.mark.asyncio
+async def test_update_memory_rejects_invalid_expected_memory_id(
+    tmp_path: Path,
+) -> None:
+    client = SQLiteClient(_sqlite_url(tmp_path / "update-memory-cas-invalid.db"))
+    await client.init_db()
+
+    await client.create_memory(
+        parent_path="",
+        content="version-1",
+        priority=1,
+        title="cas-invalid-target",
+        domain="core",
+    )
+
+    with pytest.raises(ValueError, match="Memory version conflict"):
+        await client.update_memory(
+            path="cas-invalid-target",
+            content="version-2",
+            domain="core",
+            expected_memory_id="not-an-int",  # type: ignore[arg-type]
+        )
+
+    current = await client.get_memory_by_path(
+        "cas-invalid-target",
+        domain="core",
+        reinforce_access=False,
+    )
+
+    await client.close()
+
+    assert current is not None
+    assert current["content"] == "version-1"
+
+
+def test_create_memory_has_no_expected_memory_id_parameter() -> None:
+    signature = inspect.signature(SQLiteClient.create_memory)
+
+    assert "expected_memory_id" not in signature.parameters
 
 
 @pytest.mark.asyncio

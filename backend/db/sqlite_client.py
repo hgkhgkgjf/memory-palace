@@ -5119,6 +5119,7 @@ class SQLiteClient:
         disclosure: Optional[str] = None,
         domain: str = "core",
         index_now: bool = True,
+        expected_memory_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Update a memory (creates new version, deprecates old, repoints path).
@@ -5129,6 +5130,7 @@ class SQLiteClient:
             priority: New priority (None = keep old)
             disclosure: New disclosure (None = keep old)
             domain: The domain/namespace (e.g., "core", "writer", "game")
+            expected_memory_id: Optional CAS guard for stale update detection
 
         Returns:
             Updated memory info including old and new memory IDs
@@ -5160,6 +5162,17 @@ class SQLiteClient:
 
             old_memory, path_obj = row
             old_id = old_memory.id
+            if expected_memory_id is not None:
+                try:
+                    expected_id = int(expected_memory_id)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"Memory version conflict for '{domain}://{path}'"
+                    ) from None
+                if expected_id != int(old_id):
+                    raise ValueError(
+                        f"Memory version conflict for '{domain}://{path}'"
+                    )
 
             # Update Path Metadata
             if priority_value is not None:

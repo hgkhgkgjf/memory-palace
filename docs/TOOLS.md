@@ -189,6 +189,8 @@ update_memory(
 >
 > `old_string` / `new_string` / `append` 任一超过 `100000` 字符会被拒绝。
 >
+> 如果读取后到写入前记忆被其它会话修改，服务端会返回 `Memory version conflict` 错误。重新 `read_memory` 再操作即可。
+>
 > 如果 `guard_action=UPDATE` 且返回有效 `guard_target_id`，仍按**当前 URI 原地更新**。`guard_target_uri` 是提示，不是自动重定向。
 
 **示例**：

@@ -404,7 +404,17 @@ The Docker frontend `nginx.conf.template` serves `/index.html` with `Cache-Contr
 
 ---
 
-## 15. Getting Help
+## 15. Dashboard Edit Returns 409 / Memory Version Conflict
+
+If you see `409` or `Memory version conflict` when saving on the Memory page, it means the memory was modified by another session (MCP tool, another browser tab, etc.) after you opened it.
+
+Fix: refresh the page to load the latest content, then edit again.
+
+This is the same semantics as the Review page `409` — both prevent overwriting a newer version of the memory.
+
+---
+
+## 16. Getting Help
 
 If the steps above don't help:
 

@@ -383,9 +383,11 @@ There's no fixed range. A simple rule of thumb: use `0` for critical core memori
 - **Integrate** clears the snapshot record, but the memory content itself is unchanged
 - **Reject** rolls back the memory to its pre-change state; if you later decide the change was needed, you'll need to re-create it
 
-### Q: Why did rollback return `409` or `404`?
+### Q: Why did rollback or save return `409`?
 
-That usually means the current path state changed after you opened the snapshot. A common `409` case is that the same URI already has a newer content snapshot in another Review session, or the current metadata changed again. A common `404` case is that the path disappeared before rollback actually wrote.
+This means the memory was modified elsewhere (MCP tool, another browser tab, or another Review session) after you opened the page. Refresh to load the latest content, then retry.
+
+`404` means the path was deleted before your operation completed.
 
 ### Q: Why did I suddenly see the fallback error page?
 

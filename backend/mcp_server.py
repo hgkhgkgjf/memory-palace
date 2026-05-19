@@ -5059,7 +5059,9 @@ async def update_memory(
             )
             if resolved_memory is not None:
                 full_uri = make_uri(domain, working_path)
-            current_memory_id: Optional[int] = None
+            current_memory_id: Optional[int] = (
+                resolved_memory.get("id") if isinstance(resolved_memory, dict) else None
+            )
             content = None
 
             if old_string is not None:
@@ -5232,6 +5234,7 @@ async def update_memory(
                 disclosure=disclosure,
                 domain=domain,
                 index_now=not defer_index,
+                expected_memory_id=current_memory_id,
             )
             preview_text = content
             if preview_text is None:
@@ -5302,9 +5305,12 @@ async def update_memory(
         )
 
     except ValueError as e:
+        message = "Memory version conflict" if str(e).startswith(
+            "Memory version conflict"
+        ) else str(e)
         return _tool_response(
             ok=False,
-            message=f"Error: {str(e)}",
+            message=f"Error: {message}",
             updated=False,
             **_guard_fields(guard_decision),
         )

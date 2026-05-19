@@ -117,7 +117,7 @@ npm run dev
 - 只想让 Dashboard 通过鉴权：选「只保存 Dashboard 密钥」（保存在 `sessionStorage`）
 - 想写入配置到 `.env`：仅在非 Docker 本地运行时可用，且必须从本机回环地址访问
 
-Dashboard 使用指南见 [DASHBOARD_GUIDE_CN.md](DASHBOARD_GUIDE_CN.md)。
+Dashboard 使用指南见 [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md)。
 
 ---
 
@@ -428,4 +428,4 @@ stdio 模式不经过鉴权层，不需要 key。
 | [TECHNICAL_OVERVIEW.md](TECHNICAL_OVERVIEW.md) | 系统架构与数据流 |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | 常见问题排查 |
 | [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) | 安全与隐私 |
-| [DASHBOARD_GUIDE_CN.md](DASHBOARD_GUIDE_CN.md) | Dashboard 操作指南 |
+| [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md) | Dashboard 操作指南 |

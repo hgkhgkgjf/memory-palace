@@ -104,6 +104,14 @@ class _FakeBrowseClientWithLaneHeadRefresh(_FakeBrowseClient):
         }
 
 
+class _FakeBrowseClientWithUpdateConflict(_FakeBrowseClient):
+    async def update_memory(self, **_: Any) -> Dict[str, Any]:
+        raise ValueError(
+            "Memory version conflict for 'core://agent/new_note': "
+            "expected memory id 7, current memory id 8"
+        )
+
+
 class _FakeSnapshotManager:
     def __init__(self) -> None:
         self.snapshots: dict[str, dict[str, dict[str, Any]]] = {}
@@ -357,6 +365,44 @@ async def test_browse_update_node_uses_lane_fresh_head_for_write_guard_matching(
         )
         for item in fake_snapshot_manager.created
     ] == [("memory:19", "memory", "modify_content")]
+
+
+@pytest.mark.asyncio
+async def test_browse_update_node_surfaces_version_conflict_as_409(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_client = _FakeBrowseClientWithUpdateConflict()
+    fake_snapshot_manager = _FakeSnapshotManager()
+
+    async def _run_write(*, session_id: Optional[str], operation: str, task):
+        _ = session_id, operation
+        fake_client.in_lane = True
+        try:
+            return await task()
+        finally:
+            fake_client.in_lane = False
+
+    monkeypatch.setattr(browse_api, "get_sqlite_client", lambda: fake_client)
+    monkeypatch.setattr(
+        browse_api, "get_snapshot_manager", lambda: fake_snapshot_manager
+    )
+    monkeypatch.setattr(
+        browse_api,
+        "_resolve_current_database_scope",
+        lambda: {"database_fingerprint": "123456789abcdeadbeef"},
+    )
+    monkeypatch.setattr(browse_api.runtime_state.write_lanes, "run_write", _run_write)
+    monkeypatch.setattr(browse_api, "ENABLE_WRITE_LANE_QUEUE", True)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await browse_api.update_node(
+            path="agent/new_note",
+            domain="core",
+            body=browse_api.NodeUpdate(content="update payload"),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "Memory version conflict"
 
 
 @pytest.mark.asyncio
