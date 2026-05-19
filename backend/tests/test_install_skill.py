@@ -18,6 +18,17 @@ def _load_install_skill_module():
     return module
 
 
+def _backend_venv_python_for_module(module, project_root: Path) -> Path:
+    if module.os.name == "nt":
+        return project_root / "backend" / ".venv" / "Scripts" / "python.exe"
+    return project_root / "backend" / ".venv" / "bin" / "python"
+
+
+def _clear_windows_posix_shell_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in ("MSYSTEM", "CYGWIN", "WSL_DISTRO_NAME", "WSL_INTEROP", "OSTYPE"):
+        monkeypatch.delenv(key, raising=False)
+
+
 def test_read_json_file_reports_invalid_json_path(tmp_path: Path) -> None:
     module = _load_install_skill_module()
     config_path = tmp_path / "settings.json"
@@ -462,6 +473,7 @@ def test_codex_server_block_uses_python_wrapper_on_windows(
 
     monkeypatch.setattr(module, "project_root", lambda: project_root)
     monkeypatch.setattr(module.os, "name", "nt")
+    _clear_windows_posix_shell_env(monkeypatch)
 
     rendered = module._codex_server_block_text()
 
@@ -551,11 +563,10 @@ def test_wrapper_binding_ok_accepts_python_wrapper_paths(
 ) -> None:
     module = _load_install_skill_module()
     project_root = tmp_path / "Memory-Palace"
-    venv_python = project_root / "backend" / ".venv" / "bin" / "python"
+    monkeypatch.setattr(module, "project_root", lambda: project_root)
+    venv_python = _backend_venv_python_for_module(module, project_root)
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("", encoding="utf-8")
-
-    monkeypatch.setattr(module, "project_root", lambda: project_root)
 
     assert module._wrapper_binding_ok(
         [str(venv_python), str(project_root / "backend" / "mcp_wrapper.py")],
@@ -572,11 +583,11 @@ def test_wrapper_binding_ok_accepts_documented_manual_fallbacks(
 ) -> None:
     module = _load_install_skill_module()
     project_root = tmp_path / "Memory-Palace"
-    venv_python = project_root / "backend" / ".venv" / "bin" / "python"
+    monkeypatch.setattr(module, "project_root", lambda: project_root)
+    venv_python = _backend_venv_python_for_module(module, project_root)
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("", encoding="utf-8")
 
-    monkeypatch.setattr(module, "project_root", lambda: project_root)
     monkeypatch.setattr(module.shutil, "which", lambda command: str(venv_python) if command == "python" else None)
 
     assert module._wrapper_binding_ok(

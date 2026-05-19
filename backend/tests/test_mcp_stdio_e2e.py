@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 import sys
 
@@ -25,6 +26,10 @@ def _set_windows_posix_shell_env(monkeypatch: pytest.MonkeyPatch, env: dict[str,
         monkeypatch.setenv(key, value)
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Live stdio subprocess E2E is covered on POSIX; Windows path selection is unit-tested.",
+)
 def test_live_mcp_stdio_e2e_suite_passes() -> None:
     harness = _load_harness()
     results, stderr_output = harness.run_suite_sync()

@@ -34,6 +34,23 @@ def _run_command(
     )
 
 
+def _bash_wrapper_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    env = dict(os.environ)
+    for key in (
+        "DATABASE_URL",
+        "OS",
+        "MSYSTEM",
+        "CYGWIN",
+        "WSL_DISTRO_NAME",
+        "WSL_INTEROP",
+        "OSTYPE",
+    ):
+        env.pop(key, None)
+    if overrides:
+        env.update(overrides)
+    return env
+
+
 def _load_skill_eval_module():
     project_root = Path(__file__).resolve().parents[2]
     script_path = project_root / "scripts" / "evaluate_memory_palace_skill.py"
@@ -178,7 +195,7 @@ def test_repo_local_stdio_wrapper_rejects_docker_internal_database_url(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_bash_wrapper_env(),
     )
 
     assert result.returncode == 1
@@ -215,7 +232,7 @@ def test_repo_local_stdio_wrapper_rejects_quoted_docker_internal_database_url(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_bash_wrapper_env(),
     )
 
     assert result.returncode == 1
@@ -252,7 +269,7 @@ def test_repo_local_stdio_wrapper_rejects_data_prefixed_docker_internal_database
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_bash_wrapper_env(),
     )
 
     assert result.returncode == 1
@@ -289,7 +306,7 @@ def test_repo_local_stdio_wrapper_rejects_docker_internal_database_url_with_uppe
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_bash_wrapper_env(),
     )
 
     assert result.returncode == 1
@@ -326,7 +343,7 @@ def test_repo_local_stdio_wrapper_rejects_parent_directory_database_url(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_bash_wrapper_env(),
     )
 
     assert result.returncode == 1
@@ -386,7 +403,7 @@ def test_repo_local_stdio_wrapper_exports_repo_database_url_when_runtime_value_i
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={**os.environ, "DATABASE_URL": ""},
+        env=_bash_wrapper_env({"DATABASE_URL": ""}),
     )
 
     assert result.returncode == 0
