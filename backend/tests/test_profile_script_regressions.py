@@ -1232,14 +1232,9 @@ def test_apply_profile_powershell_rejects_concurrent_writer_for_same_target(
             "-Command",
             (
                 "$lockPath='.env.generated.lock'; "
-                "$stream=[System.IO.File]::Open("
-                "$lockPath,"
-                "[System.IO.FileMode]::OpenOrCreate,"
-                "[System.IO.FileAccess]::ReadWrite,"
-                "[System.IO.FileShare]::None"
-                "); "
-                "Start-Sleep -Seconds 5; "
-                "$stream.Dispose()"
+                "$utf8NoBom=[System.Text.UTF8Encoding]::new($false); "
+                "[System.IO.File]::WriteAllText($lockPath,[string]$PID,$utf8NoBom); "
+                "Start-Sleep -Seconds 5"
             ),
         ],
         cwd=project_root,
@@ -1247,10 +1242,10 @@ def test_apply_profile_powershell_rejects_concurrent_writer_for_same_target(
     time.sleep(0.5)
 
     try:
-            result = _run_command(
-                [
-                    "pwsh",
-                    "-NoLogo",
+        result = _run_command(
+            [
+                "pwsh",
+                "-NoLogo",
                 "-NoProfile",
                 "-File",
                 "scripts/apply_profile.ps1",
@@ -1261,8 +1256,8 @@ def test_apply_profile_powershell_rejects_concurrent_writer_for_same_target(
                 "-Target",
                 ".env.generated",
             ],
-                cwd=project_root,
-            )
+            cwd=project_root,
+        )
     finally:
         lock_holder.terminate()
         try:

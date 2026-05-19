@@ -373,6 +373,10 @@ append_no_proxy_entry() {
     printf '%s\n' "${current_value}"
     return 0
   fi
+  if [[ -z "${current_value}" ]]; then
+    printf '%s\n' "${entry}"
+    return 0
+  fi
 
   IFS=',' read -r -a existing_entries <<< "${current_value}"
   for existing in "${existing_entries[@]}"; do
