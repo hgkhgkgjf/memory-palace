@@ -559,6 +559,8 @@ def test_ci_backend_workflow_uses_repo_backend_venv_for_validation() -> None:
         '"$BACKEND_PYTHON" scripts/cross_platform_smoke.py --json --output cross_platform_report.json'
         in workflow
     )
+    assert 'export PATH="/c/Program Files/Git/bin:/c/Program Files/Git/usr/bin:$PATH"' in workflow
+    assert 'echo "Using bash at: $(command -v bash)"' in workflow
     assert '"$BACKEND_PYTHON" -m pytest tests --ignore=tests/benchmark -q' in workflow
 
 

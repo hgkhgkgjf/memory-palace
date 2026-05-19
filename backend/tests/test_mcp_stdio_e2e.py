@@ -145,7 +145,8 @@ def test_write_private_report_uses_private_permissions(tmp_path: Path) -> None:
     harness._write_private_report(report_path, "secret")
 
     assert report_path.read_text(encoding="utf-8") == "secret"
-    assert report_path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert report_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_maybe_reexec_with_backend_python_sets_guard_env(monkeypatch, tmp_path: Path) -> None:

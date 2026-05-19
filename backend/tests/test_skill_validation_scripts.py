@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -141,7 +142,8 @@ def test_write_private_report_uses_private_permissions(monkeypatch, tmp_path):
     module._write_private_report(report_path, "secret")
 
     assert report_path.read_text(encoding="utf-8") == "secret"
-    assert report_path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert report_path.stat().st_mode & 0o777 == 0o600
 
 
 def test_smoke_gemini_live_suite_is_opt_in_by_default(monkeypatch):

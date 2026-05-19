@@ -14,6 +14,55 @@ from sqlalchemy.engine import make_url
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+WINDOWS_SHELL_ENV_KEYS = {
+    "CYGWIN",
+    "MSYSTEM",
+    "OS",
+    "OSTYPE",
+    "WSL_DISTRO_NAME",
+    "WSL_INTEROP",
+}
+
+
+def _windows_git_bash() -> str | None:
+    if os.name != "nt":
+        return None
+
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Git" / "bin" / "bash.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Git" / "usr" / "bin" / "bash.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
+        / "Git"
+        / "bin"
+        / "bash.exe",
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
+        / "Git"
+        / "usr"
+        / "bin"
+        / "bash.exe",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _resolve_command(args: list[str]) -> list[str]:
+    if args and args[0] == "bash":
+        return [_windows_git_bash() or args[0], *args[1:]]
+    return args
+
+
+def _posix_wrapper_env(
+    *,
+    exclude: set[str] | None = None,
+    update: dict[str, str] | None = None,
+) -> dict[str, str]:
+    excluded = set(exclude or set()) | WINDOWS_SHELL_ENV_KEYS
+    env = {key: value for key, value in os.environ.items() if key not in excluded}
+    if update:
+        env.update(update)
+    return env
 
 
 def _write_text(path: Path, content: str, *, newline: str | None = None) -> None:
@@ -42,7 +91,7 @@ def _run_command(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        args,
+        _resolve_command(args),
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -55,7 +104,7 @@ def _run_command(
 
 def _popen_command(args: list[str], *, cwd: Path) -> subprocess.Popen[str]:
     return subprocess.Popen(
-        args,
+        _resolve_command(args),
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -1389,7 +1438,7 @@ def test_repo_local_stdio_wrapper_resolves_real_project_root_through_symlink(
     result = _run_command(
         ["bash", "./memory-palace-stdio"],
         cwd=link_dir,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_posix_wrapper_env(exclude={"DATABASE_URL"}),
     )
 
     assert result.returncode == 0, result.stderr
@@ -1427,7 +1476,7 @@ def test_repo_local_stdio_wrapper_prefers_env_file_remote_timeout_when_runtime_e
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "RETRIEVAL_REMOTE_TIMEOUT_SEC"},
+        env=_posix_wrapper_env(exclude={"RETRIEVAL_REMOTE_TIMEOUT_SEC"}),
     )
 
     assert result.returncode == 0, result.stderr
@@ -1452,7 +1501,7 @@ def test_repo_local_stdio_wrapper_rejects_empty_database_url_in_env_file(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_posix_wrapper_env(exclude={"DATABASE_URL"}),
     )
 
     assert result.returncode == 1
@@ -1491,7 +1540,7 @@ def test_repo_local_stdio_wrapper_reads_env_without_python_dotenv(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "RETRIEVAL_REMOTE_TIMEOUT_SEC"},
+        env=_posix_wrapper_env(exclude={"RETRIEVAL_REMOTE_TIMEOUT_SEC"}),
     )
 
     assert result.returncode == 0, result.stderr
@@ -1523,7 +1572,7 @@ def test_repo_local_stdio_wrapper_normalizes_double_slash_default_database_path(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={key: value for key, value in os.environ.items() if key != "DATABASE_URL"},
+        env=_posix_wrapper_env(exclude={"DATABASE_URL"}),
     )
 
     assert result.returncode == 0, result.stderr
@@ -1547,11 +1596,7 @@ def test_repo_local_stdio_wrapper_exports_utf8_python_defaults(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={
-            key: value
-            for key, value in os.environ.items()
-            if key not in {"DATABASE_URL", "PYTHONIOENCODING", "PYTHONUTF8"}
-        },
+        env=_posix_wrapper_env(exclude={"DATABASE_URL", "PYTHONIOENCODING", "PYTHONUTF8"}),
     )
 
     assert result.returncode == 0, result.stderr
@@ -1581,11 +1626,8 @@ def test_repo_local_stdio_wrapper_merges_local_hosts_into_no_proxy(
     result = _run_command(
         ["bash", "scripts/run_memory_palace_mcp_stdio.sh"],
         cwd=project_root,
-        env={
-            key: value
-            for key, value in os.environ.items()
-            if key
-            not in {
+        env=_posix_wrapper_env(
+            exclude={
                 "DATABASE_URL",
                 "NO_PROXY",
                 "no_proxy",
@@ -1595,13 +1637,13 @@ def test_repo_local_stdio_wrapper_merges_local_hosts_into_no_proxy(
                 "http_proxy",
                 "https_proxy",
                 "all_proxy",
-            }
-        }
-        | {
-            "NO_PROXY": "upper.internal",
-            "no_proxy": "corp.internal",
-            "HTTP_PROXY": "http://proxy.example:8080",
-        },
+            },
+            update={
+                "NO_PROXY": "upper.internal",
+                "no_proxy": "corp.internal",
+                "HTTP_PROXY": "http://proxy.example:8080",
+            },
+        ),
     )
 
     assert result.returncode == 0, result.stderr

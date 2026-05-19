@@ -61,7 +61,7 @@ def test_gate_syntax_passes_when_parent_workspace_post_check_script_exists(
 
     assert result.status == "PASS"
     assert captured["cmd"] == [
-        "bash",
+        harness._bash_command(),
         "-n",
         harness._bash_relative_path(gate_script, cwd=repo_root),
     ]

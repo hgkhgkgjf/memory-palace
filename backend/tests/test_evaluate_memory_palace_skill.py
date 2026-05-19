@@ -468,7 +468,7 @@ def test_check_gate_syntax_validates_first_existing_post_check_script(
 
     assert result.status == "PASS"
     assert captured["cmd"] == [
-        "bash",
+        evaluate_memory_palace_skill._bash_command(),
         "-n",
         evaluate_memory_palace_skill._bash_relative_path(gate_script, cwd=tmp_path),
     ]

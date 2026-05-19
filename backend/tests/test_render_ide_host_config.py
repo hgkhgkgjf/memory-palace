@@ -49,8 +49,10 @@ def test_render_payload_for_cursor_uses_repo_agents_and_bash_wrapper(
     assert payload["skill_insertion"]["primary_rule_surface"] == str(project_root / "AGENTS.md")
     assert payload["skill_insertion"]["hidden_skill_mirrors_required"] is False
     assert payload["mcp_config"]["mcpServers"]["memory-palace"]["command"] == "bash"
+    wrapper_path = project_root / "scripts" / "run_memory_palace_mcp_stdio.sh"
+    expected_wrapper = wrapper_path.as_posix() if module.os.name == "nt" else str(wrapper_path)
     assert payload["mcp_config"]["mcpServers"]["memory-palace"]["args"] == [
-        str(project_root / "scripts" / "run_memory_palace_mcp_stdio.sh")
+        expected_wrapper
     ]
 
 
@@ -127,6 +129,7 @@ def test_render_payload_auto_uses_python_wrapper_on_windows(
 
     monkeypatch.setattr(module, "project_root", lambda: project_root)
     monkeypatch.setattr(module.os, "name", "nt")
+    _set_windows_posix_shell_env(monkeypatch, {})
 
     payload = module.render_payload("cursor", "auto")
 
@@ -186,11 +189,10 @@ def test_render_payload_supports_windsurf_python_wrapper(
 ) -> None:
     module = _load_module()
     project_root = tmp_path / "Memory-Palace"
-    venv_python = project_root / "backend" / ".venv" / "bin" / "python"
+    monkeypatch.setattr(module, "project_root", lambda: project_root)
+    venv_python = module.backend_venv_python_absolute()
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("", encoding="utf-8")
-
-    monkeypatch.setattr(module, "project_root", lambda: project_root)
 
     payload = module.render_payload("windsurf", "python-wrapper")
 

@@ -890,6 +890,27 @@ def check_sync_script() -> CheckResult:
     return CheckResult("PASS", proc.stdout.strip() or "sync script --check passed")
 
 
+def _bash_command() -> str | None:
+    if os.name == "nt":
+        candidates = [
+            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Git" / "bin" / "bash.exe",
+            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Git" / "usr" / "bin" / "bash.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
+            / "Git"
+            / "bin"
+            / "bash.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
+            / "Git"
+            / "usr"
+            / "bin"
+            / "bash.exe",
+        ]
+        for candidate in candidates:
+            if candidate.is_file():
+                return str(candidate)
+    return shutil.which("bash")
+
+
 def check_gate_syntax() -> CheckResult:
     gate_candidates = [
         REPO_ROOT / "new" / "run_post_change_checks.sh",
@@ -901,7 +922,7 @@ def check_gate_syntax() -> CheckResult:
             "SKIP",
             "run_post_change_checks.sh 不属于公开仓校验范围，跳过该项",
         )
-    bash_bin = shutil.which("bash")
+    bash_bin = _bash_command()
     if not bash_bin:
         return CheckResult(
             "SKIP",
@@ -909,7 +930,7 @@ def check_gate_syntax() -> CheckResult:
             f"missing bash for: {gate_script}",
         )
     proc = run_command(
-        ["bash", "-n", _bash_relative_path(gate_script, cwd=REPO_ROOT)],
+        [bash_bin, "-n", _bash_relative_path(gate_script, cwd=REPO_ROOT)],
         cwd=REPO_ROOT,
         timeout=30,
     )

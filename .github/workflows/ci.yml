@@ -76,6 +76,10 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: |
+          if [ "${RUNNER_OS:-}" = "Windows" ]; then
+            export PATH="/c/Program Files/Git/bin:/c/Program Files/Git/usr/bin:$PATH"
+            echo "Using bash at: $(command -v bash)"
+          fi
           cd backend
           "$BACKEND_PYTHON" -m pytest tests --ignore=tests/benchmark -q
 

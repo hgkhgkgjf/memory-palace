@@ -50,6 +50,10 @@ def _spawn_run_sse_subprocess(*, backend_dir: Path, env: dict[str, str]) -> subp
     return subprocess.Popen([sys.executable, "run_sse.py"], **kwargs)
 
 
+def _sqlite_url(path: Path) -> str:
+    return f"sqlite+aiosqlite:///{path.as_posix()}"
+
+
 def _request_graceful_shutdown(process: subprocess.Popen[str]) -> None:
     if os.name == "nt":
         ctrl_break = getattr(signal, "CTRL_BREAK_EVENT", None)
@@ -402,7 +406,7 @@ def test_sse_auth_does_not_raise_on_streaming_disconnect(tmp_path) -> None:
 
     env = dict(**os.environ)
     env["MCP_API_KEY"] = "week6-sse-secret"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'streaming_disconnect.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "streaming_disconnect.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     server = _spawn_run_sse_subprocess(backend_dir=backend_dir, env=env)
@@ -465,7 +469,7 @@ def test_sse_auth_does_not_raise_on_streaming_shutdown(tmp_path) -> None:
 
     env = dict(**os.environ)
     env["MCP_API_KEY"] = "week6-sse-secret"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'streaming_shutdown.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "streaming_shutdown.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     server = _spawn_run_sse_subprocess(backend_dir=backend_dir, env=env)
@@ -536,7 +540,7 @@ def test_sse_insecure_local_does_not_raise_on_streaming_shutdown(tmp_path) -> No
     env = dict(**os.environ)
     env.pop("MCP_API_KEY", None)
     env["MCP_API_KEY_ALLOW_INSECURE_LOCAL"] = "true"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'streaming_shutdown_insecure_local.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "streaming_shutdown_insecure_local.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     server = _spawn_run_sse_subprocess(backend_dir=backend_dir, env=env)
@@ -609,7 +613,7 @@ def test_sse_auth_rejects_when_posting_to_closed_message_stream(tmp_path) -> Non
 
     env = dict(**os.environ)
     env["MCP_API_KEY"] = "week6-sse-secret"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'closed_message_stream.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "closed_message_stream.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     server = _spawn_run_sse_subprocess(backend_dir=backend_dir, env=env)
@@ -746,7 +750,7 @@ def test_sse_messages_reject_oversized_body_with_413(tmp_path) -> None:
 
     env = dict(**os.environ)
     env["MCP_API_KEY"] = "week6-sse-secret"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'oversized_message.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "oversized_message.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     env["SSE_MESSAGE_MAX_BODY_BYTES"] = "1024"
@@ -1049,7 +1053,7 @@ def test_sse_malformed_message_returns_400_without_internal_error_event(tmp_path
 
     env = dict(**os.environ)
     env["MCP_API_KEY"] = "week6-sse-secret"
-    env["DATABASE_URL"] = f"sqlite+aiosqlite:///{tmp_path / 'malformed_message.db'}"
+    env["DATABASE_URL"] = _sqlite_url(tmp_path / "malformed_message.db")
     env["HOST"] = "127.0.0.1"
     env["PORT"] = str(port)
     server = _spawn_run_sse_subprocess(backend_dir=backend_dir, env=env)
