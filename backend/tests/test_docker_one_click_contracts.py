@@ -541,7 +541,25 @@ def test_docker_publish_workflow_uses_repo_backend_venv_for_validation() -> None
         "backend/.venv/bin/python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt"
         in workflow
     )
-    assert "cd backend && .venv/bin/python -m pytest tests -q" in workflow
+    assert (
+        "cd backend && .venv/bin/python -m pytest tests --ignore=tests/benchmark -q"
+        in workflow
+    )
+
+
+def test_ci_backend_workflow_uses_repo_backend_venv_for_validation() -> None:
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "timeout-minutes: 20" in workflow
+    assert "python -m venv backend/.venv" in workflow
+    assert 'echo "BACKEND_PYTHON=$VENV_PY" >> "$GITHUB_ENV"' in workflow
+    assert (
+        '"$BACKEND_PYTHON" scripts/cross_platform_smoke.py --json --output cross_platform_report.json'
+        in workflow
+    )
+    assert '"$BACKEND_PYTHON" -m pytest tests --ignore=tests/benchmark -q' in workflow
 
 
 def test_docker_publish_workflow_builds_and_publishes_tag_refs_directly() -> None:
