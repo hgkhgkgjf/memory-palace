@@ -84,6 +84,53 @@ vi.mock('../../lib/api', async (importOriginal) => {
   };
 });
 
+vi.mock('./vitality/VitalityCandidateTable', async () => {
+  const React = await import('react');
+  return {
+    default: function MockVitalityCandidateTable({
+      candidates,
+      selectedIds,
+      onToggleSelect,
+      onToggleSelectAll,
+      disabled = false,
+    }) {
+      const allSelected =
+        candidates.length > 0 && candidates.every((item) => selectedIds.has(item.memory_id));
+      return React.createElement(
+        'div',
+        { 'data-testid': 'mock-vitality-candidate-table' },
+        React.createElement('input', {
+          id: 'vitality-select-all',
+          type: 'checkbox',
+          checked: allSelected,
+          disabled: disabled || candidates.length === 0,
+          onChange: onToggleSelectAll,
+          'aria-label': 'select all vitality candidates',
+        }),
+        React.createElement(
+          'ul',
+          { 'aria-label': 'vitality candidates' },
+          candidates.map((item) =>
+            React.createElement(
+              'li',
+              { key: item.memory_id },
+              React.createElement(
+                'button',
+                {
+                  type: 'button',
+                  disabled,
+                  onClick: () => onToggleSelect(item.memory_id),
+                },
+                item.content_snippet || item.uri || String(item.memory_id),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  };
+});
+
 describe('MaintenancePage', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -378,7 +425,7 @@ describe('MaintenancePage', () => {
       await screen.findByText('选择数量过多：101。最多只能选择 100 条。')
     ).toBeInTheDocument();
     expect(api.prepareVitalityCleanup).not.toHaveBeenCalled();
-  }, 10000);
+  });
 
   it('describes vitality delete confirmation with the prepared deletable count', async () => {
     const user = userEvent.setup();
