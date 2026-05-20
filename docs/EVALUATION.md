@@ -146,7 +146,7 @@
 - `backend/tests/benchmark/search_quality_baseline.py` / `search_quality_baseline.json`
 - `backend/tests/benchmark/rrf_calibration.py` / `rrf_calibration_results.json`
 
-它们为 RRF 和 entity boost 这类检索改动提供可复跑的校准基线，不是线上质量承诺。代码裸默认仍保持 `RRF_ENABLED=false`；仓库自带 Profile B/C/D 模板显式设置 `RRF_ENABLED=true`（`RRF_K=10`）。Profile A 为纯关键词模式，不适用 RRF。
+它们为 RRF 和 entity boost 这类检索改动提供可复跑的校准基线，不是线上质量承诺。代码裸默认仍保持 `RRF_ENABLED=false`；仓库自带 Profile B 模板显式设置 `RRF_ENABLED=true`（`RRF_K=10`），Profile C/D 模板保持 `RRF_ENABLED=false` 并只默认开启 sqlite-vec。Profile A 为纯关键词模式，不适用 RRF。
 
 ---
 

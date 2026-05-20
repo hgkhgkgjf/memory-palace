@@ -40,7 +40,7 @@
 **说明**：
 
 - A → B：从纯关键词升级为混合检索（内置 64 维哈希，零依赖）。B 默认开启 RRF 融合（`RRF_K=10`）。
-- B → C/D：接入真实 embedding + reranker，提升语义检索效果。C/D 额外请求 `sqlite-vec` 原生向量引擎；pip 安装了 `sqlite-vec` 时自动发现，没装则自动回退 legacy。
+- B → C/D：接入真实 embedding + reranker，并默认只启用 `sqlite-vec` 原生向量引擎；RRF 与 MMR 在 C/D 模板中保持关闭。pip 安装了 `sqlite-vec` 时自动发现，没装则自动回退 legacy。
 - C vs D：算法一致，主要差别是 endpoint（本地 vs 远程）与默认 reranker 权重（C `0.30`、D `0.35`）。
 
 > **升档前的提醒**：如果库里已有用其它 embedding 后端写入的旧向量，先用 `index_status()` 检查；维度不一致时运行 `rebuild_index(wait=true)`，或换一份新库验证。系统不会自动迁移旧向量。
@@ -102,9 +102,10 @@ RETRIEVAL_RERANKER_API_KEY=replace-with-your-key
 RETRIEVAL_RERANKER_MODEL=your-reranker-model-id
 RETRIEVAL_RERANKER_WEIGHT=0.30
 
-# RRF 融合（此档位默认开启）
-RRF_ENABLED=true
-RRF_K=10
+# RRF/MMR 默认关闭；C/D 默认只打开 sqlite-vec。
+RRF_ENABLED=false
+RRF_K=60
+RETRIEVAL_MMR_ENABLED=false
 
 # sqlite-vec 原生向量引擎（pip install sqlite-vec 后自动发现）
 RETRIEVAL_SQLITE_VEC_ENABLED=true
@@ -126,7 +127,7 @@ RETRIEVAL_RERANKER_MODEL=your-reranker-model-id
 
 ### Profile D —— 远程 API
 
-与 C 的区别：endpoint 指向远程，默认 reranker 权重更高。
+与 C 的区别：endpoint 指向远程，默认 reranker 权重更高；RRF/MMR 仍保持关闭，sqlite-vec 仍保持开启。
 
 ```bash
 ROUTER_API_BASE=https://router.example.com/v1

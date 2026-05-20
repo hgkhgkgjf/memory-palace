@@ -199,6 +199,8 @@ def test_docs_keep_embedding_dim_codex_partial_and_profile_c_guidance_consistent
     assert "both `mcp_bindings` and `Codex smoke` passed" not in quickstart_en
     assert "仓库自带的 `profile-c` 模板默认仍会把 Reranker 一起打开" in profiles_zh
     assert "the shipped `profile-c` template still enables the Reranker by default" in profiles_en
+    assert "RRF 与 MMR 在 C/D 模板中保持关闭" in profiles_zh
+    assert "RRF and MMR remain disabled in the C/D templates" in profiles_en
     assert "不再默认替你补 `1024`" in zh_getting_started
     assert "no longer auto-fills `1024` for you" in en_getting_started
 

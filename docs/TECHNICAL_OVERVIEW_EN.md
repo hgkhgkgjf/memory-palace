@@ -292,8 +292,8 @@ The frontend does not read maintenance keys from `VITE_*` build variables; it us
 **Optional configuration**:
 
 - `INTENT_LLM_ENABLED` disabled by default; enabled, tries LLM intent classification first and falls back to keyword rules
-- `RETRIEVAL_MMR_ENABLED` disabled by default; only runs under `hybrid`
-- `RRF_ENABLED` is off in raw code defaults; Profile B/C/D templates explicitly enable it (`RRF_K=10`). Profile A is not applicable. RRF runs over allowlisted `fts5` / `vector` channels
+- `RETRIEVAL_MMR_ENABLED` is disabled by default; Profile C/D templates also keep it explicitly disabled, and it only runs under `hybrid` when manually enabled
+- `RRF_ENABLED` is off in raw code defaults; Profile B explicitly enables it (`RRF_K=10`), while Profile C/D explicitly disable it (`RRF_K=60`). Profile A is not applicable. RRF runs over allowlisted `fts5` / `vector` channels
 - `ENTITY_RERANK_WEIGHT` defaults to `0.0`; entity signal is a post-fusion boost, not a third RRF channel
 - `RETRIEVAL_SQLITE_VEC_ENABLED` is explicitly enabled by Profile C/D templates (`RETRIEVAL_VECTOR_ENGINE=vec`); the extension path is auto-discovered from pip `sqlite-vec` when available and falls back to legacy when absent. A/B remain off
 

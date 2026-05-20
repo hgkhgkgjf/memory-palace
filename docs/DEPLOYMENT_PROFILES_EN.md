@@ -40,7 +40,7 @@ Choose a profile (A / B / C / D) based on your hardware and use case, then deplo
 **Notes**:
 
 - A → B: upgrades from pure keyword to hybrid search (built-in 64-dim hash, no external deps). B enables RRF fusion by default (`RRF_K=10`).
-- B → C/D: real embedding + reranker for stronger semantic retrieval. C/D also request the `sqlite-vec` native vector engine; it is auto-discovered from pip `sqlite-vec` and falls back to legacy if not installed.
+- B → C/D: real embedding + reranker, with only the `sqlite-vec` native vector engine enabled by default. RRF and MMR remain disabled in the C/D templates. The engine is auto-discovered from pip `sqlite-vec` and falls back to legacy if not installed.
 - C vs D: same algorithm path. Defaults differ on endpoint (local vs remote) and reranker weight (C `0.30`, D `0.35`).
 
 > **Before upgrading**: if your database already contains vectors written by a different embedding backend, run `index_status()` first. If dimensions don't match, run `rebuild_index(wait=true)` or validate against a fresh database. The system does not auto-migrate old vectors.
@@ -102,9 +102,10 @@ RETRIEVAL_RERANKER_API_KEY=replace-with-your-key
 RETRIEVAL_RERANKER_MODEL=your-reranker-model-id
 RETRIEVAL_RERANKER_WEIGHT=0.30
 
-# RRF fusion (on by default for this profile)
-RRF_ENABLED=true
-RRF_K=10
+# RRF/MMR stay off by default; C/D only enable sqlite-vec.
+RRF_ENABLED=false
+RRF_K=60
+RETRIEVAL_MMR_ENABLED=false
 
 # sqlite-vec native vector engine (auto-discovered from pip install sqlite-vec)
 RETRIEVAL_SQLITE_VEC_ENABLED=true
@@ -126,7 +127,7 @@ RETRIEVAL_RERANKER_MODEL=your-reranker-model-id
 
 ### Profile D — Remote API
 
-Difference from C: endpoints point to remote, default reranker weight is higher.
+Difference from C: endpoints point to remote and the default reranker weight is higher; RRF/MMR stay disabled and sqlite-vec stays enabled.
 
 ```bash
 ROUTER_API_BASE=https://router.example.com/v1

@@ -292,8 +292,8 @@ frontend/src/
 **可选配置**：
 
 - `INTENT_LLM_ENABLED` 默认关闭；开启后优先 LLM 意图分类，失败回退关键词规则
-- `RETRIEVAL_MMR_ENABLED` 默认关闭；仅 `hybrid` 检索下做去重 / 多样性重排
-- `RRF_ENABLED` 代码裸默认关闭；Profile B/C/D 模板显式开启（`RRF_K=10`），Profile A 不适用；只在 `fts5` / `vector` 通道做 RRF
+- `RETRIEVAL_MMR_ENABLED` 默认关闭；Profile C/D 模板也显式保持关闭，仅手动开启后才会在 `hybrid` 检索下做去重 / 多样性重排
+- `RRF_ENABLED` 代码裸默认关闭；Profile B 模板显式开启（`RRF_K=10`），Profile C/D 模板显式关闭（`RRF_K=60`），Profile A 不适用；只在 `fts5` / `vector` 通道做 RRF
 - `ENTITY_RERANK_WEIGHT` 默认 `0.0`；entity 信号是 fusion 后的 boost，不是第三条 RRF channel
 - `RETRIEVAL_SQLITE_VEC_ENABLED` Profile C/D 模板显式开启（`RETRIEVAL_VECTOR_ENGINE=vec`），pip 安装了 `sqlite-vec` 时自动发现扩展路径；未安装时回退 legacy；A/B 保持关闭
 

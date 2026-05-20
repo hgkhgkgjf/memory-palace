@@ -58,7 +58,7 @@ If you want an AI to guide installation step by step, start from [`memory-palace
 - **Memory Maintenance Engines** (v2): four independent engines — Forgetting (vitality decay + archive), Layering (L0→L1→L2 provenance), Compression (cascade preview), Procedural (step extraction). All read-only preview by default; mutations gated behind explicit review tokens.
 - **SSE Hardening**: per-principal rate limiting (429 + Retry-After), idle watchdog, trusted proxy CIDR allowlist, graceful shutdown draining, loopback port auto-fallback.
 - **Dashboard**: L0/L1/L2 layer hierarchy, forgetting simulation, archive candidates, Search Quality panel, Observability SSE live view with connection-loss banner.
-- **Retrieval**: RRF fusion on by default for B/C/D (`RRF_K=10`). sqlite-vec native vector engine on by default for C/D when the pip `sqlite-vec` package is installed; otherwise it falls back to legacy scoring. Mixed CJK/Latin handling, full-width normalization (`ＡＰＩ → API`), MMR dedup, embedding drift detection, session-first cache.
+- **Retrieval**: RRF fusion remains on by default for Profile B only (`RRF_K=10`). Profile C/D keep RRF and MMR disabled by default and enable the sqlite-vec native vector engine when the pip `sqlite-vec` package is installed; otherwise it falls back to legacy scoring. Mixed CJK/Latin handling, full-width normalization (`ＡＰＩ → API`), MMR dedup, embedding drift detection, session-first cache.
 - **Security**: artifact stripper (opt-in tool-output sanitization), external import guard (path traversal + rate-limit + symlink rejection), Docker non-root containers.
 - **MCP boundary**: malformed URI rejection, oversized payload blocking, percent-encoded URI handling, clean rollback on `add_alias` failures, `system://` write protection.
 - **Docker**: deployment locks, runtime env injection (opt-in), loopback → `host.docker.internal` auto-rewrite, NFS/CIFS/SMB mount rejection.
@@ -96,7 +96,7 @@ Four engines work together to keep the memory store healthy over time:
 
 ### Flexible Deployment
 
-Four profiles (A/B/C/D) from pure local to remote API. B/C/D ship with RRF fusion enabled; C/D additionally enable sqlite-vec native vector search when `sqlite-vec` is installed. The vec0 KNN table is dropped and recreated when the embedding dimension changes, but existing vectors written with a different backend/model/dimension still need `rebuild_index(wait=true)` or a separate database. The most validated path remains `macOS + Docker`; native Windows works through `backend/mcp_wrapper.py`. Remote and GUI-host combinations should be re-verified in your target environment.
+Four profiles (A/B/C/D) from pure local to remote API. Profile B ships with RRF fusion enabled; C/D keep RRF/MMR disabled by default and enable sqlite-vec native vector search when `sqlite-vec` is installed. The vec0 KNN table is dropped and recreated when the embedding dimension changes, but existing vectors written with a different backend/model/dimension still need `rebuild_index(wait=true)` or a separate database. The most validated path remains `macOS + Docker`; native Windows works through `backend/mcp_wrapper.py`. Remote and GUI-host combinations should be re-verified in your target environment.
 
 ### Built-in Observability Dashboard
 

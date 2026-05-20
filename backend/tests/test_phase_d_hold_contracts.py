@@ -168,10 +168,24 @@ def test_phase_d_hold_default_flags_off_in_env_and_profiles() -> None:
         is_cd = fname in ("profile-c.env", "profile-d.env")
         expected_defaults = {**base_defaults, **(vec_on if is_cd else vec_off)}
         if fname == ".env.example":
-            expected_defaults.update({"RRF_ENABLED": "false", "RRF_K": "60"})
+            expected_defaults.update(
+                {
+                    "RETRIEVAL_MMR_ENABLED": "false",
+                    "RRF_ENABLED": "false",
+                    "RRF_K": "60",
+                }
+            )
         elif fname == "profile-a.env":
             assert "RRF_ENABLED" not in pairs, f"{contract_file} should keep RRF unset"
             assert "RRF_K" not in pairs, f"{contract_file} should keep RRF unset"
+        elif is_cd:
+            expected_defaults.update(
+                {
+                    "RETRIEVAL_MMR_ENABLED": "false",
+                    "RRF_ENABLED": "false",
+                    "RRF_K": "60",
+                }
+            )
         else:
             expected_defaults.update({"RRF_ENABLED": "true", "RRF_K": "10"})
         missing = [key for key in expected_defaults if key not in pairs]

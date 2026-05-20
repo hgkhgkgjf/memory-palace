@@ -146,7 +146,7 @@ The repository includes two small seeded harnesses:
 - `backend/tests/benchmark/search_quality_baseline.py` / `search_quality_baseline.json`
 - `backend/tests/benchmark/rrf_calibration.py` / `rrf_calibration_results.json`
 
-They provide a reproducible calibration baseline for retrieval changes such as RRF and entity boost. They are not production-quality promises. The raw code default remains `RRF_ENABLED=false`; the shipped Profile B/C/D templates explicitly set `RRF_ENABLED=true` (`RRF_K=10`). Profile A is pure keyword mode and does not use RRF.
+They provide a reproducible calibration baseline for retrieval changes such as RRF and entity boost. They are not production-quality promises. The raw code default remains `RRF_ENABLED=false`; the shipped Profile B template explicitly sets `RRF_ENABLED=true` (`RRF_K=10`), while Profile C/D keep `RRF_ENABLED=false` and only enable sqlite-vec by default. Profile A is pure keyword mode and does not use RRF.
 
 ---
 
