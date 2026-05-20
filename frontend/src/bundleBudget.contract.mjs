@@ -3,9 +3,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import zlib from 'node:zlib'
 
 const MAX_ENTRY_CHUNK_BYTES = 500 * 1024
-const MAX_TOTAL_JS_BYTES = 650 * 1024
+const MAX_ASYNC_CHUNK_BYTES = 90 * 1024
+const MAX_TOTAL_JS_GZIP_BYTES = 240 * 1024
 const FRONTEND_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const NPM_EXECUTABLE = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const BUILD_ENV = { ...process.env }
@@ -40,8 +42,19 @@ try {
   }
 
   const entryChunkBytes = fs.statSync(path.join(assetsDir, entryFile)).size
-  const totalJsBytes = jsFiles.reduce(
-    (sum, fileName) => sum + fs.statSync(path.join(assetsDir, fileName)).size,
+  const asyncChunkBytes = jsFiles
+    .filter((fileName) => fileName !== entryFile)
+    .map((fileName) => ({
+      fileName,
+      bytes: fs.statSync(path.join(assetsDir, fileName)).size,
+    }))
+  const largestAsyncChunk = asyncChunkBytes.reduce(
+    (largest, current) => current.bytes > largest.bytes ? current : largest,
+    { fileName: null, bytes: 0 }
+  )
+  const totalJsGzipBytes = jsFiles.reduce(
+    (sum, fileName) =>
+      sum + zlib.gzipSync(fs.readFileSync(path.join(assetsDir, fileName))).byteLength,
     0
   )
 
@@ -51,14 +64,20 @@ try {
     )
   }
 
-  if (totalJsBytes > MAX_TOTAL_JS_BYTES) {
+  if (largestAsyncChunk.bytes > MAX_ASYNC_CHUNK_BYTES) {
     throw new Error(
-      `Bundle budget exceeded for total JS: ${totalJsBytes} > ${MAX_TOTAL_JS_BYTES}`
+      `Bundle budget exceeded for async chunk ${largestAsyncChunk.fileName}: ${largestAsyncChunk.bytes} > ${MAX_ASYNC_CHUNK_BYTES}`
+    )
+  }
+
+  if (totalJsGzipBytes > MAX_TOTAL_JS_GZIP_BYTES) {
+    throw new Error(
+      `Bundle budget exceeded for total gzipped JS: ${totalJsGzipBytes} > ${MAX_TOTAL_JS_GZIP_BYTES}`
     )
   }
 
   console.log(
-    `Bundle budget OK: entry=${entryChunkBytes}B total=${totalJsBytes}B files=${jsFiles.length}`
+    `Bundle budget OK: entry=${entryChunkBytes}B largestAsync=${largestAsyncChunk.bytes}B totalGzip=${totalJsGzipBytes}B files=${jsFiles.length}`
   )
 } finally {
   fs.rmSync(outDir, { recursive: true, force: true })

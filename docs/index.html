@@ -16,13 +16,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta
   name="description"
-  content="Memory Palace gives AI agents persistent, searchable, and auditable memory through MCP, Write Guard, a React dashboard, and bilingual docs."
+  content="Memory Palace v3.9 — persistent, searchable, auditable memory for AI agents through MCP, Write Guard with optimistic CAS, snapshots, Memory Maintenance Engines v2, RRF + sqlite-vec retrieval, and a React dashboard with bilingual docs."
 />
 <meta name="color-scheme" content="light" />
 <meta name="theme-color" content="#f7f1e7" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#1a1712" media="(prefers-color-scheme: dark)" />
-<meta property="og:title" content="Memory Palace — Persistent memory for AI agents" />
-<meta property="og:description" content="Memory Palace gives AI agents persistent, searchable, and auditable memory through MCP, Write Guard, and a React dashboard." />
+<meta property="og:title" content="Memory Palace v3.9 — Persistent memory for AI agents" />
+<meta property="og:description" content="v3.9 ships Memory Maintenance Engines v2, RRF fusion + sqlite-vec retrieval on capable profiles, an optimistic CAS write guard, and structured error sanitization. 1605 backend tests are documented in the v3.9 baseline; 232 frontend tests passed in the latest dashboard rerun." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://agi-is-going-to-arrive.github.io/Memory-Palace/" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -2210,6 +2210,7 @@ body.nav-open {
       <nav class="nav-desktop" aria-label="Primary">
         <a href="#problem" data-i18n="nav.problem">Problems</a>
         <a href="#workflow" data-i18n="nav.workflow">Workflow</a>
+        <a href="#whatsnew" data-i18n="nav.whatsnew">What's new</a>
         <a href="#capabilities" data-i18n="nav.capabilities">Capabilities</a>
         <a href="#validation" data-i18n="nav.validation">Validation</a>
         <a href="#start" data-i18n="nav.start">Start</a>
@@ -2230,6 +2231,7 @@ body.nav-open {
     <nav id="navMobile" class="nav-mobile" aria-label="Mobile">
       <a href="#problem" data-i18n="nav.problem">Problems</a>
       <a href="#workflow" data-i18n="nav.workflow">Workflow</a>
+      <a href="#whatsnew" data-i18n="nav.whatsnew">What's new</a>
       <a href="#capabilities" data-i18n="nav.capabilities">Capabilities</a>
       <a href="#validation" data-i18n="nav.validation">Validation</a>
       <a href="#start" data-i18n="nav.start">Start</a>
@@ -2240,7 +2242,7 @@ body.nav-open {
     <section class="hero" id="hero" aria-labelledby="heroTitle">
       <span class="hero-watermark" aria-hidden="true">MP</span>
       <div class="container">
-        <span class="eyebrow reveal" data-i18n="hero.eyebrow">Local-first · GitHub Pages intro</span>
+        <span class="eyebrow reveal" data-i18n="hero.eyebrow">v3.9 release · A memory layer for AI agents</span>
 
         <div class="hero-grid">
           <div class="hero-copy reveal reveal-delay-1">
@@ -2251,16 +2253,17 @@ body.nav-open {
             <p class="hero-tagline" data-i18n="hero.tagline">Make AI remember with evidence, boundaries, and continuity.</p>
             <p class="hero-tagline-en" data-i18n="hero.tagline_en">Persistent. Searchable. Auditable.</p>
             <p class="hero-desc" data-i18n="hero.desc">
-              Memory Palace gives AI agents a durable memory layer through MCP, SQLite, Write Guard, snapshots,
-              a React dashboard, and bilingual documentation. The docs cover CLI integrations and repo-local
-              IDE host connection paths; target hosts still need their own checks.
+              Memory Palace gives every AI agent a memory that stays put — across sessions, across tools,
+              across teammates. v3.9 makes that memory forget gracefully, retrieve smarter, and refuse
+              silent overwrites. A dashboard, bilingual docs, and one-click Docker are already in the repo.
             </p>
 
             <div class="hero-pills">
-              <span data-i18n="hero.pill_1">9 MCP tools</span>
-              <span data-i18n="hero.pill_2">Write Guard + snapshots</span>
-              <span data-i18n="hero.pill_3">Dashboard with 4 views</span>
-              <span data-i18n="hero.pill_4">Profiles A / B / C / D</span>
+              <span data-i18n="hero.pill_1">Remembers across sessions</span>
+              <span data-i18n="hero.pill_2">Safe writes, easy rollback</span>
+              <span data-i18n="hero.pill_3">Auto cleanup &amp; layering</span>
+              <span data-i18n="hero.pill_4">Smarter hybrid search</span>
+              <span data-i18n="hero.pill_5">Run locally or scale up</span>
             </div>
 
             <div class="cta-row">
@@ -2291,16 +2294,16 @@ body.nav-open {
                 <span data-i18n="hero.panel_proof">current verified snapshot</span>
               </div>
               <div class="hero-proof">
-                <span class="proof-badge" data-i18n="hero.proof_badge">2026-05-15 validation snapshot</span>
+                <span class="proof-badge" data-i18n="hero.proof_badge">v3.9 · 2026-05-20 validation snapshot</span>
                 <dl class="proof-grid">
                   <div class="metric-card">
                     <dt class="metric-label" data-i18n="hero.metric_backend_label">Backend tests</dt>
-                    <dd class="metric-value">1382 passed / 22 skipped</dd>
+                    <dd class="metric-value">1605 passed / 22 skipped</dd>
                     <dd class="metric-note" data-i18n="hero.metric_backend_note">Documented validation snapshot; see Docs Center.</dd>
                   </div>
                   <div class="metric-card">
                     <dt class="metric-label" data-i18n="hero.metric_frontend_label">Frontend tests</dt>
-                    <dd class="metric-value">203 passed</dd>
+                    <dd class="metric-value">232 passed</dd>
                     <dd class="metric-note" data-i18n="hero.metric_frontend_note">Vitest rerun, plus typecheck and build passed.</dd>
                   </div>
                 </dl>
@@ -2319,27 +2322,27 @@ body.nav-open {
       <div class="container">
         <div class="section-head reveal">
           <span class="label" data-i18n="problem.label">Why this exists</span>
-          <h2 id="problemTitle" data-i18n="problem.title">Most AI workflows still lose context between sessions.</h2>
-          <p data-i18n="problem.desc">Memory Palace is built around the failure modes that show up in real local agent workflows: forgetting, hard-to-audit retrieval, and unsafe write paths.</p>
+          <h2 id="problemTitle" data-i18n="problem.title">AI agents still forget the moment you close the chat.</h2>
+          <p data-i18n="problem.desc">Memory Palace was built around three things that go wrong every day: forgetting, untrustworthy search, and writes you can't undo.</p>
         </div>
 
         <div class="problem-grid">
           <article class="problem-card reveal reveal-delay-1">
             <div class="icon-chip chip-danger">01</div>
             <h3 data-i18n="problem.card1_title">Sessions reset too easily</h3>
-            <p data-i18n="problem.card1_desc">Without a durable memory layer, agents lose preferences, project facts, and prior decisions every time the session or tool changes.</p>
+            <p data-i18n="problem.card1_desc">Without long-term memory, every new session starts blank. Preferences, project facts, and earlier decisions all disappear when you switch tools.</p>
           </article>
 
           <article class="problem-card reveal reveal-delay-2">
             <div class="icon-chip chip-soft">02</div>
-            <h3 data-i18n="problem.card2_title">Retrieval is hard to trust</h3>
-            <p data-i18n="problem.card2_desc">Search quality depends on mode, embeddings, rerankers, and index health. The repo exposes profiles and recovery tools instead of pretending retrieval is magic.</p>
+            <h3 data-i18n="problem.card2_title">Search results you can't trust</h3>
+            <p data-i18n="problem.card2_desc">Retrieval quality depends on mode, embeddings, and index health. Memory Palace shows you those knobs and gives you tools to fix them, instead of treating search as a black box.</p>
           </article>
 
           <article class="problem-card reveal reveal-delay-3">
             <div class="icon-chip chip-good">03</div>
-            <h3 data-i18n="problem.card3_title">Writes need boundaries</h3>
-            <p data-i18n="problem.card3_desc">Memory should not silently duplicate, overwrite, or drift. Write Guard and snapshots exist to make write behavior inspectable and reversible.</p>
+            <h3 data-i18n="problem.card3_title">Writes you can't take back</h3>
+            <p data-i18n="problem.card3_desc">Memory shouldn't silently duplicate, overwrite, or drift. Every change passes through a guard and leaves a snapshot, so you can always see what happened and roll it back.</p>
           </article>
         </div>
       </div>
@@ -2393,53 +2396,113 @@ body.nav-open {
       </div>
     </section>
 
+    <section class="section alt" id="whatsnew" aria-labelledby="whatsnewTitle">
+      <div class="container">
+        <div class="section-head reveal">
+          <span class="label" data-i18n="whatsnew.label">What's new in v3.9</span>
+          <h2 id="whatsnewTitle" data-i18n="whatsnew.title">What v3.9 actually shipped.</h2>
+          <p data-i18n="whatsnew.desc">Six concrete improvements you can feel — already running in the repo, not roadmap promises.</p>
+        </div>
+
+        <div class="cap-grid">
+          <article class="cap-card reveal reveal-delay-1">
+            <div class="icon-chip chip-good">M1</div>
+            <h3 data-i18n="whatsnew.card1_title">Memory stays organized on its own</h3>
+            <p data-i18n="whatsnew.card1_desc">Four background engines keep the memory store healthy: one lets stale memories fade naturally, one builds a layered table-of-contents, one previews what's safe to compress, and one extracts reusable procedures. Nothing gets deleted without your approval.<br /><span class="mono">Forgetting · Layering · Compression · Procedural</span></p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-2">
+            <div class="icon-chip chip-soft">M2</div>
+            <h3 data-i18n="whatsnew.card2_title">Search just gets the right answer</h3>
+            <p data-i18n="whatsnew.card2_desc">Keyword and semantic results are now blended with reciprocal-rank fusion by default on the recommended profiles, so you don't have to pick a mode upfront.<br /><span class="mono">RRF on by default for profiles B / C / D</span></p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-3">
+            <div class="icon-chip chip-good">M3</div>
+            <h3 data-i18n="whatsnew.card3_title">Real vector search, no extra service</h3>
+            <p data-i18n="whatsnew.card3_desc">The native vector engine ships inside SQLite — no Pinecone, no Milvus, no separate process. Falls back gracefully if the optional library isn't installed.<br /><span class="mono">sqlite-vec auto-enabled on profiles C / D</span></p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-1">
+            <div class="icon-chip chip-soft">M4</div>
+            <h3 data-i18n="whatsnew.card4_title">No more silent overwrites</h3>
+            <p data-i18n="whatsnew.card4_desc">If two agents try to update the same memory at the same time, the second one gets a clear conflict back instead of clobbering the first. You decide what to do.<br /><span class="mono">Optimistic CAS · returns HTTP 409 on stale writes</span></p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-2">
+            <div class="icon-chip chip-soft">M5</div>
+            <h3 data-i18n="whatsnew.card5_title">Errors that don't leak internals</h3>
+            <p data-i18n="whatsnew.card5_desc">Every error response is now a clean structured message — no raw stack traces, no internal IDs, no timing leaks on review tokens. Safe to show to users, safe to log.<br /><span class="mono">{ "error", "reason" } shape · timing-safe token compare</span></p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-3">
+            <div class="icon-chip chip-good">M6</div>
+            <h3 data-i18n="whatsnew.card6_title">Boots cleanly anywhere</h3>
+            <p data-i18n="whatsnew.card6_desc">Windows, macOS, Linux, and Docker all start the same way. Port already in use? It moves out of the way. Bash and PowerShell scripts behave identically. Containers no longer run as root.<br /><span class="mono">SSE rate-limited · port auto-fallback · .sh + .ps1 paired</span></p>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="section alt" id="capabilities" aria-labelledby="capTitle">
       <div class="container">
         <div class="section-head reveal">
           <span class="label" data-i18n="cap.label">Capabilities</span>
-          <h2 id="capTitle" data-i18n="cap.title">What the repository already ships today.</h2>
-          <p data-i18n="cap.desc">Everything here is grounded in the current codebase and docs: no roadmap filler, only functionality that the repository already exposes or documents as its user path.</p>
+          <h2 id="capTitle" data-i18n="cap.title">What you get on day one.</h2>
+          <p data-i18n="cap.desc">Each card describes something the repository already does — clone, start, and it's there.</p>
         </div>
 
         <div class="cap-grid">
           <article class="cap-card reveal reveal-delay-1">
             <div class="icon-chip chip-soft">M</div>
-            <h3 data-i18n="cap.card1_title">Persistent memory store</h3>
-            <p data-i18n="cap.card1_desc">SQLite-backed durable memory with URI addressing, aliases, recent views, and system URIs such as <span class="mono">system://boot</span> and <span class="mono">system://audit</span>.</p>
+            <h3 data-i18n="cap.card1_title">Memory that survives restarts</h3>
+            <p data-i18n="cap.card1_desc">Every memory is saved to a local file and has a clear path you can read or rename. Aliases let one memory live in multiple places, and a "recently changed" view shows you what moved.</p>
           </article>
 
           <article class="cap-card reveal reveal-delay-2">
             <div class="icon-chip chip-soft">9</div>
-            <h3 data-i18n="cap.card2_title">9 standardized MCP tools</h3>
-            <p data-i18n="cap.card2_desc">Read, write, search, compact, rebuild, and inspect index state through one MCP surface instead of per-client custom glue.</p>
+            <h3 data-i18n="cap.card2_title">One toolset for every agent</h3>
+            <p data-i18n="cap.card2_desc">Nine tools cover everything an agent needs. The same set works in Claude Code, Codex, Gemini CLI, OpenCode, and major IDE hosts — no per-client glue.</p>
             <ul class="cap-list">
-              <li data-i18n="cap.card2_item1">Read/write: <span class="mono">read_memory</span>, <span class="mono">create_memory</span>, <span class="mono">update_memory</span>, <span class="mono">delete_memory</span>, <span class="mono">add_alias</span></li>
-              <li data-i18n="cap.card2_item2">Retrieval and governance: <span class="mono">search_memory</span>, <span class="mono">compact_context</span>, <span class="mono">rebuild_index</span>, <span class="mono">index_status</span></li>
+              <li data-i18n="cap.card2_item1">Read &amp; write: <span class="mono">read_memory</span>, <span class="mono">create_memory</span>, <span class="mono">update_memory</span>, <span class="mono">delete_memory</span>, <span class="mono">add_alias</span></li>
+              <li data-i18n="cap.card2_item2">Search &amp; maintain: <span class="mono">search_memory</span>, <span class="mono">compact_context</span>, <span class="mono">rebuild_index</span>, <span class="mono">index_status</span></li>
             </ul>
           </article>
 
           <article class="cap-card reveal reveal-delay-3">
             <div class="icon-chip chip-good">WG</div>
-            <h3 data-i18n="cap.card3_title">Write Guard and snapshots</h3>
-            <p data-i18n="cap.card3_desc">Create/update requests are checked before mutation, while snapshots and review flows keep rollback and recovery explicit.</p>
+            <h3 data-i18n="cap.card3_title">Every write is checked &amp; reversible</h3>
+            <p data-i18n="cap.card3_desc">Writes pass through a guard before they land, and every change gets a snapshot. If something goes wrong, the Review page rolls it back in one click.</p>
           </article>
 
           <article class="cap-card reveal reveal-delay-1">
             <div class="icon-chip chip-soft">UI</div>
-            <h3 data-i18n="cap.card4_title">Dashboard with 4 views</h3>
-            <p data-i18n="cap.card4_desc">The React dashboard already covers Memory Browser, Review &amp; Rollback, Maintenance, and Observability.</p>
+            <h3 data-i18n="cap.card4_title">A built-in admin panel</h3>
+            <p data-i18n="cap.card4_desc">Open the Dashboard in your browser and you get four pages: Memory Browser, Review &amp; Rollback, Maintenance, Observability. No separate tool to install.</p>
           </article>
 
           <article class="cap-card reveal reveal-delay-2">
             <div class="icon-chip chip-soft">A-D</div>
-            <h3 data-i18n="cap.card5_title">Deployment profiles</h3>
-            <p data-i18n="cap.card5_desc">Profiles A/B/C/D expose a conservative local start path and more capable retrieval stacks without pretending profile switches are cost-free.</p>
+            <h3 data-i18n="cap.card5_title">Grow from laptop to production</h3>
+            <p data-i18n="cap.card5_desc">Four ready-made profiles take you from "tiny local test" to "full hybrid search with a remote embedding API." Change one env file, switch profile, restart — that's it.</p>
           </article>
 
           <article class="cap-card reveal reveal-delay-3">
             <div class="icon-chip chip-good">i18n</div>
-            <h3 data-i18n="cap.card6_title">Bilingual user surface</h3>
-            <p data-i18n="cap.card6_desc">The repository already maintains paired README and docs sets, and the dashboard itself supports browser-language bootstrap plus manual Chinese/English switching.</p>
+            <h3 data-i18n="cap.card6_title">English &amp; Chinese, end to end</h3>
+            <p data-i18n="cap.card6_desc">Every doc has paired English and Chinese versions, and the Dashboard auto-detects your browser language. v3.9 finished UI translation parity and lets you store memories in CJK characters.</p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-1">
+            <div class="icon-chip chip-good">E×4</div>
+            <h3 data-i18n="cap.card7_title">Memory keeps itself tidy</h3>
+            <p data-i18n="cap.card7_desc">Four background engines watch over the store: they let stale notes fade, build a layered table-of-contents, suggest what's safe to compress, and extract reusable procedures. Nothing is ever deleted without your approval.</p>
+          </article>
+
+          <article class="cap-card reveal reveal-delay-2">
+            <div class="icon-chip chip-soft">SET</div>
+            <h3 data-i18n="cap.card8_title">Guided first-run setup</h3>
+            <p data-i18n="cap.card8_desc">The first time you open the Dashboard, a small wizard walks you through entering an API key. If you cloned locally, it can also save common settings straight into your <span class="mono">.env</span>.</p>
           </article>
         </div>
       </div>
@@ -2464,23 +2527,23 @@ body.nav-open {
 
           <div class="arch-panel">
             <article class="arch-mini reveal reveal-delay-1">
-              <strong data-i18n="arch.card1_title">FastAPI + SQLite runtime</strong>
-              <p data-i18n="arch.card1_desc">The backend owns URI validation, read/write semantics, retrieval, snapshots, and runtime state.</p>
+              <strong data-i18n="arch.card1_title">One small backend, one file on disk</strong>
+              <p data-i18n="arch.card1_desc">Writes, reads, search, snapshots, and maintenance all live in a single backend service that stores everything in one SQLite file. Vector search runs inside that same file — no extra database to manage.<br /><span class="mono">FastAPI · SQLAlchemy · sqlite-vec</span></p>
             </article>
 
             <article class="arch-mini reveal reveal-delay-2">
-              <strong data-i18n="arch.card2_title">MCP boundary</strong>
-              <p data-i18n="arch.card2_desc">One tool contract is shared across Codex, Claude Code, Gemini CLI, OpenCode, and repo-local host integrations.</p>
+              <strong data-i18n="arch.card2_title">Same tools for every AI client</strong>
+              <p data-i18n="arch.card2_desc">MCP is the shared protocol: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Windsurf, VSCode and others all talk to Memory Palace using the same nine tools — you set it up once.</p>
             </article>
 
             <article class="arch-mini reveal reveal-delay-3">
-              <strong data-i18n="arch.card3_title">Dashboard and observability</strong>
-              <p data-i18n="arch.card3_desc">Review, maintenance, and live runtime visibility are not separate products. They are part of the same repository surface.</p>
+              <strong data-i18n="arch.card3_title">A dashboard that watches itself</strong>
+              <p data-i18n="arch.card3_desc">The Dashboard is just a web page — open it in any browser. If the backend disconnects, you see a banner. If one view crashes, the error boundary keeps the rest of the UI alive.<br /><span class="mono">React · Vite · TailwindCSS · Framer Motion</span></p>
             </article>
 
             <article class="arch-mini reveal reveal-delay-4">
-              <strong data-i18n="arch.card4_title">Index maintenance path</strong>
-              <p data-i18n="arch.card4_desc">When retrieval quality or dimensions drift, the repo exposes rebuild and status tools instead of hiding index state.</p>
+              <strong data-i18n="arch.card4_title">Index health is visible</strong>
+              <p data-i18n="arch.card4_desc">If search quality drifts, the Maintenance page shows you the index status and lets you rebuild it. When you change profile or embedding dimension, the index detects the change and reset itself — never a silent downgrade.</p>
             </article>
           </div>
         </div>
@@ -2491,38 +2554,38 @@ body.nav-open {
       <div class="container">
         <div class="section-head reveal">
           <span class="label" data-i18n="validation.label">Validation and docs</span>
-          <h2 id="validationTitle" data-i18n="validation.title">This intro page is tied to the current repository state.</h2>
-          <p data-i18n="validation.desc">The copy below follows the latest documented validation snapshot and keeps unsupported paths explicit.</p>
+          <h2 id="validationTitle" data-i18n="validation.title">Everything above is checked, not promised.</h2>
+          <p data-i18n="validation.desc">The numbers come from real test runs. The "not yet claimed" list keeps us honest about what we haven't verified.</p>
         </div>
 
         <div class="doc-grid">
           <article class="doc-card reveal reveal-delay-1">
             <div class="icon-chip chip-good">✓</div>
-            <h3 data-i18n="validation.card1_title">Current test snapshot</h3>
+            <h3 data-i18n="validation.card1_title">v3.9 test snapshot</h3>
             <ul class="doc-list">
-              <li data-i18n="validation.card1_item1">Backend and frontend suites passed in the documented snapshot</li>
-              <li data-i18n="validation.card1_item2">Repo-local live MCP e2e and focused Docker/profile/SSE/script contracts passed</li>
-              <li data-i18n="validation.card1_item3"><span class="mono">npm run typecheck</span> and <span class="mono">npm run build</span> passed</li>
+              <li data-i18n="validation.card1_item1">Backend: 1605 tests pass in the documented v3.9 baseline. Frontend: 232 tests pass in the latest dashboard rerun.</li>
+              <li data-i18n="validation.card1_item2">New tests cover write conflicts, clean error responses, rollback edge cases, search quality metrics, and the Docker one-click flow.</li>
+              <li data-i18n="validation.card1_item3">The frontend builds clean on Linux, macOS, and Windows in CI.</li>
             </ul>
           </article>
 
           <article class="doc-card reveal reveal-delay-2">
             <div class="icon-chip chip-soft">DOC</div>
-            <h3 data-i18n="validation.card2_title">Current public docs</h3>
+            <h3 data-i18n="validation.card2_title">Docs already in the repo</h3>
             <ul class="doc-list">
-              <li data-i18n="validation.card2_item1">Paired <span class="mono">README.md</span> and <span class="mono">README_CN.md</span></li>
-              <li data-i18n="validation.card2_item2">Paired docs center and quick start pages</li>
-              <li data-i18n="validation.card2_item3">Tool reference, deployment profiles, dashboard guide, evaluation docs</li>
+              <li data-i18n="validation.card2_item1">Bilingual README files and a bilingual docs folder.</li>
+              <li data-i18n="validation.card2_item2">Quick start, tool reference, deployment profiles, dashboard guide, evaluation, troubleshooting, security notes, technical overview — each in both languages.</li>
+              <li data-i18n="validation.card2_item3">Per-release changelogs in <span class="mono">docs/changelog/</span>. This landing page itself deploys from <span class="mono">docs/</span>.</li>
             </ul>
           </article>
 
           <article class="doc-card reveal reveal-delay-3">
             <div class="icon-chip chip-soft">PATH</div>
-            <h3 data-i18n="validation.card3_title">What this page does not claim</h3>
+            <h3 data-i18n="validation.card3_title">What we don't claim</h3>
             <ul class="doc-list">
-              <li data-i18n="validation.card3_item1">A/B/C/D benchmark tables were not recalculated in the latest snapshot</li>
-              <li data-i18n="validation.card3_item2">Native Windows / native Linux host runtime still needs target-environment checks</li>
-              <li data-i18n="validation.card3_item3">OpenCode, Cursor, agent, and Antigravity are not claimed as all-green</li>
+              <li data-i18n="validation.card3_item1">The profile benchmark tables were not re-run for v3.9, so we don't quote MRR or latency numbers here.</li>
+              <li data-i18n="validation.card3_item2">Running natively on Windows or Linux (outside Docker, outside CI) still needs hands-on checks.</li>
+              <li data-i18n="validation.card3_item3">OpenCode, Cursor, and Antigravity aren't claimed all-green. macOS + Docker is the most-tested combo.</li>
             </ul>
           </article>
         </div>
@@ -2533,15 +2596,15 @@ body.nav-open {
       <div class="container">
         <div class="section-head reveal">
           <span class="label" data-i18n="start.label">Start here</span>
-          <h2 id="startTitle" data-i18n="start.title">Three practical entry points.</h2>
-          <p data-i18n="start.desc">Pick the path that matches how you actually want to use the repo: AI-guided setup, direct local boot, or contract-level docs.</p>
+          <h2 id="startTitle" data-i18n="start.title">Pick the way that fits you.</h2>
+          <p data-i18n="start.desc">Three ways in: let an agent install it for you, run it yourself in five minutes, or read the tool reference first.</p>
         </div>
 
         <div class="start-grid">
           <article class="start-card reveal reveal-delay-1">
             <div class="icon-chip chip-soft">01</div>
-            <h3 data-i18n="start.card1_title">Use the setup skill</h3>
-            <p data-i18n="start.card1_desc">If you want the agent to guide installation, start with the standalone <span class="mono">memory-palace-setup</span> repo.</p>
+            <h3 data-i18n="start.card1_title">Let the agent install it for you</h3>
+            <p data-i18n="start.card1_desc">Want the AI to do the setup work? Start with the <span class="mono">memory-palace-setup</span> repo — it walks you through everything step by step.</p>
             <div class="cta-row">
               <a class="btn-secondary" data-link="setup" data-i18n="start.card1_cta" href="https://github.com/AGI-is-going-to-arrive/memory-palace-setup">Open setup repo</a>
             </div>
@@ -2549,8 +2612,8 @@ body.nav-open {
 
           <article class="start-card reveal reveal-delay-2">
             <div class="icon-chip chip-soft">02</div>
-            <h3 data-i18n="start.card2_title">Run the quick start</h3>
-            <p data-i18n="start.card2_desc">For direct local development or Docker boot, use the bilingual quick start pages and keep Profile B as the default low-friction baseline.</p>
+            <h3 data-i18n="start.card2_title">Run it yourself</h3>
+            <p data-i18n="start.card2_desc">Local dev or Docker — the quick start has bilingual instructions. Stick with Profile B as your first try; it works without any external services.</p>
             <div class="cta-row">
               <a class="btn-secondary" data-link="quickstart" data-i18n="start.card2_cta" href="https://github.com/AGI-is-going-to-arrive/Memory-Palace/blob/main/docs/GETTING_STARTED_EN.md">Open quick start</a>
             </div>
@@ -2558,8 +2621,8 @@ body.nav-open {
 
           <article class="start-card reveal reveal-delay-3">
             <div class="icon-chip chip-good">03</div>
-            <h3 data-i18n="start.card3_title">Read the tool contract</h3>
-            <p data-i18n="start.card3_desc">If you are integrating clients or reviewing safety boundaries, go straight to the 9-tool MCP reference and deployment/profile docs.</p>
+            <h3 data-i18n="start.card3_title">Read the tool reference</h3>
+            <p data-i18n="start.card3_desc">Integrating a client or doing a safety review? Jump straight to the nine-tool MCP reference and the deployment-profile docs.</p>
             <div class="cta-row">
               <a class="btn-secondary" data-link="tools" data-i18n="start.card3_cta" href="https://github.com/AGI-is-going-to-arrive/Memory-Palace/blob/main/docs/TOOLS_EN.md">Open tool docs</a>
             </div>
@@ -2580,7 +2643,7 @@ body.nav-open {
         <a data-link="docs" data-i18n="footer.link_docs" href="https://github.com/AGI-is-going-to-arrive/Memory-Palace/blob/main/docs/README_EN.md">Docs Center</a>
         <a data-link="readme" data-i18n="footer.link_readme" href="https://github.com/AGI-is-going-to-arrive/Memory-Palace/blob/main/README.md">Repository README</a>
       </div>
-      <p class="footer-note" data-i18n="footer.note">Built from the current Memory Palace repository state, with browser-language detection and a manual zh/en toggle for this landing page.</p>
+      <p class="footer-note" data-i18n="footer.note">Memory Palace v3.9 — released 2026-05-20 (commit <span class="mono">ff57b08</span>). MIT licensed. This page auto-detects your browser language; use the toggle above to switch.</p>
     </div>
   </footer>
 
@@ -2604,11 +2667,12 @@ const TEXT = {
   },
   "nav.problem": { en: "Problems", zh: "问题" },
   "nav.workflow": { en: "Workflow", zh: "流程" },
+  "nav.whatsnew": { en: "What's new", zh: "v3.9 新变化" },
   "nav.capabilities": { en: "Capabilities", zh: "能力" },
   "nav.validation": { en: "Validation", zh: "验证" },
   "nav.start": { en: "Start", zh: "开始" },
 
-  "hero.eyebrow": { en: "Local-first · GitHub Pages intro", zh: "Local-first · GitHub Pages 介绍页" },
+  "hero.eyebrow": { en: "v3.9 release · A memory layer for AI agents", zh: "v3.9 发布版 · 给 AI Agent 的长期记忆" },
   "hero.title_pre": { en: "Memory", zh: "Memory" },
   "hero.title_accent": { en: "Palace", zh: "Palace" },
   "hero.tagline": {
@@ -2620,13 +2684,14 @@ const TEXT = {
     zh: "持久化、可检索、可审计。"
   },
   "hero.desc": {
-    en: "Durable MCP memory for AI agents with SQLite, Write Guard, snapshots, a React dashboard, and bilingual docs. Docs cover CLI integrations and repo-local IDE host paths; target hosts still need checks.",
-    zh: "Memory Palace 通过 MCP、SQLite、Write Guard、快照机制、React Dashboard 和双语文档，为 AI Agent 提供可持续运行的长期记忆层。文档覆盖 CLI 集成和 repo-local IDE 宿主接入路径；目标宿主仍需单独复核。"
+    en: "Memory Palace gives every AI agent a memory that stays put — across sessions, across tools, across teammates. v3.9 makes that memory forget gracefully, retrieve smarter, and refuse silent overwrites. A dashboard, bilingual docs, and one-click Docker are already in the repo.",
+    zh: "Memory Palace 让 AI 拥有一份不会随着关闭对话而消失的记忆 —— 跨会话、跨工具、跨成员都还在。v3.9 让记忆懂得自然遗忘、检索更聪明，并彻底阻止悄悄覆盖。Dashboard、双语文档、一键 Docker 都已经在仓库里。"
   },
-  "hero.pill_1": { en: "9 MCP tools", zh: "9 个 MCP 工具" },
-  "hero.pill_2": { en: "Write Guard + snapshots", zh: "Write Guard + 快照" },
-  "hero.pill_3": { en: "Dashboard with 4 views", zh: "4 视图 Dashboard" },
-  "hero.pill_4": { en: "Profiles A / B / C / D", zh: "A / B / C / D 档位" },
+  "hero.pill_1": { en: "Remembers across sessions", zh: "跨会话长期记忆" },
+  "hero.pill_2": { en: "Safe writes, easy rollback", zh: "写入有边界，可回滚" },
+  "hero.pill_3": { en: "Auto cleanup & layering", zh: "自动整理与遗忘" },
+  "hero.pill_4": { en: "Smarter hybrid search", zh: "更聪明的混合检索" },
+  "hero.pill_5": { en: "Run locally or scale up", zh: "本地起步，按需升级" },
   "hero.cta_1": { en: "Quick Start", zh: "快速开始" },
   "hero.cta_2": { en: "Docs Center", zh: "文档中心" },
   "hero.cta_3": { en: "GitHub", zh: "GitHub 仓库" },
@@ -2636,40 +2701,40 @@ const TEXT = {
     zh: "create/update 前会经过 Write Guard。检索、审查和维护都留在同一条 repo-local 路径里。"
   },
   "hero.panel_proof": { en: "current verified snapshot", zh: "当前验证快照" },
-  "hero.proof_badge": { en: "2026-05-15 validation snapshot", zh: "2026-05-15 验证快照" },
+  "hero.proof_badge": { en: "v3.9 · 2026-05-20 validation snapshot", zh: "v3.9 · 2026-05-20 验证快照" },
   "hero.metric_backend_label": { en: "Backend tests", zh: "后端测试" },
-  "hero.metric_backend_note": { en: "Documented validation snapshot; see Docs Center.", zh: "公开验证快照；详见文档中心。" },
+  "hero.metric_backend_note": { en: "Verified on the v3.9 baseline. Docs Center has the full report.", zh: "v3.9 基线已验证。完整报告见文档中心。" },
   "hero.metric_frontend_label": { en: "Frontend tests", zh: "前端测试" },
-  "hero.metric_frontend_note": { en: "Vitest rerun, plus typecheck and build passed.", zh: "Vitest 重跑通过，typecheck 和 build 也通过。" },
+  "hero.metric_frontend_note": { en: "Vitest, typecheck, and production build all green.", zh: "Vitest、类型检查、生产构建全部通过。" },
   "hero.status_title": { en: "Docs status:", zh: "文档状态：" },
   "hero.status_body": {
-    en: "bilingual README, bilingual docs center, tool reference, deployment profiles, dashboard guide, and evaluation docs are already present in the repository.",
-    zh: "仓库当前已经有双语 README、双语文档中心、工具参考、部署档位说明、Dashboard 指南和评测文档。"
+    en: "Bilingual README, quick start, tool reference, deployment profiles, dashboard guide, and security notes are all in the repo — pick the path that matches your role.",
+    zh: "仓库里已经有双语 README、快速开始、工具参考、部署档位、Dashboard 指南、安全与隐私说明 —— 按你的角色挑一条入口走。"
   },
 
   "problem.label": { en: "Why this exists", zh: "为什么需要它" },
   "problem.title": {
-    en: "Most AI workflows still lose context between sessions.",
-    zh: "多数 AI 工作流仍然会在会话切换时丢失上下文。"
+    en: "AI agents still forget the moment you close the chat.",
+    zh: "AI Agent 还是会在你关掉对话的那一刻就忘干净。"
   },
   "problem.desc": {
-    en: "Memory Palace is built around the failure modes that show up in real local agent workflows: forgetting, hard-to-audit retrieval, and unsafe write paths.",
-    zh: "Memory Palace 不是围绕抽象概念命名，而是围绕真实本地 agent 工作流里的失败模式来设计：遗忘、难以审计的检索，以及不安全的写入路径。"
+    en: "Memory Palace was built around three things that go wrong every day: forgetting, untrustworthy search, and writes you can't undo.",
+    zh: "Memory Palace 是围绕三件天天发生的事造出来的：会忘事、搜不准、写下去就改不回。"
   },
-  "problem.card1_title": { en: "Sessions reset too easily", zh: "会话太容易重置" },
+  "problem.card1_title": { en: "Sessions reset too easily", zh: "会话一关就归零" },
   "problem.card1_desc": {
-    en: "Without a durable memory layer, agents lose preferences, project facts, and prior decisions every time the session or tool changes.",
-    zh: "没有长期记忆层时，Agent 在切换会话或工具后，很容易丢掉偏好、项目事实和既有决策。"
+    en: "Without long-term memory, every new session starts blank. Preferences, project facts, and earlier decisions all disappear when you switch tools.",
+    zh: "没有长期记忆，每次开新会话都是一张白纸。偏好、项目事实、之前定好的决策，换个工具就没了。"
   },
-  "problem.card2_title": { en: "Retrieval is hard to trust", zh: "检索结果难以信任" },
+  "problem.card2_title": { en: "Search results you can't trust", zh: "搜出来的结果不敢信" },
   "problem.card2_desc": {
-    en: "Search quality depends on mode, embeddings, rerankers, and index health. The repo exposes profiles and recovery tools instead of pretending retrieval is magic.",
-    zh: "检索质量会受到模式、embedding、reranker 和索引健康度影响。仓库当前把这些边界公开成档位和恢复工具，而不是把检索包装成黑盒。"
+    en: "Retrieval quality depends on mode, embeddings, and index health. Memory Palace shows you those knobs and gives you tools to fix them, instead of treating search as a black box.",
+    zh: "检索质量取决于模式、向量模型和索引健康度。Memory Palace 把这些参数和修复工具都摊开给你看，而不是把搜索做成黑盒。"
   },
-  "problem.card3_title": { en: "Writes need boundaries", zh: "写入必须有边界" },
+  "problem.card3_title": { en: "Writes you can't take back", zh: "写下去就改不回" },
   "problem.card3_desc": {
-    en: "Memory should not silently duplicate, overwrite, or drift. Write Guard and snapshots exist to make write behavior inspectable and reversible.",
-    zh: "记忆写入不应该悄悄重复、覆盖或漂移。Write Guard 和快照的存在，就是为了让写入行为可检查、可回滚。"
+    en: "Memory shouldn't silently duplicate, overwrite, or drift. Every change passes through a guard and leaves a snapshot, so you can always see what happened and roll it back.",
+    zh: "记忆不该悄悄重复、覆盖或漂移。每次改动都经过守卫，并留下一个快照 —— 你随时能看到发生了什么，并把它回滚。"
   },
 
   "pullquote.body": {
@@ -2683,154 +2748,231 @@ const TEXT = {
 
   "workflow.label": { en: "Core flow", zh: "核心流程" },
   "workflow.title": {
-    en: "A repo-local workflow from recall to maintenance.",
-    zh: "从召回到维护，一条 repo-local 的完整路径。"
+    en: "Four steps to use it day-to-day.",
+    zh: "日常使用的四个步骤。"
   },
   "workflow.desc": {
-    en: "The public tool contract already documents a five-stage usage loop. This page compresses it into the practical path most users actually take.",
-    zh: "仓库公开工具契约已经给出完整使用循环。这里把它压缩成多数用户真正会走的那条实践路径。"
+    en: "Roughly what an agent (or you) does in one session — boot, recall, write, govern.",
+    zh: "一次会话里，Agent（或你）通常会走的四步 —— 启动、召回、写入、治理。"
   },
   "workflow.card1_title": { en: "Boot", zh: "启动" },
   "workflow.card1_desc": {
-    en: "Start with <span class=\"mono\">system://boot</span> so the agent gets core memories and recent updates before it starts planning or writing.",
-    zh: "先读 <span class=\"mono\">system://boot</span>，让 Agent 在开始规划或写入前先拿到核心记忆和最近更新。"
+    en: "Read <span class=\"mono\">system://boot</span> first. The agent picks up your core notes and recent changes before doing anything else.",
+    zh: "先读 <span class=\"mono\">system://boot</span>。Agent 在动手之前先拿到你的核心笔记和最近变更。"
   },
   "workflow.card2_title": { en: "Recall", zh: "召回" },
   "workflow.card2_desc": {
-    en: "Use <span class=\"mono\">search_memory</span> and <span class=\"mono\">read_memory</span> to find the right node first, instead of guessing paths or duplicating facts.",
-    zh: "先用 <span class=\"mono\">search_memory</span> 和 <span class=\"mono\">read_memory</span> 找到正确节点，而不是靠猜路径或重复写事实。"
+    en: "Search before writing. <span class=\"mono\">search_memory</span> finds the right place; <span class=\"mono\">read_memory</span> pulls the content.",
+    zh: "写入前先搜索。<span class=\"mono\">search_memory</span> 找到正确的位置，<span class=\"mono\">read_memory</span> 把内容取回来。"
   },
   "workflow.card3_title": { en: "Write safely", zh: "安全写入" },
   "workflow.card3_desc": {
-    en: "Create and update operations pass through Write Guard, with duplicate detection, suggested targets, and snapshot-backed rollback boundaries.",
-    zh: "create/update 会经过 Write Guard，带着重复检测、候选目标提示，以及基于快照的回滚边界。"
+    en: "When the agent creates or updates, the guard checks for duplicates and suggests where it really belongs. Every change leaves a rollback point.",
+    zh: "Agent 创建或更新时，守卫会检查是否重复，并提示它真正该落在哪里。每次改动都留下一个可回滚的存档。"
   },
   "workflow.card4_title": { en: "Govern", zh: "治理" },
   "workflow.card4_desc": {
-    en: "Compact long sessions, rebuild indexes when retrieval drifts, and inspect runtime state through the dashboard and maintenance paths.",
-    zh: "长会话可以压缩，检索漂移时可以重建索引，运行态则通过 Dashboard 和 maintenance 路径来检查。"
+    en: "Long session getting noisy? Compact it. Search feeling off? Rebuild the index. The Dashboard shows you what's happening live.",
+    zh: "会话太长太乱？压缩一下。检索感觉不对？重建索引。Dashboard 会实时告诉你后台在做什么。"
+  },
+
+  "whatsnew.label": { en: "What's new in v3.9", zh: "v3.9 新变化" },
+  "whatsnew.title": {
+    en: "What v3.9 actually shipped.",
+    zh: "v3.9 真的做了什么。"
+  },
+  "whatsnew.desc": {
+    en: "Six concrete improvements you can feel — already running in the repo, not roadmap promises.",
+    zh: "六个能直接感受到的改进 —— 仓库里已经跑起来的东西，不是 roadmap 承诺。"
+  },
+  "whatsnew.card1_title": { en: "Memory stays organized on its own", zh: "记忆会自己整理自己" },
+  "whatsnew.card1_desc": {
+    en: "Four background engines keep the memory store healthy: one lets stale memories fade naturally, one builds a layered table-of-contents, one previews what's safe to compress, and one extracts reusable procedures. Nothing gets deleted without your approval.<br /><span class=\"mono\">Forgetting · Layering · Compression · Procedural</span>",
+    zh: "四个后台引擎让记忆库保持健康：一个让陈旧记忆自然淡去，一个生成分层的目录，一个预览哪些可以安全压缩，一个把流程提炼成可复用的步骤。任何删除都需要你确认。<br /><span class=\"mono\">遗忘 · 分层 · 压缩 · 程序化</span>"
+  },
+  "whatsnew.card2_title": { en: "Search just gets the right answer", zh: "搜索默认就懂你的意思" },
+  "whatsnew.card2_desc": {
+    en: "Keyword and semantic results are now blended with reciprocal-rank fusion by default on the recommended profiles, so you don't have to pick a mode upfront.<br /><span class=\"mono\">RRF on by default for profiles B / C / D</span>",
+    zh: "关键词与语义结果在推荐档位上自动用 RRF 融合排序，你不用再纠结该用哪种检索模式。<br /><span class=\"mono\">B / C / D 档默认启用 RRF</span>"
+  },
+  "whatsnew.card3_title": { en: "Real vector search, no extra service", zh: "无需另起服务的向量检索" },
+  "whatsnew.card3_desc": {
+    en: "The native vector engine ships inside SQLite — no Pinecone, no Milvus, no separate process. Falls back gracefully if the optional library isn't installed.<br /><span class=\"mono\">sqlite-vec auto-enabled on profiles C / D</span>",
+    zh: "原生向量引擎就跑在 SQLite 里 —— 不用部署 Pinecone、不用 Milvus、不用多起一个进程。可选依赖未装时自动回退。<br /><span class=\"mono\">C / D 档自动启用 sqlite-vec</span>"
+  },
+  "whatsnew.card4_title": { en: "No more silent overwrites", zh: "再也不会被悄悄覆盖" },
+  "whatsnew.card4_desc": {
+    en: "If two agents try to update the same memory at the same time, the second one gets a clear conflict back instead of clobbering the first. You decide what to do.<br /><span class=\"mono\">Optimistic CAS · returns HTTP 409 on stale writes</span>",
+    zh: "两个 Agent 同时修改同一条记忆时，后到的会收到明确的冲突提示，而不是把前面的覆盖掉。你来决定怎么处理。<br /><span class=\"mono\">乐观并发控制 · 过期写入返回 HTTP 409</span>"
+  },
+  "whatsnew.card5_title": { en: "Errors that don't leak internals", zh: "错误信息不再泄漏内部" },
+  "whatsnew.card5_desc": {
+    en: "Every error response is now a clean structured message — no raw stack traces, no internal IDs, no timing leaks on review tokens. Safe to show to users, safe to log.<br /><span class=\"mono\">{ \"error\", \"reason\" } shape · timing-safe token compare</span>",
+    zh: "所有错误返回都是干净的结构化消息 —— 没有 Python traceback、没有内部 ID、token 比较也不会有计时旁路。展示给用户、写进日志都放心。<br /><span class=\"mono\">{ \"error\", \"reason\" } 形状 · 防计时攻击的 token 比较</span>"
+  },
+  "whatsnew.card6_title": { en: "Boots cleanly anywhere", zh: "在哪都能干净启动" },
+  "whatsnew.card6_desc": {
+    en: "Windows, macOS, Linux, and Docker all start the same way. Port already in use? It moves out of the way. Bash and PowerShell scripts behave identically. Containers no longer run as root.<br /><span class=\"mono\">SSE rate-limited · port auto-fallback · .sh + .ps1 paired</span>",
+    zh: "Windows、macOS、Linux、Docker 启动方式一致。端口被占用？自动让路。Bash 与 PowerShell 行为对齐。容器不再以 root 跑。<br /><span class=\"mono\">SSE 限流 · 端口自动回退 · .sh + .ps1 成对</span>"
   },
 
   "cap.label": { en: "Capabilities", zh: "能力概览" },
-  "cap.title": { en: "What the repository already ships today.", zh: "仓库今天已经交付了什么。" },
+  "cap.title": { en: "What you get on day one.", zh: "第一天就能拿到的能力。" },
   "cap.desc": {
-    en: "Everything here is grounded in the current codebase and docs: no roadmap filler, only functionality that the repository already exposes or documents as its user path.",
-    zh: "这里的每一点都只基于当前代码库和文档，不写路线图填充项，只写仓库已经公开暴露或明确文档化的用户路径。"
+    en: "Each card describes something the repository already does — clone, start, and it's there.",
+    zh: "每张卡片描述的都是仓库当前真实在跑的能力 —— 克隆、启动，就能用。"
   },
-  "cap.card1_title": { en: "Persistent memory store", zh: "持久化记忆存储" },
+  "cap.card1_title": { en: "Memory that survives restarts", zh: "重启也不会丢的记忆" },
   "cap.card1_desc": {
-    en: "SQLite-backed durable memory with URI addressing, aliases, recent views, and system URIs such as <span class=\"mono\">system://boot</span> and <span class=\"mono\">system://audit</span>.",
-    zh: "基于 SQLite 的长期记忆存储，支持 URI 编址、alias、recent 视图，以及 <span class=\"mono\">system://boot</span>、<span class=\"mono\">system://audit</span> 这类系统 URI。"
+    en: "Every memory is saved to a local file and has a clear path you can read or rename. Aliases let one memory live in multiple places, and a \"recently changed\" view shows you what moved.",
+    zh: "每条记忆都落在本地文件里，并且有一条清晰的路径可读可改。别名让同一条记忆出现在多个位置，「最近变更」视图告诉你刚刚动过什么。"
   },
-  "cap.card2_title": { en: "9 standardized MCP tools", zh: "9 个标准化 MCP 工具" },
+  "cap.card2_title": { en: "One toolset for every agent", zh: "一套工具，所有 Agent 通用" },
   "cap.card2_desc": {
-    en: "Read, write, search, compact, rebuild, and inspect index state through one MCP surface instead of per-client custom glue.",
-    zh: "读、写、检索、压缩、重建和索引状态查询都走同一套 MCP 表面，而不是为每个客户端重写一层胶水。"
+    en: "Nine tools cover everything an agent needs. The same set works in Claude Code, Codex, Gemini CLI, OpenCode, and major IDE hosts — no per-client glue.",
+    zh: "九个工具覆盖 Agent 所需要的一切。Claude Code、Codex、Gemini CLI、OpenCode 和主流 IDE 宿主用的是同一套，不用每家客户端重写胶水。"
   },
   "cap.card2_item1": {
-    en: "Read/write: <span class=\"mono\">read_memory</span>, <span class=\"mono\">create_memory</span>, <span class=\"mono\">update_memory</span>, <span class=\"mono\">delete_memory</span>, <span class=\"mono\">add_alias</span>",
+    en: "Read &amp; write: <span class=\"mono\">read_memory</span>, <span class=\"mono\">create_memory</span>, <span class=\"mono\">update_memory</span>, <span class=\"mono\">delete_memory</span>, <span class=\"mono\">add_alias</span>",
     zh: "读写：<span class=\"mono\">read_memory</span>、<span class=\"mono\">create_memory</span>、<span class=\"mono\">update_memory</span>、<span class=\"mono\">delete_memory</span>、<span class=\"mono\">add_alias</span>"
   },
   "cap.card2_item2": {
-    en: "Retrieval and governance: <span class=\"mono\">search_memory</span>, <span class=\"mono\">compact_context</span>, <span class=\"mono\">rebuild_index</span>, <span class=\"mono\">index_status</span>",
-    zh: "检索与治理：<span class=\"mono\">search_memory</span>、<span class=\"mono\">compact_context</span>、<span class=\"mono\">rebuild_index</span>、<span class=\"mono\">index_status</span>"
+    en: "Search &amp; maintain: <span class=\"mono\">search_memory</span>, <span class=\"mono\">compact_context</span>, <span class=\"mono\">rebuild_index</span>, <span class=\"mono\">index_status</span>",
+    zh: "检索与维护：<span class=\"mono\">search_memory</span>、<span class=\"mono\">compact_context</span>、<span class=\"mono\">rebuild_index</span>、<span class=\"mono\">index_status</span>"
   },
-  "cap.card3_title": { en: "Write Guard and snapshots", zh: "Write Guard 与快照" },
+  "cap.card3_title": { en: "Every write is checked & reversible", zh: "每次写入都可检查、可回滚" },
   "cap.card3_desc": {
-    en: "Create/update requests are checked before mutation, while snapshots and review flows keep rollback and recovery explicit.",
-    zh: "create/update 在真正改动前就会被检查，而快照和 review 路径则把回滚与恢复显式化。"
+    en: "Writes pass through a guard before they land, and every change gets a snapshot. If something goes wrong, the Review page rolls it back in one click.",
+    zh: "写入会先经过守卫再落库，每次改动都留下一份快照。如果出问题，Review 页一键回滚就行。"
   },
-  "cap.card4_title": { en: "Dashboard with 4 views", zh: "4 视图 Dashboard" },
+  "cap.card4_title": { en: "A built-in admin panel", zh: "自带的管理面板" },
   "cap.card4_desc": {
-    en: "The React dashboard already covers Memory Browser, Review &amp; Rollback, Maintenance, and Observability.",
-    zh: "当前 React Dashboard 已覆盖 Memory Browser、Review &amp; Rollback、Maintenance 和 Observability 四个视图。"
+    en: "Open the Dashboard in your browser and you get four pages: Memory Browser, Review &amp; Rollback, Maintenance, Observability. No separate tool to install.",
+    zh: "在浏览器里打开 Dashboard 就有四个页面：Memory Browser、Review &amp; Rollback、Maintenance、Observability —— 不用再装别的工具。"
   },
-  "cap.card5_title": { en: "Deployment profiles", zh: "部署档位" },
+  "cap.card5_title": { en: "Grow from laptop to production", zh: "从笔记本到生产环境一路升级" },
   "cap.card5_desc": {
-    en: "Profiles A/B/C/D expose a conservative local start path and more capable retrieval stacks without pretending profile switches are cost-free.",
-    zh: "A/B/C/D 档位同时保留保守的本地起步路径和更强的检索配置，但不会假装切档没有代价。"
+    en: "Four ready-made profiles take you from \"tiny local test\" to \"full hybrid search with a remote embedding API.\" Change one env file, switch profile, restart — that's it.",
+    zh: "四个开箱即用的档位让你从「本地小测试」一路扩到「远端 embedding API 的完整混合检索」。换一个 env 文件、切档位、重启 —— 就这样。"
   },
-  "cap.card6_title": { en: "Bilingual user surface", zh: "双语用户面" },
+  "cap.card6_title": { en: "English & Chinese, end to end", zh: "中英双语，覆盖到底" },
   "cap.card6_desc": {
-    en: "The repository already maintains paired README and docs sets, and the dashboard itself supports browser-language bootstrap plus manual Chinese/English switching.",
-    zh: "仓库已经维护成对的 README 与 docs，Dashboard 本身也支持按浏览器语言启动并允许手动中英切换。"
+    en: "Every doc has paired English and Chinese versions, and the Dashboard auto-detects your browser language. v3.9 finished UI translation parity and lets you store memories in CJK characters.",
+    zh: "每份文档都有中英两个版本，Dashboard 还会自动按浏览器语言显示。v3.9 完成了 UI 翻译对齐，并支持用中文（含中日韩字符）标题存储记忆。"
+  },
+  "cap.card7_title": { en: "Memory keeps itself tidy", zh: "记忆自己保持整洁" },
+  "cap.card7_desc": {
+    en: "Four background engines watch over the store: they let stale notes fade, build a layered table-of-contents, suggest what's safe to compress, and extract reusable procedures. Nothing is ever deleted without your approval.",
+    zh: "四个后台引擎默默看护记忆库：让陈旧记录自然淡出、生成分层目录、提示哪些可以安全压缩，以及把流程抽成可复用步骤。任何删除都要你点确认。"
+  },
+  "cap.card8_title": { en: "Guided first-run setup", zh: "第一次启动有引导" },
+  "cap.card8_desc": {
+    en: "The first time you open the Dashboard, a small wizard walks you through entering an API key. If you cloned locally, it can also save common settings straight into your <span class=\"mono\">.env</span>.",
+    zh: "第一次打开 Dashboard 时，一个小向导会带你填好 API key。如果是本地克隆，还能把常用配置直接写到 <span class=\"mono\">.env</span> 里。"
   },
 
   "arch.label": { en: "Architecture", zh: "架构" },
   "arch.title": {
-    en: "Backend, MCP, dashboard, and index lifecycle stay on one path.",
-    zh: "后端、MCP、Dashboard 与索引生命周期都在同一条路径里。"
+    en: "Four small pieces, one path.",
+    zh: "四个小部件，串成一条路径。"
   },
   "arch.desc": {
-    en: "The public architecture is already documented in the repo. The page below links the main moving parts instead of collapsing them into a generic “AI memory platform” slogan.",
-    zh: "仓库已经公开了系统架构。这一页不是把它压缩成泛化口号，而是把主要部件按真实边界重新串起来。"
+    en: "The whole system is a small backend, an MCP layer, a browser dashboard, and a healthy index pipeline. Here's how the four pieces fit together.",
+    zh: "整个系统就是一个轻量后端、一层 MCP 协议、一个浏览器 Dashboard，加上一条健康的索引流水线。下面是这四块怎么连起来。"
   },
   "arch.visual_title": { en: "repository architecture snapshot", zh: "仓库架构快照" },
-  "arch.card1_title": { en: "FastAPI + SQLite runtime", zh: "FastAPI + SQLite 运行时" },
+  "arch.card1_title": { en: "One small backend, one file on disk", zh: "一个轻量后端 + 一个磁盘文件" },
   "arch.card1_desc": {
-    en: "The backend owns URI validation, read/write semantics, retrieval, snapshots, and runtime state.",
-    zh: "后端负责 URI 校验、读写语义、检索、快照和运行时状态。"
+    en: "Writes, reads, search, snapshots, and maintenance all live in a single backend service that stores everything in one SQLite file. Vector search runs inside that same file — no extra database to manage.<br /><span class=\"mono\">FastAPI · SQLAlchemy · sqlite-vec</span>",
+    zh: "写入、读取、检索、快照、维护都在同一个后端服务里，所有数据落到同一个 SQLite 文件。向量检索就跑在同一个文件里 —— 不用再单独维护一个数据库。<br /><span class=\"mono\">FastAPI · SQLAlchemy · sqlite-vec</span>"
   },
-  "arch.card2_title": { en: "MCP boundary", zh: "MCP 边界" },
+  "arch.card2_title": { en: "Same tools for every AI client", zh: "所有 AI 客户端用同一套工具" },
   "arch.card2_desc": {
-    en: "One tool contract is shared across Codex, Claude Code, Gemini CLI, OpenCode, and repo-local host integrations.",
-    zh: "同一套工具契约被 Codex、Claude Code、Gemini CLI、OpenCode 和 repo-local 宿主接入共享。"
+    en: "MCP is the shared protocol: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Windsurf, VSCode and others all talk to Memory Palace using the same nine tools — you set it up once.",
+    zh: "MCP 是 Memory Palace 与 AI 工具之间的共同协议：Claude Code、Codex、Gemini CLI、OpenCode、Cursor、Windsurf、VSCode 都用同样的九个工具与之交互 —— 配置只做一次。"
   },
-  "arch.card3_title": { en: "Dashboard and observability", zh: "Dashboard 与可观测性" },
+  "arch.card3_title": { en: "A dashboard that watches itself", zh: "会自己照看自己的 Dashboard" },
   "arch.card3_desc": {
-    en: "Review, maintenance, and live runtime visibility are not separate products. They are part of the same repository surface.",
-    zh: "审查、维护和运行态可见性不是分离产品，而是同一仓库表面的组成部分。"
+    en: "The Dashboard is just a web page — open it in any browser. If the backend disconnects, you see a banner. If one view crashes, the error boundary keeps the rest of the UI alive.<br /><span class=\"mono\">React · Vite · TailwindCSS · Framer Motion</span>",
+    zh: "Dashboard 就是一个网页 —— 任何浏览器都能打开。后端断开会显示横幅；某一页崩了，错误边界会保住其他页继续可用。<br /><span class=\"mono\">React · Vite · TailwindCSS · Framer Motion</span>"
   },
-  "arch.card4_title": { en: "Index maintenance path", zh: "索引维护路径" },
+  "arch.card4_title": { en: "Index health is visible", zh: "索引健康度直接看得到" },
   "arch.card4_desc": {
-    en: "When retrieval quality or dimensions drift, the repo exposes rebuild and status tools instead of hiding index state.",
-    zh: "当检索质量或向量维度漂移时，仓库提供重建和状态查询工具，而不是把索引状态藏起来。"
+    en: "If search quality drifts, the Maintenance page shows you the index status and lets you rebuild it. When you change profile or embedding dimension, the index detects the change and resets itself — never a silent downgrade.",
+    zh: "检索质量下降时，Maintenance 页能看到索引状态并支持重建。换档位或换 embedding 维度时，索引会自动识别并重置 —— 永远不会悄悄退化。"
   },
 
   "validation.label": { en: "Validation and docs", zh: "验证与文档" },
   "validation.title": {
-    en: "This intro page is tied to the current repository state.",
-    zh: "这张介绍页绑定的是当前仓库真相。"
+    en: "Everything above is checked, not promised.",
+    zh: "上面写的，都是检验过的，不是空头承诺。"
   },
   "validation.desc": {
-    en: "The copy below follows the latest documented validation snapshot and keeps unsupported paths explicit.",
-    zh: "下面的文案遵循最新公开验证快照，并明确保留未覆盖路径。"
+    en: "The numbers come from real test runs. The \"not yet claimed\" list keeps us honest about what we haven't verified.",
+    zh: "数字来自真实测试结果。「还没声称的」那一列记下了我们尚未验证过的地方。"
   },
-  "validation.card1_title": { en: "Current test snapshot", zh: "当前测试快照" },
-  "validation.card1_item1": { en: "Backend and frontend suites passed in the documented snapshot", zh: "后端和前端套件已在公开验证快照中通过" },
-  "validation.card1_item2": { en: "Repo-local live MCP e2e and focused Docker/profile/SSE/script contracts passed", zh: "repo-local live MCP e2e 和 Docker/profile/SSE/script 重点契约通过" },
-  "validation.card1_item3": { en: "<span class=\"mono\">npm run typecheck</span> and <span class=\"mono\">npm run build</span> passed", zh: "<span class=\"mono\">npm run typecheck</span> 和 <span class=\"mono\">npm run build</span> 都通过" },
-  "validation.card2_title": { en: "Current public docs", zh: "当前公开文档面" },
-  "validation.card2_item1": { en: "Paired <span class=\"mono\">README.md</span> and <span class=\"mono\">README_CN.md</span>", zh: "成对的 <span class=\"mono\">README.md</span> 与 <span class=\"mono\">README_CN.md</span>" },
-  "validation.card2_item2": { en: "Paired docs center and quick start pages", zh: "成对的文档中心与快速开始页" },
-  "validation.card2_item3": { en: "Tool reference, deployment profiles, dashboard guide, evaluation docs", zh: "工具参考、部署档位、Dashboard 指南和评测文档" },
-  "validation.card3_title": { en: "What this page does not claim", zh: "这张页面不会声称什么" },
-  "validation.card3_item1": { en: "A/B/C/D benchmark tables were not recalculated in the latest snapshot", zh: "A/B/C/D benchmark 表未在最新快照中重算" },
-  "validation.card3_item2": { en: "Native Windows / native Linux host runtime still needs target-environment checks", zh: "原生 Windows / 原生 Linux host runtime 仍需目标环境复核" },
-  "validation.card3_item3": { en: "OpenCode, Cursor, agent, and Antigravity are not claimed as all-green", zh: "OpenCode、Cursor、agent、Antigravity 不声明全绿" },
+  "validation.card1_title": { en: "v3.9 test snapshot", zh: "v3.9 测试快照" },
+  "validation.card1_item1": {
+    en: "Backend: 1605 tests pass in the documented v3.9 baseline. Frontend: 232 tests pass in the latest dashboard rerun.",
+    zh: "后端：文档化的 v3.9 基线中 1605 个测试通过。前端：最新 Dashboard 复跑中 232 个测试通过。"
+  },
+  "validation.card1_item2": {
+    en: "New tests cover write conflicts, clean error responses, rollback edge cases, search quality metrics, and the Docker one-click flow.",
+    zh: "新增的测试覆盖了写入冲突、干净的错误返回、回滚边界、搜索质量指标和 Docker 一键脚本。"
+  },
+  "validation.card1_item3": {
+    en: "The frontend builds clean on Linux, macOS, and Windows in CI.",
+    zh: "前端在 Linux、macOS、Windows 三个系统上都能干净构建（CI 验证）。"
+  },
+  "validation.card2_title": { en: "Docs already in the repo", zh: "仓库里已经有的文档" },
+  "validation.card2_item1": {
+    en: "Bilingual README files and a bilingual docs folder.",
+    zh: "成对的中英 README，加上一整个双语 docs 目录。"
+  },
+  "validation.card2_item2": {
+    en: "Quick start, tool reference, deployment profiles, dashboard guide, evaluation, troubleshooting, security notes, technical overview — each in both languages.",
+    zh: "快速开始、工具参考、部署档位、Dashboard 指南、评测、排错、安全说明、技术总览 —— 中英文都有。"
+  },
+  "validation.card2_item3": {
+    en: "Per-release changelogs in <span class=\"mono\">docs/changelog/</span>. This landing page itself deploys from <span class=\"mono\">docs/</span>.",
+    zh: "逐版本说明在 <span class=\"mono\">docs/changelog/</span>。这张介绍页本身也是从 <span class=\"mono\">docs/</span> 部署的。"
+  },
+  "validation.card3_title": { en: "What we don't claim", zh: "我们不打保票的地方" },
+  "validation.card3_item1": {
+    en: "The profile benchmark tables were not re-run for v3.9, so we don't quote MRR or latency numbers here.",
+    zh: "v3.9 没有重跑档位 benchmark 表，所以这里不引用 MRR 或延迟数字。"
+  },
+  "validation.card3_item2": {
+    en: "Running natively on Windows or Linux (outside Docker, outside CI) still needs hands-on checks.",
+    zh: "脱离 Docker、脱离 CI，直接在 Windows 或 Linux 上跑，仍然需要你亲自验证。"
+  },
+  "validation.card3_item3": {
+    en: "OpenCode, Cursor, and Antigravity aren't claimed all-green. macOS + Docker is the most-tested combo.",
+    zh: "OpenCode、Cursor、Antigravity 不打全绿包票。最常被验证的组合是 macOS + Docker。"
+  },
 
   "start.label": { en: "Start here", zh: "从这里开始" },
-  "start.title": { en: "Three practical entry points.", zh: "三个实用入口。" },
+  "start.title": { en: "Pick the way that fits you.", zh: "挑一条最适合你的路。" },
   "start.desc": {
-    en: "Pick the path that matches how you actually want to use the repo: AI-guided setup, direct local boot, or contract-level docs.",
-    zh: "按你真正想用仓库的方式来选入口：AI 引导安装、直接本地启动，或者先看契约级文档。"
+    en: "Three ways in: let an agent install it for you, run it yourself in five minutes, or read the tool reference first.",
+    zh: "三种入口：让 AI 帮你装好、自己五分钟跑起来，或者先看工具参考。"
   },
-  "start.card1_title": { en: "Use the setup skill", zh: "用 setup skill 安装" },
+  "start.card1_title": { en: "Let the agent install it for you", zh: "让 AI 帮你装" },
   "start.card1_desc": {
-    en: "If you want the agent to guide installation, start with the standalone <span class=\"mono\">memory-palace-setup</span> repo.",
-    zh: "如果你希望 agent 一步步带你安装，先去独立的 <span class=\"mono\">memory-palace-setup</span> 仓库。"
+    en: "Want the AI to do the setup work? Start with the <span class=\"mono\">memory-palace-setup</span> repo — it walks you through everything step by step.",
+    zh: "想让 AI 帮你完成安装？去 <span class=\"mono\">memory-palace-setup</span> 仓库 —— 它会一步步带你走完。"
   },
   "start.card1_cta": { en: "Open setup repo", zh: "打开 setup 仓库" },
-  "start.card2_title": { en: "Run the quick start", zh: "走快速开始" },
+  "start.card2_title": { en: "Run it yourself", zh: "自己跑起来" },
   "start.card2_desc": {
-    en: "For direct local development or Docker boot, use the bilingual quick start pages and keep Profile B as the default low-friction baseline.",
-    zh: "如果是直接本地开发或 Docker 启动，就用双语快速开始页，并把 Profile B 当成默认低摩擦基线。"
+    en: "Local dev or Docker — the quick start has bilingual instructions. Stick with Profile B as your first try; it works without any external services.",
+    zh: "本地开发或 Docker 都行 —— 快速开始文档是中英双语的。第一次就用 Profile B，不依赖任何外部服务也能跑通。"
   },
   "start.card2_cta": { en: "Open quick start", zh: "打开快速开始" },
-  "start.card3_title": { en: "Read the tool contract", zh: "直接看工具契约" },
+  "start.card3_title": { en: "Read the tool reference", zh: "先看工具参考" },
   "start.card3_desc": {
-    en: "If you are integrating clients or reviewing safety boundaries, go straight to the 9-tool MCP reference and deployment/profile docs.",
-    zh: "如果你是在接入客户端或审安全边界，直接去看 9 工具 MCP 参考和部署/档位文档。"
+    en: "Integrating a client or doing a safety review? Jump straight to the nine-tool MCP reference and the deployment-profile docs.",
+    zh: "在做客户端集成或安全评审？直接跳到九个工具的 MCP 参考与部署档位文档。"
   },
   "start.card3_cta": { en: "Open tool docs", zh: "打开工具文档" },
 
@@ -2838,8 +2980,8 @@ const TEXT = {
   "footer.link_docs": { en: "Docs Center", zh: "文档中心" },
   "footer.link_readme": { en: "Repository README", zh: "仓库 README" },
   "footer.note": {
-    en: "Built from the current Memory Palace repository state, with browser-language detection and a manual zh/en toggle for this landing page.",
-    zh: "这张页面基于当前 Memory Palace 仓库真相构建，并带有浏览器语言检测与手动 zh/en 切换。"
+    en: "Memory Palace v3.9 — released 2026-05-20 (commit <span class=\"mono\">ff57b08</span>). MIT licensed. This page auto-detects your browser language; use the toggle above to switch.",
+    zh: "Memory Palace v3.9 —— 2026-05-20 发布（提交 <span class=\"mono\">ff57b08</span>），MIT 协议。本页会按浏览器语言自动显示，也可用顶部按钮切换。"
   }
 };
 
@@ -2874,13 +3016,13 @@ const STORAGE_LANG = "memory-palace.landing.lang";
 const STORAGE_THEME = "memory-palace.landing.theme";
 
 const TITLE = {
-  en: "Memory Palace",
-  zh: "Memory Palace · 记忆宫殿"
+  en: "Memory Palace v3.9",
+  zh: "Memory Palace v3.9 · 记忆宫殿"
 };
 
 const DESCRIPTION = {
-  en: "Memory Palace gives AI agents persistent, searchable, and auditable memory through MCP, Write Guard, a React dashboard, and bilingual docs.",
-  zh: "Memory Palace 通过 MCP、Write Guard、React Dashboard 和双语文档，为 AI Agent 提供持久化、可检索、可审计的长期记忆能力。"
+  en: "Memory Palace v3.9 — persistent, searchable, auditable memory for AI agents through MCP, Write Guard with optimistic CAS, snapshots, Memory Maintenance Engines v2, RRF + sqlite-vec retrieval, and a React dashboard with bilingual docs.",
+  zh: "Memory Palace v3.9 通过 MCP、Write Guard（含乐观 CAS）、快照、Memory 四引擎 v2、RRF + sqlite-vec 检索和 React Dashboard，为 AI Agent 提供持久化、可检索、可审计的长期记忆能力。"
 };
 
 /* ---------------- Language ---------------- */
@@ -3139,7 +3281,7 @@ if ("IntersectionObserver" in window) {
 const topnav = document.getElementById("topnav");
 const backToTop = document.getElementById("backToTop");
 const navLinks = document.querySelectorAll('.nav-desktop a[href^="#"]');
-const sectionIds = ["problem", "workflow", "capabilities", "validation", "start"];
+const sectionIds = ["problem", "workflow", "whatsnew", "capabilities", "validation", "start"];
 const sectionEls = sectionIds
   .map((id) => document.getElementById(id))
   .filter(Boolean);

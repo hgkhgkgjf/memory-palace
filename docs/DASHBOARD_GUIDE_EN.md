@@ -188,6 +188,11 @@ Click a snapshot to load its diff view on the right.
 - **Green / highlighted text**: Added content
 - **Metadata Shifts**: Changes to priority, disclosure, or other metadata
 
+For delete snapshots, the right side also shows reachability:
+
+- If no path can reach the memory anymore, the page shows an irreversible orphan warning
+- If other paths still reach it, the surviving paths panel lists each URI and gives each row its own copy button
+
 #### 🎛️ Action Buttons
 
 | Button | What It Does |
@@ -211,9 +216,22 @@ Click a snapshot to load its diff view on the right.
 |------|---------|
 | **Deprecated** | Number of old versions left behind when memories were updated |
 | **Orphaned** | Number of memories that no path can reach |
-| **Low Vitality** | Number of memories whose vitality score has decayed enough to be deletable |
+| **Low Vitality** | Number of low-vitality cleanup candidates currently loaded. The hint shows how many are deletable. |
+| **Forgetting** | Number of archive candidates currently loaded |
 
-### 🧹 Upper Section: Orphan Cleanup
+The Orphan panel loads first. Vitality and Forgetting load when you open those tabs, so their numbers appear after the first visit.
+
+### 🧭 Maintenance Tabs
+
+The page is split into three tabs:
+
+- **Orphan Cleanup**
+- **Vitality Cleanup**
+- **Forgetting Simulation**
+
+Opening a tab loads that panel. Panels you already opened stay mounted while you switch tabs, so review state and selections are not dropped during normal tab changes.
+
+### 🧹 Tab: Orphan Cleanup
 
 > **Orphan memory**: each memory is accessed via a path. If that path is deleted but the memory record still exists in the database, it becomes an "orphan" — it's there but unreachable.
 
@@ -233,7 +251,7 @@ Two categories:
 >
 > If a deprecated item is still the final migration target of older versions, the cleanup dialog will refuse that deletion first.
 
-### 💚 Lower Section: Vitality Cleanup Candidates
+### 💚 Tab: Vitality Cleanup Candidates
 
 > **Vitality**: Every memory has a vitality score representing how "active" it is. Newly created memories start with high vitality. Over time, the score naturally decays.
 
@@ -260,11 +278,13 @@ Two categories:
 5. Click **Confirm delete** or **Confirm keep** — the system asks you to type a confirmation phrase
 6. Type the exact confirmation phrase to execute the action
 
+`Prepare Delete (N)` only includes selected rows marked deletable. Selected rows with active paths stay out of the delete review.
+
 > **Run Decay + Refresh**: Manually triggers a vitality decay recalculation.
 >
 > If confirm fails (wrong phrase, rejected key, request timeout) before the backend used that prepared batch, the prepared review stays on the page so you can fix the problem and retry.
 
-### 🧠 Forgetting Simulation and Archive Candidates
+### 🧠 Tab: Forgetting Simulation and Archive Candidates
 
 The Maintenance page also includes a **Forgetting** panel for previewing which memories would fall below a threshold after N more days.
 

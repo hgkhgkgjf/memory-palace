@@ -1,721 +1,286 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import clsx from 'clsx';
+import React, { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import {
-  AlertTriangle,
-  Archive,
-  CheckSquare,
-  Eye,
-  RefreshCw,
-  Shield,
-  Square,
-  ThumbsUp,
-  TrendingDown,
-} from 'lucide-react';
+import { Archive, Inbox, RefreshCw, Shield, ThumbsUp, TrendingDown } from 'lucide-react';
 
-import {
-  confirmForgettingArchive,
-  getForgettingCandidates,
-  prepareForgettingArchive,
-  simulateForgettingDecay,
-} from '../../lib/api';
-import { confirmWithFallback, promptWithFallback } from '../../lib/dialogs';
+import SectionCard from './shared/SectionCard';
+import EmptyState from './shared/EmptyState';
+import ErrorBanner from './shared/ErrorBanner';
+import LoadingPulse from './shared/LoadingPulse';
+import SelectionBar from './shared/SelectionBar';
+import useReducedMotion from './shared/useReducedMotion';
 
-const PANEL_CLASS =
-  'rounded-2xl border border-[color:var(--palace-line)] bg-[rgba(255,250,244,0.9)] p-4 shadow-[var(--palace-shadow-sm)] backdrop-blur-sm';
+import { useForgetting } from './forgetting/useForgetting';
+import ForgettingToolbar from './forgetting/ForgettingToolbar';
+import ForgettingSummary from './forgetting/ForgettingSummary';
+import ForgettingDistribution from './forgetting/ForgettingDistribution';
+import ForgettingCandidateCard from './forgetting/ForgettingCandidateCard';
 
-const DECAY_CHART_WIDTH = 280;
-const DECAY_CHART_HEIGHT = 60;
+/** @type {[number, number, number, number]} */
+const EASE_OUT = [0, 0, 0.2, 1];
 
 /**
- * @typedef {{
- *   memory_id: string | number,
- *   title?: string | null,
- *   uri?: string | null,
- *   current_score: number,
- *   projected_score: number,
- *   last_accessed_at?: string | null,
- *   recommendation?: 'archive' | 'keep' | 'review' | string,
- *   decay_curve?: number[] | null,
- *   reason?: string | null,
- * }} ForgettingCandidate
+ * Forgetting Simulation panel — thin composition root for the maintenance
+ * dashboard. All state, side effects, and the production prepare/confirm
+ * archive flow live in `useForgetting`; rendering is delegated to small
+ * subcomponents under `./forgetting/`.
  *
- * @typedef {{
- *   timestamp?: string | null,
- *   threshold?: number | null,
- *   total_candidates?: number,
- *   projected_archived?: number,
- *   projected_retained?: number,
- *   simulation_days?: number,
- *   is_mock?: boolean | null,
- * }} ForgettingSimulation
+ * @param {{
+ *   onInspectMemory?: (memoryId: string | number) => void,
+ *   onStatsChange?: (stats: { forgetting?: number }) => void,
+ * }} props
  */
-
-const createMockSimulation = (days) => ({
-  timestamp: new Date().toISOString(),
-  threshold: 0.35,
-  total_candidates: 42,
-  projected_archived: 18,
-  projected_retained: 24,
-  simulation_days: days,
-  is_mock: true,
-});
-
-/**
- * @param {number} threshold
- * @param {(key: string, options?: object) => string} t
- * @returns {ForgettingCandidate[]}
- */
-const createMockCandidates = (threshold, t) => {
-  const sources = [
-    { id: 1001, uri: 'core://agent/stale_notes/release-rollback', title: t('maintenance.forgetting.mock.candidate1Title') },
-    { id: 1002, uri: 'core://research/ml_papers/decay-models', title: t('maintenance.forgetting.mock.candidate2Title') },
-    { id: 1003, uri: 'core://meeting/2026-01-17', title: t('maintenance.forgetting.mock.candidate3Title') },
-    { id: 1004, uri: 'core://snippets/legacy-shell', title: t('maintenance.forgetting.mock.candidate4Title') },
-    { id: 1005, uri: 'core://misc/old-draft', title: t('maintenance.forgetting.mock.candidate5Title') },
-  ];
-  return sources.map((s, idx) => {
-    const current = Math.max(0.05, threshold - 0.05 - idx * 0.04);
-    const projected = Math.max(0.0, current - 0.08 - idx * 0.01);
-    return {
-      memory_id: s.id,
-      title: s.title,
-      uri: s.uri,
-      current_score: current,
-      projected_score: projected,
-      last_accessed_at: new Date(Date.now() - (idx + 5) * 86400000).toISOString(),
-      recommendation: projected < 0.1 ? 'archive' : 'review',
-      decay_curve: [
-        current + 0.12,
-        current + 0.08,
-        current + 0.04,
-        current,
-        projected,
-      ],
-      reason: idx === 0 ? 'stale_for_60d' : 'low_access_rate',
-    };
-  });
-};
-
-const decayCurveValues = (curve) => {
-  if (!Array.isArray(curve)) return null;
-  const values = curve
-    .map((point) => (Array.isArray(point) ? point[1] : point))
-    .filter((value) => Number.isFinite(Number(value)))
-    .map(Number);
-  return values.length >= 2 ? values : null;
-};
-
-const normalizeSimulationPayload = (raw, days, threshold) => {
-  if (!raw || typeof raw !== 'object') return createMockSimulation(days);
-  const simulations = Array.isArray(raw.simulations) ? raw.simulations : [];
-  const projectedArchived =
-    raw.projected_archived ??
-    simulations.filter((item) => Number(item?.projected_score) < threshold).length;
-  const total = raw.total_candidates ?? raw.count ?? simulations.length;
-  return {
-    ...raw,
-    threshold: raw.threshold ?? threshold,
-    total_candidates: total,
-    projected_archived: projectedArchived,
-    projected_retained: raw.projected_retained ?? Math.max(0, total - projectedArchived),
-    simulation_days: raw.simulation_days ?? raw.days_forward ?? days,
-    simulations,
-  };
-};
-
-const normalizeCandidatePayload = (candidate, simulation) => {
-  if (!candidate || typeof candidate !== 'object') return candidate;
-  const currentScore = candidate.current_score ?? simulation?.current_score ?? 0;
-  const projectedScore = candidate.projected_score ?? simulation?.projected_score ?? currentScore;
-  return {
-    ...candidate,
-    current_score: currentScore,
-    projected_score: projectedScore,
-    last_accessed_at: candidate.last_accessed_at ?? simulation?.last_accessed_at ?? null,
-    days_forward: candidate.days_forward ?? simulation?.days_forward ?? null,
-    recommendation: candidate.recommendation ?? 'review',
-    decay_curve:
-      decayCurveValues(candidate.decay_curve) ??
-      decayCurveValues(simulation?.decay_curve) ??
-      [currentScore, projectedScore],
-  };
-};
-
-const formatScore = (value) => {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
-  return Number(value).toFixed(3);
-};
-
-const formatDateTimeShort = (value, lng) => {
-  if (!value) return '-';
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleDateString(lng || 'en');
-  } catch (_error) {
-    return String(value);
-  }
-};
-
-/** @param {{ data: number[] | null | undefined, color: string, label: string }} props */
-function DecayChart({ data, color, label }) {
+export default function ForgettingPanel({ onInspectMemory, onStatsChange }) {
   const { t } = useTranslation();
-  const values = Array.isArray(data) ? data.filter((v) => Number.isFinite(Number(v))).map(Number) : [];
-
-  if (values.length < 2) {
-    return (
-      <div className="flex h-[60px] items-center justify-center rounded border border-dashed border-[color:var(--palace-line)] bg-white/30 text-[10px] text-[color:var(--palace-muted)]">
-        {t('maintenance.forgetting.decayUnavailable')}
-      </div>
-    );
-  }
-
-  const min = Math.min(0, ...values);
-  const max = Math.max(...values, 1);
-  const range = max - min || 1;
-  const stepX = (DECAY_CHART_WIDTH - 6) / (values.length - 1);
-  const path = values
-    .map((v, idx) => {
-      const x = 3 + idx * stepX;
-      const y = DECAY_CHART_HEIGHT - 3 - ((v - min) / range) * (DECAY_CHART_HEIGHT - 6);
-      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(' ');
-
-  return (
-    <svg
-      role="img"
-      aria-label={label}
-      viewBox={`0 0 ${DECAY_CHART_WIDTH} ${DECAY_CHART_HEIGHT}`}
-      className="block w-full"
-      preserveAspectRatio="none"
-    >
-      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function CandidateCard({
-  candidate,
-  selected,
-  onToggleSelect,
-  onKeep,
-  onArchive,
-  onInspect,
-  busy,
-}) {
-  const { t, i18n } = useTranslation();
-  const id = candidate.memory_id;
-  const title = candidate.title || candidate.uri || t('maintenance.forgetting.unnamedMemory');
-  const recommendation = candidate.recommendation || 'review';
-  const recommendationTone =
-    recommendation === 'archive' ? 'warn' : recommendation === 'keep' ? 'good' : 'neutral';
-
-  return (
-    <article
-      className={clsx(
-        'rounded-xl border bg-[rgba(255,250,244,0.9)] p-3 transition-colors',
-        selected
-          ? 'border-[color:var(--palace-accent)] shadow-[var(--palace-shadow-sm)]'
-          : 'border-[color:var(--palace-line)]'
-      )}
-      data-testid={`forgetting-candidate-${id}`}
-    >
-      <header className="mb-2 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onToggleSelect(id)}
-          disabled={busy}
-          aria-label={selected ? t('maintenance.forgetting.deselect') : t('maintenance.forgetting.select')}
-          className="rounded p-0.5 transition-colors hover:bg-[rgba(223,214,199,0.4)] disabled:opacity-50"
-        >
-          {selected ? (
-            <CheckSquare size={16} className="text-[color:var(--palace-accent)]" />
-          ) : (
-            <Square size={16} className="text-[color:var(--palace-muted)]" />
-          )}
-        </button>
-        <code className="break-all text-[11px] font-mono text-[color:var(--palace-accent-2)]">
-          #{id}
-        </code>
-        <span
-          className={clsx(
-            'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-            recommendationTone === 'good' && 'border-[rgba(179,133,79,0.5)] bg-[rgba(246,237,224,0.85)] text-[color:var(--palace-accent-2)]',
-            recommendationTone === 'warn' && 'border-[rgba(200,171,134,0.65)] bg-[rgba(240,230,215,0.9)] text-[color:var(--palace-accent-2)]',
-            recommendationTone === 'neutral' && 'border-[color:var(--palace-line)] bg-white/70 text-[color:var(--palace-muted)]'
-          )}
-        >
-          {t(`maintenance.forgetting.recommendations.${recommendation}`, { defaultValue: recommendation })}
-        </span>
-      </header>
-      <div className="mb-2 text-sm font-semibold text-[color:var(--palace-ink)]">{title}</div>
-      {candidate.uri && (
-        <div className="mb-2 break-all text-[11px] text-[color:var(--palace-muted)]">{candidate.uri}</div>
-      )}
-      <dl className="mb-2 grid grid-cols-3 gap-2 text-[11px]">
-        <div>
-          <dt className="text-[color:var(--palace-muted)]">{t('maintenance.forgetting.currentScore')}</dt>
-          <dd className="font-mono font-semibold text-[color:var(--palace-ink)]">{formatScore(candidate.current_score)}</dd>
-        </div>
-        <div>
-          <dt className="text-[color:var(--palace-muted)]">{t('maintenance.forgetting.projectedScore')}</dt>
-          <dd className="font-mono font-semibold text-[color:var(--palace-accent-2)]">{formatScore(candidate.projected_score)}</dd>
-        </div>
-        <div>
-          <dt className="text-[color:var(--palace-muted)]">{t('maintenance.forgetting.lastAccessed')}</dt>
-          <dd className="font-mono text-[color:var(--palace-ink)]">{formatDateTimeShort(candidate.last_accessed_at, i18n.resolvedLanguage)}</dd>
-        </div>
-      </dl>
-      <DecayChart
-        data={candidate.decay_curve}
-        color="rgba(179,133,79,0.92)"
-        label={t('maintenance.forgetting.decayChartLabel', { id })}
-      />
-      {candidate.reason && (
-        <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-[color:var(--palace-muted)]">
-          {t('maintenance.forgetting.reason', { value: candidate.reason })}
-        </div>
-      )}
-      <div className="mt-2 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onKeep(id)}
-          disabled={busy}
-          data-testid={`forgetting-keep-${id}`}
-          className="inline-flex cursor-pointer items-center gap-1 rounded border border-[color:var(--palace-line)] bg-white/90 px-2 py-1 text-[11px] text-[color:var(--palace-muted)] transition-colors hover:border-[color:var(--palace-accent)] hover:text-[color:var(--palace-ink)] disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
-        >
-          <ThumbsUp size={12} />
-          {t('maintenance.forgetting.keep')}
-        </button>
-        <button
-          type="button"
-          onClick={() => onArchive(id)}
-          disabled={busy}
-          data-testid={`forgetting-archive-${id}`}
-          className="inline-flex cursor-pointer items-center gap-1 rounded border border-[rgba(200,171,134,0.65)] bg-[rgba(244,236,224,0.9)] px-2 py-1 text-[11px] text-[color:var(--palace-accent-2)] transition-colors hover:border-[color:var(--palace-accent)] disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
-        >
-          <Archive size={12} />
-          {t('maintenance.forgetting.archive')}
-        </button>
-        <button
-          type="button"
-          onClick={() => onInspect(id)}
-          disabled={busy}
-          data-testid={`forgetting-inspect-${id}`}
-          className="inline-flex cursor-pointer items-center gap-1 rounded border border-[color:var(--palace-line)] bg-white/90 px-2 py-1 text-[11px] text-[color:var(--palace-muted)] transition-colors hover:border-[color:var(--palace-accent)] hover:text-[color:var(--palace-ink)] disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
-        >
-          <Eye size={12} />
-          {t('maintenance.forgetting.inspect')}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-/**
- * @param {{ onInspectMemory?: (memoryId: string | number) => void }} props
- */
-export default function ForgettingPanel({ onInspectMemory }) {
-  const { t } = useTranslation();
-  const [thresholdInput, setThresholdInput] = useState('0.35');
-  const [daysInput, setDaysInput] = useState('30');
-  const [candidates, setCandidates] = useState(/** @type {ForgettingCandidate[]} */ ([]));
-  const [simulation, setSimulation] = useState(/** @type {ForgettingSimulation | null} */ (null));
-  const [loading, setLoading] = useState(false);
-  const [busyId, setBusyId] = useState(/** @type {string | number | null} */ (null));
-  const [error, setError] = useState(/** @type {string | null} */ (null));
-  const [message, setMessage] = useState(/** @type {string | null} */ (null));
-  const [selectedIds, setSelectedIds] = useState(/** @type {Set<string | number>} */ (new Set()));
-  const [isMock, setIsMock] = useState(false);
-
-  const threshold = useMemo(() => {
-    const parsed = Number(thresholdInput);
-    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 0.35;
-  }, [thresholdInput]);
-
-  const days = useMemo(() => {
-    const parsed = Number(daysInput);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.min(365, Math.floor(parsed)) : 30;
-  }, [daysInput]);
-
-  const isUnsupportedError = (err) => {
-    const statusCode = err?.response?.status;
-    return statusCode === 404 || statusCode === 501 || err?.code === 'ERR_NETWORK';
-  };
-
-  const cancelledRef = useRef(false);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const [simRes, candRes] = await Promise.allSettled([
-        simulateForgettingDecay({ days }),
-        getForgettingCandidates({ threshold }),
-      ]);
-      if (cancelledRef.current) return;
-      let mock = false;
-      let simulationLookup = new Map();
-      if (simRes.status === 'fulfilled' && simRes.value) {
-        const sim = normalizeSimulationPayload(simRes.value, days, threshold);
-        setSimulation(sim);
-        simulationLookup = new Map(
-          (Array.isArray(sim.simulations) ? sim.simulations : [])
-            .filter((item) => item?.memory_id !== undefined && item?.memory_id !== null)
-            .map((item) => [String(item.memory_id), item])
-        );
-        if (sim?.is_mock) mock = true;
-      } else if (simRes.status === 'rejected' && isUnsupportedError(simRes.reason)) {
-        setSimulation(createMockSimulation(days));
-        mock = true;
-      } else if (simRes.status === 'rejected') {
-        setSimulation(createMockSimulation(days));
-        mock = true;
-        setError(t('maintenance.forgetting.errors.loadSimulation'));
-      }
-
-      if (candRes.status === 'fulfilled' && Array.isArray(candRes.value?.candidates)) {
-        setCandidates(
-          candRes.value.candidates.map((candidate) =>
-            normalizeCandidatePayload(candidate, simulationLookup.get(String(candidate?.memory_id)))
-          )
-        );
-        if (candRes.value.is_mock) mock = true;
-      } else if (candRes.status === 'rejected' && isUnsupportedError(candRes.reason)) {
-        setCandidates(createMockCandidates(threshold, t));
-        mock = true;
-      } else if (candRes.status === 'rejected') {
-        setCandidates(createMockCandidates(threshold, t));
-        mock = true;
-        setError(t('maintenance.forgetting.errors.loadCandidates'));
-      } else if (candRes.status === 'fulfilled') {
-        // Server returned no candidates field - fall back to empty list.
-        setCandidates([]);
-      }
-
-      setIsMock(mock);
-      setSelectedIds(new Set());
-    } finally {
-      if (!cancelledRef.current) setLoading(false);
-    }
-  }, [days, threshold, t]);
-
-  useEffect(() => {
-    cancelledRef.current = false;
-    void loadData();
-    return () => {
-      cancelledRef.current = true;
-    };
-  }, [loadData]);
-
-  const toggleSelect = useCallback((id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const handleKeep = useCallback(
-    async (id) => {
-      setBusyId(id);
-      setMessage(null);
-      try {
-        setMessage(t('maintenance.forgetting.messages.kept', { id }));
-        setCandidates((prev) => prev.filter((c) => c.memory_id !== id));
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      } catch (_err) {
-        setMessage(t('maintenance.forgetting.messages.keepFailed', { id }));
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [t]
-  );
-
-  const performArchive = useCallback(
-    async (ids) => {
-      if (!ids.length) return;
-      const phrase = t('maintenance.forgetting.confirmArchive', { count: ids.length });
-      const confirmResult = confirmWithFallback(phrase);
-      if (!confirmResult.available) {
-        setMessage(t('maintenance.errors.confirmUnavailable'));
-        return;
-      }
-      if (!confirmResult.confirmed) return;
-
-      setBusyId(ids.length === 1 ? ids[0] : 'batch');
-      setMessage(null);
-      try {
-        const preparePayload = await prepareForgettingArchive({
-          memory_ids: ids,
-          threshold,
-          days,
-          archive_reason: 'maintenance_dashboard',
-          archived_by: 'dashboard',
-        });
-        const review = preparePayload?.review || {};
-        const confirmationPhrase = String(review.confirmation_phrase || '');
-        if (!review.review_id || !review.token || !confirmationPhrase) {
-          setMessage(t('maintenance.forgetting.messages.archiveFailed', { count: ids.length }));
-          return;
-        }
-        const promptResult = promptWithFallback(
-          t('maintenance.forgetting.executeArchive', { phrase: confirmationPhrase })
-        );
-        if (!promptResult.available) {
-          setMessage(t('maintenance.errors.promptUnavailable'));
-          return;
-        }
-        const typed = String(promptResult.value || '').trim();
-        if (typed !== confirmationPhrase) {
-          setMessage(t('maintenance.errors.confirmationMismatch'));
-          return;
-        }
-        await confirmForgettingArchive({
-          review_id: review.review_id,
-          token: review.token,
-          confirmation_phrase: typed,
-        });
-        setMessage(t('maintenance.forgetting.messages.archived', { count: ids.length }));
-        const idSet = new Set(ids);
-        setCandidates((prev) => prev.filter((c) => !idSet.has(c.memory_id)));
-        setSelectedIds(new Set());
-      } catch (err) {
-        if (isUnsupportedError(err)) {
-          setMessage(t('maintenance.forgetting.messages.archivedMock', { count: ids.length }));
-          const idSet = new Set(ids);
-          setCandidates((prev) => prev.filter((c) => !idSet.has(c.memory_id)));
-          setSelectedIds(new Set());
-        } else {
-          setMessage(t('maintenance.forgetting.messages.archiveFailed', { count: ids.length }));
-        }
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [days, t, threshold]
-  );
-
-  const handleInspect = useCallback(
-    (id) => {
-      if (typeof onInspectMemory === 'function') {
-        onInspectMemory(id);
-      } else {
-        setMessage(t('maintenance.forgetting.messages.inspectQueued', { id }));
-      }
-    },
-    [onInspectMemory, t]
-  );
-
-  const handleBatchArchive = useCallback(() => {
-    const ids = Array.from(selectedIds);
-    void performArchive(ids);
-  }, [performArchive, selectedIds]);
-
-  const handleBatchKeep = useCallback(async () => {
-    const ids = Array.from(selectedIds);
-    if (!ids.length) return;
-    setBusyId('batch');
-    setMessage(null);
-    try {
-      setMessage(t('maintenance.forgetting.messages.keptBatch', { count: ids.length }));
-      const idSet = new Set(ids);
-      setCandidates((prev) => prev.filter((c) => !idSet.has(c.memory_id)));
-      setSelectedIds(new Set());
-    } catch (_err) {
-      setMessage(t('maintenance.forgetting.messages.keepBatchFailed', { count: ids.length }));
-    } finally {
-      setBusyId(null);
-    }
-  }, [selectedIds, t]);
+  const reducedMotion = useReducedMotion();
+  const {
+    candidates,
+    loading,
+    error,
+    isMock,
+    selectedIds,
+    busyId,
+    message,
+    thresholdInput,
+    daysInput,
+    threshold,
+    simulationDays,
+    setThreshold,
+    setSimulationDays,
+    simulationData,
+    loadData,
+    handleKeep,
+    handleArchive,
+    handleBatchArchive,
+    handleBatchKeep,
+    handleInspect,
+    toggleSelect,
+    clearSelection,
+  } = useForgetting({ onInspectMemory });
 
   const busy = busyId !== null;
+  const selectedCount = selectedIds.size;
+
+  useEffect(() => {
+    if (typeof onStatsChange === 'function') {
+      onStatsChange({ forgetting: candidates.length });
+    }
+  }, [candidates.length, onStatsChange]);
 
   return (
-    <section aria-label={t('maintenance.forgetting.title')} className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display flex items-center gap-2 text-base font-semibold text-[color:var(--palace-ink)]">
-            <TrendingDown size={16} className="text-[color:var(--palace-accent)]" />
-            {t('maintenance.forgetting.title')}
-          </h2>
-          <p className="mt-1 text-xs text-[color:var(--palace-muted)]">
-            {t('maintenance.forgetting.subtitle')}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {isMock && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full border border-[rgba(200,171,134,0.65)] bg-[rgba(244,236,224,0.92)] px-3 py-1 text-[11px] font-medium text-[color:var(--palace-accent-2)]"
-              data-testid="forgetting-mock-badge"
+    <SectionCard as="section" aria-label={t('maintenance.forgetting.title')}>
+      <div className="flex flex-col gap-4">
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2
+              className="font-display flex items-center gap-2 text-base font-semibold"
+              style={{ color: 'var(--palace-ink)' }}
             >
-              <AlertTriangle size={12} />
-              {t('maintenance.forgetting.mockBadge')}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading || busy}
-            data-testid="forgetting-refresh"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[color:var(--palace-line)] bg-white/[.88] px-3 py-2 text-xs font-medium text-[color:var(--palace-muted)] transition-colors hover:border-[color:var(--palace-accent)] hover:text-[color:var(--palace-ink)] disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
+              <TrendingDown
+                size={16}
+                strokeWidth={2}
+                aria-hidden="true"
+                style={{ color: 'var(--palace-accent)' }}
+              />
+              {t('maintenance.forgetting.title')}
+            </h2>
+            <p className="text-xs" style={{ color: 'var(--palace-muted)' }}>
+              {t('maintenance.forgetting.subtitle')}
+            </p>
+          </div>
+          <ForgettingToolbar
+            loading={loading}
+            busy={busy}
+            isMock={isMock}
+            selectedCount={selectedCount}
+            onRefresh={loadData}
+            onBatchKeep={handleBatchKeep}
+            onBatchArchive={handleBatchArchive}
+            t={t}
+          />
+        </header>
+
+        {error ? <ErrorBanner message={error} onRetry={loadData} retryLabel={t('common.actions.refresh')} /> : null}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label
+            htmlFor="forgetting-threshold-input"
+            className="glass-card flex flex-col gap-1 rounded-xl bg-white/30 p-3"
+            style={{ borderColor: 'var(--palace-line)' }}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            {t('maintenance.forgetting.refresh')}
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="rounded-md border border-[rgba(143,106,69,0.45)] bg-[rgba(232,218,198,0.88)] px-3 py-2 text-xs text-[color:var(--palace-accent-2)]"
-        >
-          {error}
-        </div>
-      )}
-
-      <div className={PANEL_CLASS}>
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[color:var(--palace-ink)]">
-          <Shield size={15} className="text-[color:var(--palace-accent)]" />
-          {t('maintenance.forgetting.simulationHeading')}
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-[color:var(--palace-line)] bg-white/80 p-3">
-            <label htmlFor="forgetting-threshold-input" className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-[color:var(--palace-muted)]">
+            <span
+              className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: 'var(--palace-muted)' }}
+            >
               {t('maintenance.forgetting.thresholdLabel')}
-            </label>
+            </span>
             <input
               id="forgetting-threshold-input"
+              data-testid="forgetting-threshold-input"
               type="number"
               step="0.05"
               min="0"
               max="1"
               value={thresholdInput}
-              onChange={(e) => setThresholdInput(e.target.value)}
-              data-testid="forgetting-threshold-input"
-              className="w-full rounded border border-[color:var(--palace-line)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
+              onChange={(e) => setThreshold(e.target.value)}
+              className="w-full rounded-lg border bg-white/80 px-2 py-1.5 text-sm focus:outline-none focus:ring-2"
+              style={{ borderColor: 'var(--palace-line)', color: 'var(--palace-ink)' }}
             />
-          </div>
-          <div className="rounded-xl border border-[color:var(--palace-line)] bg-white/80 p-3">
-            <label htmlFor="forgetting-days-input" className="mb-1 block text-[10px] uppercase tracking-[0.14em] text-[color:var(--palace-muted)]">
+          </label>
+          <label
+            htmlFor="forgetting-days-input"
+            className="glass-card flex flex-col gap-1 rounded-xl bg-white/30 p-3"
+            style={{ borderColor: 'var(--palace-line)' }}
+          >
+            <span
+              className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: 'var(--palace-muted)' }}
+            >
               {t('maintenance.forgetting.daysLabel')}
-            </label>
+            </span>
             <input
               id="forgetting-days-input"
+              data-testid="forgetting-days-input"
               type="number"
               min="1"
               max="365"
               value={daysInput}
-              onChange={(e) => setDaysInput(e.target.value)}
-              data-testid="forgetting-days-input"
-              className="w-full rounded border border-[color:var(--palace-line)] bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
+              onChange={(e) => setSimulationDays(e.target.value)}
+              className="w-full rounded-lg border bg-white/80 px-2 py-1.5 text-sm focus:outline-none focus:ring-2"
+              style={{ borderColor: 'var(--palace-line)', color: 'var(--palace-ink)' }}
             />
-          </div>
-          <div className="rounded-xl border border-[color:var(--palace-line)] bg-white/80 p-3">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-[color:var(--palace-muted)]">
-              {t('maintenance.forgetting.projectedArchived')}
-            </div>
-            <div className="text-lg font-semibold text-[color:var(--palace-accent-2)]">
-              {Number(simulation?.projected_archived) || 0}
-            </div>
-            <div className="text-[10px] text-[color:var(--palace-muted)]">
-              {t('maintenance.forgetting.outOfTotal', { count: Number(simulation?.total_candidates) || 0 })}
-            </div>
-          </div>
-          <div className="rounded-xl border border-[color:var(--palace-line)] bg-white/80 p-3">
-            <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-[color:var(--palace-muted)]">
-              {t('maintenance.forgetting.projectedRetained')}
-            </div>
-            <div className="text-lg font-semibold text-[color:var(--palace-ink)]">
-              {Number(simulation?.projected_retained) || 0}
-            </div>
-            <div className="text-[10px] text-[color:var(--palace-muted)]">
-              {t('maintenance.forgetting.simulationDays', { count: Number(simulation?.simulation_days) || days })}
-            </div>
-          </div>
+          </label>
         </div>
-      </div>
 
-      <div className={PANEL_CLASS}>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-[color:var(--palace-ink)]">
-            <Archive size={15} className="text-[color:var(--palace-accent)]" />
+        <div className="flex flex-col gap-2">
+          <h3
+            className="flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--palace-ink)' }}
+          >
+            <Shield
+              size={14}
+              strokeWidth={2}
+              aria-hidden="true"
+              style={{ color: 'var(--palace-accent)' }}
+            />
+            {t('maintenance.forgetting.simulationHeading')}
+          </h3>
+          <ForgettingSummary
+            simulationData={simulationData}
+            threshold={threshold}
+            simulationDays={simulationDays}
+            t={t}
+          />
+        </div>
+
+        <ForgettingDistribution candidates={candidates} threshold={threshold} t={t} />
+
+        <div className="flex flex-col gap-3">
+          <h3
+            className="flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--palace-ink)' }}
+          >
+            <Archive
+              size={14}
+              strokeWidth={2}
+              aria-hidden="true"
+              style={{ color: 'var(--palace-accent)' }}
+            />
             {t('maintenance.forgetting.queueHeading')}
           </h3>
-          {selectedIds.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] text-[color:var(--palace-muted)]">
-                {t('maintenance.forgetting.selectedCount', { count: selectedIds.size })}
-              </span>
-              <button
-                type="button"
-                onClick={handleBatchKeep}
-                disabled={busy}
-                data-testid="forgetting-batch-keep"
-                className="inline-flex cursor-pointer items-center gap-1 rounded border border-[color:var(--palace-line)] bg-white/90 px-2 py-1 text-[11px] text-[color:var(--palace-muted)] transition-colors hover:border-[color:var(--palace-accent)] hover:text-[color:var(--palace-ink)] disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
-              >
-                <ThumbsUp size={12} />
-                {t('maintenance.forgetting.batchKeep')}
-              </button>
-              <button
-                type="button"
-                onClick={handleBatchArchive}
-                disabled={busy}
-                data-testid="forgetting-batch-archive"
-                className="inline-flex cursor-pointer items-center gap-1 rounded border border-[rgba(200,171,134,0.65)] bg-[rgba(244,236,224,0.9)] px-2 py-1 text-[11px] text-[color:var(--palace-accent-2)] transition-colors hover:border-[color:var(--palace-accent)] disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2 focus:ring-[rgba(179,133,79,0.35)]"
-              >
-                <Archive size={12} />
-                {t('maintenance.forgetting.batchArchive')}
-              </button>
+
+          {message ? (
+            <div
+              role="status"
+              className="rounded-lg border bg-white/40 px-3 py-2 text-xs"
+              style={{ borderColor: 'var(--palace-line)', color: 'var(--palace-muted)' }}
+            >
+              {message}
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div
+              className="flex items-center gap-2 text-xs"
+              style={{ color: 'var(--palace-muted)' }}
+            >
+              <RefreshCw size={14} strokeWidth={2} className="animate-spin" aria-hidden="true" />
+              {t('maintenance.forgetting.loading')}
+              <LoadingPulse lines={2} className="ml-2 flex-1" />
+            </div>
+          ) : candidates.length === 0 ? (
+            <EmptyState
+              icon={Inbox}
+              title={t('maintenance.forgetting.noCandidates')}
+              description={t('maintenance.forgetting.subtitle')}
+            />
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <AnimatePresence initial={false}>
+                {candidates.map((candidate, index) => (
+                  <motion.div
+                    key={candidate.memory_id}
+                    layout
+                    initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+                    transition={
+                      reducedMotion
+                        ? { duration: 0.12 }
+                        : { duration: 0.25, ease: EASE_OUT, delay: index * 0.03 }
+                    }
+                  >
+                    <ForgettingCandidateCard
+                      candidate={candidate}
+                      selected={selectedIds.has(candidate.memory_id)}
+                      onToggleSelect={toggleSelect}
+                      onKeep={handleKeep}
+                      onArchive={handleArchive}
+                      onInspect={handleInspect}
+                      busy={busy}
+                      busyId={busyId}
+                      threshold={threshold}
+                      t={t}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
-
-        {message && (
-          <div
-            role="status"
-            className="mb-3 rounded-md border border-[color:var(--palace-line)] bg-white/80 px-3 py-2 text-xs text-[color:var(--palace-muted)]"
-          >
-            {message}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center gap-2 text-xs text-[color:var(--palace-muted)]">
-            <RefreshCw size={14} className="animate-spin" />
-            {t('maintenance.forgetting.loading')}
-          </div>
-        ) : candidates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[color:var(--palace-line)] bg-white/30 px-4 py-8 text-center text-sm text-[color:var(--palace-muted)]">
-            {t('maintenance.forgetting.noCandidates')}
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {candidates.map((candidate) => (
-              <CandidateCard
-                key={candidate.memory_id}
-                candidate={candidate}
-                selected={selectedIds.has(candidate.memory_id)}
-                onToggleSelect={toggleSelect}
-                onKeep={handleKeep}
-                onArchive={(id) => performArchive([id])}
-                onInspect={handleInspect}
-                busy={busy}
-              />
-            ))}
-          </div>
-        )}
       </div>
-    </section>
+
+      <SelectionBar
+        count={selectedCount}
+        clearLabel={t('maintenance.forgetting.deselect')}
+        onClear={clearSelection}
+        ariaLabel={t('maintenance.forgetting.selectionRegion')}
+        countLabel={t('maintenance.shared.selected', { count: selectedCount })}
+      >
+        <button
+          type="button"
+          onClick={handleBatchKeep}
+          disabled={busy}
+          className="palace-btn-ghost text-xs"
+        >
+          <ThumbsUp size={12} strokeWidth={2} aria-hidden="true" />
+          {t('maintenance.forgetting.batchKeep')}
+        </button>
+        <button
+          type="button"
+          onClick={handleBatchArchive}
+          disabled={busy}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 focus:outline-none focus:ring-2"
+          style={{
+            background: 'rgba(244, 236, 224, 0.9)',
+            borderColor: 'rgba(200, 171, 134, 0.65)',
+            color: 'var(--palace-accent-2)',
+          }}
+        >
+          <Archive size={12} strokeWidth={2} aria-hidden="true" />
+          {t('maintenance.forgetting.batchArchive')}
+        </button>
+      </SelectionBar>
+    </SectionCard>
   );
 }

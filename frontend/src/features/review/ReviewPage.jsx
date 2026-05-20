@@ -11,19 +11,20 @@ import {
 } from '../../lib/api';
 import SnapshotList from '../../components/SnapshotList';
 import { SimpleDiff } from '../../components/DiffViewer'; // Uses the Memory Palace styled diff
+import SurvivingPathsPanel from './SurvivingPathsPanel';
 import {
-  Activity, 
-  Check, 
-  ChevronRight, 
-  Clock, 
-  Database, 
+  Activity,
+  Check,
+  ChevronRight,
+  Clock,
+  Database,
   FileText,
-  Layout, 
+  Layout,
   Link2,
-  RefreshCw, 
-  RotateCcw, 
+  RefreshCw,
+  RotateCcw,
   Settings2,
-  ShieldCheck, 
+  ShieldCheck,
   Trash2
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -369,58 +370,20 @@ function ReviewPage() {
   };
 
   // --- Render Helpers ---
-  
+
   // Surviving Paths Renderer (for DELETE operations)
   const renderSurvivingPaths = () => {
     if (!selectedSnapshot || selectedSnapshot.operation_type !== 'delete') return null;
     if (!diffData?.current_data) return null;
-    
-    const survivingPathsRaw = diffData.current_data.surviving_paths;
-    if (survivingPathsRaw === undefined) return null;  // Data not loaded yet
-    const survivingPaths = Array.isArray(survivingPathsRaw) ? survivingPathsRaw : [];
-    
-    const isFullDeletion = survivingPaths.length === 0;
 
-    return (
-      <div className={clsx(
-        "mb-8 p-4 rounded-lg border backdrop-blur-sm",
-        isFullDeletion 
-          ? "bg-rose-950/20 border-rose-800/40" 
-          : "bg-stone-900/40 border-stone-800/60"
-      )}>
-        <h3 className="text-xs font-bold uppercase mb-3 flex items-center gap-2 tracking-widest">
-          {isFullDeletion ? (
-            <>
-              <Trash2 size={12} className="text-rose-500" />
-              <span className="text-rose-400">{t('review.memoryFullyOrphaned')}</span>
-            </>
-          ) : (
-            <>
-              <Link2 size={12} className="text-stone-500" />
-              <span className="text-stone-500">{t('review.survivingPaths')}</span>
-            </>
-          )}
-        </h3>
-        
-        {isFullDeletion ? (
-          <p className="text-xs text-rose-300/70">
-            {t('review.noOtherPaths')}
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            <p className="text-xs text-stone-500 mb-2">
-              {t('review.stillReachable', { count: survivingPaths.length })}
-            </p>
-            {survivingPaths.map((path, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-xs font-mono text-emerald-400/80 bg-emerald-950/20 rounded px-2.5 py-1.5 border border-emerald-900/30">
-                <Link2 size={10} className="text-emerald-600 flex-shrink-0" />
-                <span className="truncate">{path}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    const survivingPathsRaw = diffData.current_data.surviving_paths;
+    // Pass the raw value through; SurvivingPathsPanel distinguishes:
+    //   - non-array (null/undefined/string/object) -> renders nothing
+    //   - []                                       -> renders OrphanWarning
+    //   - [..]                                     -> renders the path list
+    if (survivingPathsRaw === undefined) return null;
+
+    return <SurvivingPathsPanel survivingPaths={survivingPathsRaw} />;
   };
 
   // Custom Metadata Renderer

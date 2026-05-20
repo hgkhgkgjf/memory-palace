@@ -396,6 +396,8 @@ describe('ReviewPage', () => {
       snapshot_data: { content: 'old-content' },
       current_data: {
         content: 'new-content',
+        // Non-array (object) surviving_paths must not be misread as the
+        // "fully orphaned" state; the panel should render nothing.
         surviving_paths: { invalid: true },
       },
     });
@@ -405,8 +407,30 @@ describe('ReviewPage', () => {
     await waitFor(() => {
       expect(api.getSnapshots).toHaveBeenCalledWith('session-1');
     });
-    expect(await screen.findByText(i18n.t('review.memoryFullyOrphaned'))).toBeInTheDocument();
     expect(screen.getByText(i18n.t('common.states.unknown'))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('review.orphan.title'))).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('review.orphan.body'))).not.toBeInTheDocument();
+  });
+
+  it('renders orphan warning only when surviving_paths is an empty array', async () => {
+    const deleteSnapshot = {
+      ...DEFAULT_SNAPSHOT,
+      operation_type: 'delete',
+    };
+    api.getSnapshots.mockResolvedValue([deleteSnapshot]);
+    api.getDiff.mockResolvedValue({
+      has_changes: true,
+      snapshot_data: { content: 'old-content' },
+      current_data: {
+        content: 'new-content',
+        surviving_paths: [],
+      },
+    });
+
+    render(<ReviewPage />);
+
+    expect(await screen.findByText(i18n.t('review.orphan.title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('review.orphan.body'))).toBeInTheDocument();
   });
 
   it('renders object detail from loadDiff without crashing', async () => {
