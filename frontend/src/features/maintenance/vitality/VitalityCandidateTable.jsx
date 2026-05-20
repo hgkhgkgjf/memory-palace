@@ -7,6 +7,7 @@ import VitalityCandidateRow from './VitalityCandidateRow';
 
 /** @type {[number, number, number, number]} */
 const EASE_OUT = [0, 0, 0.2, 1];
+const REDUCE_MOTION_CANDIDATE_COUNT = 50;
 
 /**
  * @param {{
@@ -26,6 +27,8 @@ const VitalityCandidateTable = ({
 }) => {
   const { t } = useTranslation();
   const reducedMotion = useReducedMotion();
+  const shouldReduceListMotion =
+    reducedMotion || candidates.length > REDUCE_MOTION_CANDIDATE_COUNT;
 
   const { allSelected, someSelected } = useMemo(() => {
     if (!candidates.length) return { allSelected: false, someSelected: false };
@@ -77,22 +80,33 @@ const VitalityCandidateTable = ({
       >
         <AnimatePresence initial={false}>
           {candidates.map((item, index) => {
-            const motionProps = reducedMotion
-              ? { initial: false, animate: { opacity: 1 } }
-              : {
-                  initial: { opacity: 0, y: 8 },
-                  animate: { opacity: 1, y: 0 },
-                  exit: { opacity: 0, y: -4 },
-                  transition: {
-                    duration: 0.2,
-                    delay: Math.min(index * 0.02, 0.2),
-                    ease: EASE_OUT,
-                  },
-                };
+            if (shouldReduceListMotion) {
+              return (
+                <li key={item.memory_id}>
+                  <VitalityCandidateRow
+                    item={item}
+                    selected={selectedIds.has(item.memory_id)}
+                    onToggleSelect={onToggleSelect}
+                    disabled={disabled}
+                  />
+                </li>
+              );
+            }
+
+            const motionProps = {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              exit: { opacity: 0, y: -4 },
+              transition: {
+                duration: 0.2,
+                delay: Math.min(index * 0.02, 0.2),
+                ease: EASE_OUT,
+              },
+            };
             return (
               <motion.li
                 key={item.memory_id}
-                layout={!reducedMotion}
+                layout
                 {...motionProps}
               >
                 <VitalityCandidateRow

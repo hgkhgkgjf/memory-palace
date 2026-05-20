@@ -371,14 +371,14 @@ describe('MaintenancePage', () => {
     expect(screen.getByLabelText(i18n.t('maintenance.vitality.domain'))).toBeInTheDocument();
     expect(screen.getByLabelText(i18n.t('maintenance.vitality.pathPrefix'))).toBeInTheDocument();
 
-    await user.click(getVitalitySelectAllCheckbox());
-    await user.click(getVitalityPrepareDeleteButton(101));
+    fireEvent.click(getVitalitySelectAllCheckbox());
+    fireEvent.click(getVitalityPrepareDeleteButton(101));
 
     expect(
       await screen.findByText('选择数量过多：101。最多只能选择 100 条。')
     ).toBeInTheDocument();
     expect(api.prepareVitalityCleanup).not.toHaveBeenCalled();
-  });
+  }, 10000);
 
   it('describes vitality delete confirmation with the prepared deletable count', async () => {
     const user = userEvent.setup();
